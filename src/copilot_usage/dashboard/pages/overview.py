@@ -5,6 +5,7 @@ import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from dash import Input, Output, callback, dcc, html
 
 from copilot_usage.dashboard import queries
@@ -38,6 +39,24 @@ layout = html.Div([
         ),
     ], className="g-3 mb-4"),
 
+    # Data source breakdown chart
+    dbc.Row([
+        dbc.Col(
+            html.Div([
+                html.Div([
+                    html.Span("Data Source Breakdown"),
+                    html.Span(
+                        " JSONL = actual tokens · Legacy JSON = estimated tokens",
+                        className="text-muted ms-2",
+                        style={"fontSize": "0.75rem", "fontWeight": "400"},
+                    ),
+                ], className="card-header"),
+                dcc.Graph(id="ov-source-chart", config={"displayModeBar": False}),
+            ], className="section-card"),
+            lg=12,
+        ),
+    ], className="g-3 mb-4"),
+
     # Tables
     dbc.Row([
         dbc.Col(
@@ -68,14 +87,42 @@ layout = html.Div([
 @callback(Output("ov-kpi-row", "children"), Input("ov-init", "n_intervals"))
 def _kpis(_):
     kpi = queries.kpi_totals()
-    return [
-        kpi_card("Requests",      f"{kpi['total_requests']:,}",       "📨"),
+    legacy = kpi.get("legacy_events", 0) or 0
+    estimated = kpi.get("estimated_events", 0) or 0
+    total = kpi["total_requests"]
+    new_count = total - legacy
+
+    cards = [
+        kpi_card("Requests",      f"{total:,}",                       "📨"),
         kpi_card("Prompt Tokens",  fmt_number(kpi["total_prompt"]),    "📝"),
         kpi_card("Output Tokens",  fmt_number(kpi["total_output"]),    "💬"),
         kpi_card("Premium Est.",   f"~{kpi['total_premium']:,.0f}",   "💎"),
         kpi_card("Workspaces",     str(kpi["workspaces"]),             "📂"),
         kpi_card("Sessions",       str(kpi["sessions"]),               "🗂️"),
     ]
+
+    # Data-source breakdown card
+    cards.append(
+        dbc.Col(
+            html.Div([
+                html.Div("📊", className="kpi-emoji"),
+                html.Div("Data Sources", className="kpi-label"),
+                html.Div([
+                    html.Span(f"{new_count:,}", style={"color": "#58a6ff"}),
+                    html.Span(" JSONL", className="text-muted", style={"fontSize": ".75rem"}),
+                    html.Span(" · ", className="text-muted"),
+                    html.Span(f"{legacy:,}", style={"color": "#d29922"}),
+                    html.Span(" Legacy", className="text-muted", style={"fontSize": ".75rem"}),
+                ], className="kpi-value", style={"fontSize": "1rem"}),
+                html.Div(
+                    f"{estimated:,} with estimated tokens",
+                    className="text-muted", style={"fontSize": ".7rem"},
+                ) if estimated else None,
+            ], className="kpi-card"),
+            xs=6, sm=4, lg=2,
+        )
+    )
+    return cards
 
 
 @callback(Output("ov-timeline", "figure"), Input("ov-init", "n_intervals"))
@@ -99,6 +146,36 @@ def _timeline(_):
         bargap=0.15,
         xaxis=dict(gridcolor="rgba(48,54,61,.5)"),
         yaxis=dict(gridcolor="rgba(48,54,61,.5)"),
+    )
+    return fig
+
+
+@callback(Output("ov-source-chart", "figure"), Input("ov-init", "n_intervals"))
+def _source_chart(_):
+    rows = queries.daily_by_source()
+    if not rows:
+        return empty_fig("No data yet")
+    df = pd.DataFrame(rows)
+    label_map = {"jsonl": "JSONL (actual)", "legacy_json": "Legacy JSON (estimated)"}
+    df["source_label"] = df["source"].map(label_map).fillna(df["source"])
+    color_map = {"JSONL (actual)": "#58a6ff", "Legacy JSON (estimated)": "#d29922"}
+    fig = go.Figure()
+    for src_label, grp in df.groupby("source_label"):
+        fig.add_trace(go.Bar(
+            x=grp["date"], y=grp["prompt_tokens"],
+            name=src_label,
+            marker_color=color_map.get(src_label, "#888"),
+        ))
+    fig.update_layout(
+        barmode="stack",
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(t=10, b=30, l=60, r=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        bargap=0.15,
+        xaxis=dict(gridcolor="rgba(48,54,61,.5)", title=""),
+        yaxis=dict(gridcolor="rgba(48,54,61,.5)", title="Prompt Tokens"),
     )
     return fig
 

@@ -63,6 +63,7 @@ class ParsedFile:
     source_path: Path
     workspace_id: str
     workspace_path: str
+    data_source: str = "jsonl"  # 'jsonl' or 'legacy_json'
     anchor: SessionAnchor | None = None
     requests: list[RequestEvent] = field(default_factory=list)
     # Track request-index → model_id from kind=2 append lines
@@ -133,6 +134,7 @@ def parse_legacy_json(
         source_path=json_path,
         workspace_id=workspace_id,
         workspace_path=workspace_path,
+        data_source="legacy_json",
     )
 
     try:

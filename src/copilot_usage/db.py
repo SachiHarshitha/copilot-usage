@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS events (
     tool_call_rounds   INTEGER DEFAULT 0,
     premium_estimate   DOUBLE DEFAULT 0.0,
     tokens_estimated   BOOLEAN DEFAULT FALSE,
+    data_source        TEXT NOT NULL DEFAULT 'jsonl',  -- 'jsonl' or 'legacy_json'
     source_file        TEXT NOT NULL
 );
 
@@ -116,3 +117,5 @@ def _ensure_schema(con: duckdb.DuckDBPyConnection) -> None:
     cols = {r[0] for r in con.execute("SELECT column_name FROM information_schema.columns WHERE table_name='events'").fetchall()}
     if "tokens_estimated" not in cols:
         con.execute("ALTER TABLE events ADD COLUMN tokens_estimated BOOLEAN DEFAULT FALSE")
+    if "data_source" not in cols:
+        con.execute("ALTER TABLE events ADD COLUMN data_source TEXT DEFAULT 'jsonl'")

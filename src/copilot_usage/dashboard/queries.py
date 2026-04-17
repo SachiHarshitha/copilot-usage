@@ -16,7 +16,9 @@ def kpi_totals() -> dict:
                COALESCE(SUM(output_tokens), 0) AS total_output,
                COALESCE(SUM(premium_estimate), 0) AS total_premium,
                COUNT(DISTINCT workspace_id) AS workspaces,
-               COUNT(DISTINCT chat_session_id) AS sessions
+               COUNT(DISTINCT chat_session_id) AS sessions,
+               SUM(CASE WHEN data_source = 'legacy_json' THEN 1 ELSE 0 END) AS legacy_events,
+               SUM(CASE WHEN tokens_estimated THEN 1 ELSE 0 END) AS estimated_events
         FROM events
     """).fetchone()
     con.close()
@@ -27,6 +29,8 @@ def kpi_totals() -> dict:
         "total_premium": row[3],
         "workspaces": row[4],
         "sessions": row[5],
+        "legacy_events": row[6],
+        "estimated_events": row[7],
     }
 
 
@@ -48,6 +52,59 @@ def daily_timeseries() -> list[dict]:
             "output_tokens": r[4],
             "premium": r[5],
         }
+        for r in rows
+    ]
+
+
+def daily_by_source() -> list[dict]:
+    """Daily token totals split by data_source (jsonl vs legacy_json)."""
+    con = _con()
+    rows = con.execute("""
+        SELECT CAST(epoch_ms(timestamp_ms) AS DATE) AS d,
+               data_source,
+               COUNT(*) AS requests,
+               SUM(prompt_tokens) AS prompt_tokens,
+               SUM(output_tokens) AS output_tokens
+        FROM events
+        WHERE timestamp_ms IS NOT NULL
+        GROUP BY 1, 2
+        ORDER BY 1
+    """).fetchall()
+    con.close()
+    return [
+        {"date": str(r[0]), "source": r[1], "requests": r[2],
+         "prompt_tokens": r[3], "output_tokens": r[4]}
+        for r in rows
+    ]
+
+
+def scan_history(limit: int = 20) -> list[dict]:
+    con = _con()
+    rows = con.execute(f"""
+        SELECT scan_id, started_at, finished_at, files_checked, files_parsed
+        FROM scan_runs ORDER BY scan_id DESC LIMIT {int(limit)}
+    """).fetchall()
+    con.close()
+    return [
+        {"scan_id": r[0], "started_at": str(r[1]) if r[1] else "",
+         "finished_at": str(r[2]) if r[2] else "", "files_checked": r[3], "files_parsed": r[4]}
+        for r in rows
+    ]
+
+
+def badge_data() -> list[dict]:
+    """Return badge JSON data for all workspaces + summary."""
+    con = _con()
+    rows = con.execute("""
+        SELECT workspace_id, workspace_path,
+               total_requests, total_prompt, total_output,
+               premium_estimate, top_model
+        FROM badge_metrics ORDER BY total_prompt + total_output DESC
+    """).fetchall()
+    con.close()
+    return [
+        {"workspace_id": r[0], "workspace_path": r[1], "requests": r[2],
+         "prompt_tokens": r[3], "output_tokens": r[4], "premium": r[5], "top_model": r[6]}
         for r in rows
     ]
 
@@ -223,7 +280,9 @@ def explorer_events(
             e.prompt_tokens,
             e.output_tokens,
             e.tool_call_rounds,
-            e.premium_estimate
+            e.premium_estimate,
+            e.tokens_estimated,
+            e.data_source
         FROM events e
         LEFT JOIN workspaces w ON w.workspace_id = e.workspace_id
         WHERE {where}
@@ -255,6 +314,8 @@ def explorer_events(
             "output_tokens": r[8] or 0,
             "tool_call_rounds": r[9] or 0,
             "premium": r[10] or 0.0,
+            "tokens_estimated": bool(r[11]),
+            "data_source": r[12] or "jsonl",
         })
 
     return total, result

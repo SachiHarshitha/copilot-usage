@@ -193,7 +193,22 @@ def _apply_filters(_clicks, _init, active_page,
             html.Th("Date"), html.Th("Session"), html.Th("Workspace"),
             html.Th("Model"), html.Th("Req #"), html.Th("Prompt"),
             html.Th("Output"), html.Th("Tools"), html.Th("Premium"),
+            html.Th("Source"),
         ]))
+
+        def _source_badge(r):
+            if r["data_source"] == "legacy_json":
+                badge = dbc.Badge("Legacy", color="warning", className="me-1")
+            else:
+                badge = dbc.Badge("JSONL", color="info", className="me-1")
+            parts = [badge]
+            if r["tokens_estimated"]:
+                parts.append(
+                    html.Span("≈", title="Tokens estimated via tiktoken",
+                              style={"cursor": "help", "color": "#d29922"}),
+                )
+            return html.Span(parts)
+
         body = html.Tbody([
             html.Tr([
                 html.Td(r["date_str"]),
@@ -205,6 +220,7 @@ def _apply_filters(_clicks, _init, active_page,
                 html.Td(fmt_number(r["output_tokens"])),
                 html.Td(str(r["tool_call_rounds"])),
                 html.Td(f"~{r['premium']:.1f}"),
+                html.Td(_source_badge(r)),
             ]) for r in rows
         ])
         table = dbc.Table([header, body], striped=True, hover=True, size="sm",

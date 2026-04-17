@@ -36,6 +36,8 @@ def create_app() -> dash.Dash:
                     [
                         dbc.NavItem(dbc.NavLink("Overview", href="/", active="exact")),
                         dbc.NavItem(dbc.NavLink("Explorer", href="/explorer", active="exact")),
+                        dbc.NavItem(dbc.NavLink("Pipeline", href="/pipeline", active="exact")),
+                        dbc.NavItem(dbc.NavLink("Badges", href="/badges", active="exact")),
                     ],
                     className="ms-auto",
                     pills=True,
