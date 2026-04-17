@@ -101,28 +101,31 @@ def _kpis(_):
         kpi_card("Sessions",       str(kpi["sessions"]),               "🗂️"),
     ]
 
-    # Data-source breakdown card
-    cards.append(
-        dbc.Col(
+    # Data-source breakdown bar (full-width, sits inside same Row)
+    source_bar = dbc.Col(
+        html.Div([
             html.Div([
-                html.Div("📊", className="kpi-emoji"),
-                html.Div("Data Sources", className="kpi-label"),
-                html.Div([
-                    html.Span(f"{new_count:,}", style={"color": "#58a6ff"}),
-                    html.Span(" JSONL", className="text-muted", style={"fontSize": ".75rem"}),
-                    html.Span(" · ", className="text-muted"),
-                    html.Span(f"{legacy:,}", style={"color": "#d29922"}),
-                    html.Span(" Legacy", className="text-muted", style={"fontSize": ".75rem"}),
-                ], className="kpi-value", style={"fontSize": "1rem"}),
-                html.Div(
-                    f"{estimated:,} with estimated tokens",
-                    className="text-muted", style={"fontSize": ".7rem"},
-                ) if estimated else None,
-            ], className="kpi-card"),
-            xs=6, sm=4, lg=2,
-        )
+                html.Span("📊", style={"fontSize": "1.1rem", "marginRight": "0.5rem"}),
+                html.Span("Data Sources", className="kpi-label",
+                          style={"textTransform": "uppercase", "letterSpacing": "0.5px"}),
+            ], className="d-inline-flex align-items-center me-4"),
+            html.Div([
+                html.Span(f"{new_count:,}", style={"color": "#58a6ff", "fontWeight": "700", "fontSize": "1.1rem"}),
+                html.Span(" JSONL", className="text-muted ms-1", style={"fontSize": ".8rem"}),
+                html.Span("  ·  ", className="text-muted mx-2"),
+                html.Span(f"{legacy:,}", style={"color": "#d29922", "fontWeight": "700", "fontSize": "1.1rem"}),
+                html.Span(" Legacy", className="text-muted ms-1", style={"fontSize": ".8rem"}),
+            ], className="d-inline-flex align-items-baseline me-4"),
+            html.Div(
+                f"({estimated:,} events with estimated tokens)",
+                className="text-muted d-inline",
+                style={"fontSize": ".78rem"},
+            ) if estimated else None,
+        ], className="kpi-card d-flex align-items-center justify-content-center flex-wrap px-4 py-2"),
+        xs=12,
     )
-    return cards
+
+    return cards + [source_bar]
 
 
 @callback(Output("ov-timeline", "figure"), Input("ov-init", "n_intervals"))

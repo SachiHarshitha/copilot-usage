@@ -10,9 +10,9 @@ body { background: #0d1117; font-family: -apple-system, BlinkMacSystemFont, 'Seg
     transition: transform 0.15s, box-shadow 0.15s;
 }
 .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(88,166,255,.12); }
-.kpi-value { font-size: 1.65rem; font-weight: 700; color: #e6edf3; }
-.kpi-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #8b949e; }
-.kpi-icon { font-size: 1.3rem; opacity: 0.6; }
+.kpi-value { font-size: 1.3rem; font-weight: 700; color: #e6edf3; }
+.kpi-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: #8b949e; }
+.kpi-icon { font-size: 1rem; opacity: 0.6; margin-bottom: 0 !important; }
 
 /* ---- Section cards ---- */
 .section-card {
@@ -60,10 +60,50 @@ body { background: #0d1117; font-family: -apple-system, BlinkMacSystemFont, 'Seg
 .DateRangePickerInput { background: #0d1117 !important; border: 1px solid #30363d !important; border-radius: 6px; }
 .DateRangePickerInput_arrow_svg { fill: #8b949e; }
 
-/* ---- Nav pills ---- */
-.nav-pills .nav-link { color: #8b949e; border-radius: 8px; margin-right: 4px; padding: 6px 16px; font-size: 0.88rem; }
-.nav-pills .nav-link.active { background: #1f6feb; color: #fff; }
-.nav-pills .nav-link:hover:not(.active) { color: #e6edf3; background: rgba(255,255,255,.05); }
+/* ---- Nav buttons ---- */
+.nav-pills .nav-link.nav-btn {
+    color: #8b949e;
+    border-radius: 10px;
+    margin-right: 6px;
+    padding: 7px 18px;
+    font-size: 0.84rem;
+    font-weight: 500;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.nav-pills .nav-link.nav-btn.active {
+    background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%);
+    color: #fff;
+    border-color: rgba(56,139,253,.4);
+    box-shadow: 0 2px 12px rgba(31,111,235,.25);
+}
+.nav-pills .nav-link.nav-btn:hover:not(.active) {
+    color: #e6edf3;
+    background: rgba(255,255,255,.06);
+    border-color: #30363d;
+}
+.nav-pills .nav-link.nav-btn-icon {
+    padding: 7px 10px;
+    font-size: 1rem;
+    border-left: 1px solid #30363d;
+    border-radius: 10px;
+    margin-left: 4px;
+}
+
+/* ---- Settings page ---- */
+.settings-label {
+    color: #e6edf3;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+}
+.settings-radio .form-check-inline { margin-right: 16px; }
+.settings-radio .form-check-input:checked { background-color: #1f6feb; border-color: #1f6feb; }
+.danger-zone { border-color: rgba(248,81,73,.3) !important; }
+.danger-zone .card-header { border-bottom-color: rgba(248,81,73,.2) !important; }
 
 /* ---- Pagination ---- */
 .pagination .page-link { background: #161b22; border-color: #30363d; color: #c9d1d9; }

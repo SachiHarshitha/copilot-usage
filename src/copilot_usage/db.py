@@ -119,3 +119,5 @@ def _ensure_schema(con: duckdb.DuckDBPyConnection) -> None:
         con.execute("ALTER TABLE events ADD COLUMN tokens_estimated BOOLEAN DEFAULT FALSE")
     if "data_source" not in cols:
         con.execute("ALTER TABLE events ADD COLUMN data_source TEXT DEFAULT 'jsonl'")
+        # Backfill: rows with estimated tokens came from legacy JSON files
+        con.execute("UPDATE events SET data_source = 'legacy_json' WHERE tokens_estimated = TRUE")

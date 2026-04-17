@@ -2,8 +2,8 @@
 
 A **local-first** analytics dashboard that parses your VS Code Copilot chat session data and visualises token usage, premium request estimates, and model distribution — all without sending any data externally.
 
-<!-- Screenshot placeholder: Add dashboard screenshot here -->
-<!-- ![Dashboard Overview](docs/screenshots/dashboard-overview.png) -->
+![Dashboard Overview](docs/images/dashboard.png)
+![Dashboard Charts](docs/images/dashboard_2.png)
 
 ## Features
 
@@ -53,8 +53,6 @@ The dashboard opens automatically at [http://127.0.0.1:8050](http://127.0.0.1:80
 
 The main page shows at-a-glance KPI cards, a daily token timeline chart, model distribution pie chart, and summary tables for workspaces and sessions.
 
-<!-- ![Overview Page](docs/screenshots/overview.png) -->
-
 ### Explorer
 
 A dedicated search & filter page where you can:
@@ -64,7 +62,19 @@ A dedicated search & filter page where you can:
 - **Sort** results by any column
 - Browse the full event-level detail
 
-<!-- ![Explorer Page](docs/screenshots/explorer.png) -->
+![Explorer](docs/images/explorer.png)
+
+### Pipeline
+
+Run the data ingestion pipeline directly from the dashboard with a real-time console output.
+
+![Pipeline](docs/images/pipeline.png)
+
+### Badges
+
+Generate Shields.io-compatible JSON badges for your workspaces.
+
+![Badges](docs/images/badges.png)
 
 ## How It Works
 
@@ -121,9 +131,13 @@ src/copilot_usage/
 ├── badges.py          # Shields.io badge export
 └── dashboard/
     ├── app.py         # Dash multi-page app
+    ├── assets/        # CSS & favicon
     ├── pages/
     │   ├── overview.py    # KPI + charts page
-    │   └── explorer.py    # Search & filter page
+    │   ├── explorer.py    # Search & filter page
+    │   ├── pipeline.py    # Pipeline runner page
+    │   ├── badges.py      # Badge generator page
+    │   └── settings.py    # Settings & DB management
     └── queries.py     # Read-only DB queries
 ```
 
@@ -134,4 +148,4 @@ src/copilot_usage/
 
 ## License
 
-MIT
+Apache 2.0 — see [LICENSE](LICENSE).

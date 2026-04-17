@@ -6,10 +6,9 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html, page_container
 
 _COPILOT_LOGO = html.Img(
-    src="https://github.githubassets.com/favicons/favicon-dark.svg",
-    height="24",
+    src="/assets/favicon.svg",
+    height="28",
     className="me-2",
-    style={"filter": "brightness(1.8)"},
 )
 
 
@@ -18,11 +17,16 @@ def create_app() -> dash.Dash:
         __name__,
         use_pages=True,
         pages_folder="pages",
-        external_stylesheets=[dbc.themes.DARKLY],
+        external_stylesheets=[
+            dbc.themes.DARKLY,
+            dbc.icons.BOOTSTRAP,
+        ],
         title="Copilot Usage",
         update_title=None,
         suppress_callback_exceptions=True,
+        assets_folder="assets",
     )
+    app._favicon = "favicon.svg"
 
     navbar = dbc.Navbar(
         dbc.Container(
@@ -34,10 +38,27 @@ def create_app() -> dash.Dash:
                 ),
                 dbc.Nav(
                     [
-                        dbc.NavItem(dbc.NavLink("Overview", href="/", active="exact")),
-                        dbc.NavItem(dbc.NavLink("Explorer", href="/explorer", active="exact")),
-                        dbc.NavItem(dbc.NavLink("Pipeline", href="/pipeline", active="exact")),
-                        dbc.NavItem(dbc.NavLink("Badges", href="/badges", active="exact")),
+                        dbc.NavItem(dbc.NavLink(
+                            [html.I(className="bi bi-grid me-1"), "Overview"],
+                            href="/", active="exact", className="nav-btn",
+                        )),
+                        dbc.NavItem(dbc.NavLink(
+                            [html.I(className="bi bi-search me-1"), "Explorer"],
+                            href="/explorer", active="exact", className="nav-btn",
+                        )),
+                        dbc.NavItem(dbc.NavLink(
+                            [html.I(className="bi bi-play-circle me-1"), "Pipeline"],
+                            href="/pipeline", active="exact", className="nav-btn",
+                        )),
+                        dbc.NavItem(dbc.NavLink(
+                            [html.I(className="bi bi-award me-1"), "Badges"],
+                            href="/badges", active="exact", className="nav-btn",
+                        )),
+                        dbc.NavItem(dbc.NavLink(
+                            html.I(className="bi bi-gear"),
+                            href="/settings", active="exact",
+                            className="nav-btn nav-btn-icon ms-2",
+                        )),
                     ],
                     className="ms-auto",
                     pills=True,
@@ -107,7 +128,7 @@ def kpi_card(label: str, value: str, icon: str = "") -> dbc.Col:
                 html.Div(value, className="kpi-value"),
                 html.Div(label, className="kpi-label mt-1"),
             ],
-            className="kpi-card text-center p-3",
+            className="kpi-card text-center px-3 py-2",
         ),
         xs=6, sm=4, md=2,
     )
