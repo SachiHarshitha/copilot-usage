@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "copilot-usage"
+version = "0.1.0"
+description = "Local-first Copilot usage analytics dashboard"
+requires-python = ">=3.10"
+dependencies = [
+    "duckdb>=1.1",
+    "dash>=2.17",
+    "dash-bootstrap-components>=1.6",
+    "plotly>=5.22",
+    "polars>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pyinstaller>=6.0"]
+
+[project.scripts]
+copilot-usage = "copilot_usage.__main__:main"
