@@ -28,6 +28,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - name: Checkout
@@ -104,21 +106,18 @@ jobs:
           pip install . pyinstaller
 
       - name: Build executable
-        run: >
-          pyinstaller
-          --onefile
-          --name ${{ matrix.name }}
-          --hidden-import copilot_usage.dashboard.pages.overview
-          --hidden-import copilot_usage.dashboard.pages.explorer
-          --hidden-import copilot_usage.dashboard.pages.pipeline
-          --hidden-import copilot_usage.dashboard.pages.badges
-          src/copilot_usage/__main__.py
+        shell: bash
+        run: |
+          pyinstaller copilot-usage.spec --noconfirm
+          # Rename to platform-specific name
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            mv dist/copilot-usage.exe "dist/${{ matrix.artifact }}"
+          else
+            mv dist/copilot-usage "dist/${{ matrix.artifact }}"
+          fi
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.publish.outputs.version }}
           files: dist/${{ matrix.artifact }}
-
-    outputs:
-      version: ${{ needs.publish.outputs.version }}

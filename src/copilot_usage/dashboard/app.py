@@ -1,10 +1,23 @@
 """Dash multi-page application factory."""
 from __future__ import annotations
 
+import os
+import sys
+
 import dash
 import dash_bootstrap_components as dbc
 from dash import dcc, html, page_container
 from dash_bootstrap_templates import ThemeChangerAIO
+
+
+def _resolve_dash_folder(subfolder: str) -> str:
+    """Return absolute path to a dashboard subfolder, PyInstaller-aware."""
+    if getattr(sys, "frozen", False):
+        # Running as a PyInstaller bundle – data files live under _MEIPASS
+        base = os.path.join(sys._MEIPASS, "copilot_usage", "dashboard")  # type: ignore[attr-defined]
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, subfolder)
 
 _COPILOT_LOGO = html.Img(
     src="/assets/favicon.svg",
@@ -33,7 +46,7 @@ def create_app() -> dash.Dash:
     app = dash.Dash(
         __name__,
         use_pages=True,
-        pages_folder="pages",
+        pages_folder=_resolve_dash_folder("pages"),
         external_stylesheets=[
             dbc.themes.DARKLY,
             dbc.icons.BOOTSTRAP,
@@ -41,7 +54,7 @@ def create_app() -> dash.Dash:
         title="Copilot Usage",
         update_title=None,
         suppress_callback_exceptions=True,
-        assets_folder="assets",
+        assets_folder=_resolve_dash_folder("assets"),
     )
     app._favicon = "favicon.svg"
 

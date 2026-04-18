@@ -12,11 +12,11 @@ import platform
 def _default_vscode_storage() -> pathlib.Path:
     sys = platform.system()
     if sys == "Windows":
-        base = pathlib.Path(os.environ.get("APPDATA", "~"))
+        base = pathlib.Path(os.environ.get("APPDATA", "") or str(pathlib.Path.home() / "AppData" / "Roaming"))
     elif sys == "Darwin":
         base = pathlib.Path.home() / "Library" / "Application Support"
     else:  # Linux / other
-        base = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config"))
+        base = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", "") or str(pathlib.Path.home() / ".config"))
     return base / "Code" / "User" / "workspaceStorage"
 
 
@@ -29,11 +29,11 @@ VSCODE_STORAGE_ROOT = _default_vscode_storage()
 def _default_app_data() -> pathlib.Path:
     sys = platform.system()
     if sys == "Windows":
-        base = pathlib.Path(os.environ.get("LOCALAPPDATA", "~"))
+        base = pathlib.Path(os.environ.get("LOCALAPPDATA", "") or str(pathlib.Path.home() / "AppData" / "Local"))
     elif sys == "Darwin":
         base = pathlib.Path.home() / "Library" / "Application Support"
     else:
-        base = pathlib.Path(os.environ.get("XDG_DATA_HOME", pathlib.Path.home() / ".local" / "share"))
+        base = pathlib.Path(os.environ.get("XDG_DATA_HOME", "") or str(pathlib.Path.home() / ".local" / "share"))
     return base / "copilot-usage"
 
 
