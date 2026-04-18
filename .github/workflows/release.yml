@@ -121,3 +121,31 @@ jobs:
         with:
           tag_name: v${{ needs.publish.outputs.version }}
           files: dist/${{ matrix.artifact }}
+
+  # ── Build VS Code extension (.vsix) ────────────────────────────
+  vsix:
+    needs: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: vsc-extension/copilot-usage
+        run: npm ci
+
+      - name: Package VSIX
+        working-directory: vsc-extension/copilot-usage
+        run: npx @vscode/vsce package --allow-missing-repository --skip-license
+
+      - name: Upload VSIX to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.publish.outputs.version }}
+          files: vsc-extension/copilot-usage/*.vsix

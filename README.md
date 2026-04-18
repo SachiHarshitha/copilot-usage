@@ -199,6 +199,28 @@ Token counts shown by this tool are **estimates** and may not match GitHub's off
 - Python ≥ 3.10
 - VS Code with GitHub Copilot Chat extension
 
+## VS Code Extension
+
+A standalone VS Code extension is included under `vsc-extension/copilot-usage/`. It provides the same analytics directly inside the editor — no Python, no browser, no external server.
+
+- **Workspace View** — Token usage, model distribution, and daily chart scoped to the current project
+- **Global Dashboard** — Aggregated stats across all discovered workspaces with a workspaces breakdown table
+- **One-click navigation** — Switch between workspace and global views from the header buttons
+- **Status bar** — Quick token count always visible in the bottom bar
+
+![VS Code — Workspace View](docs/images/vscode_workspace.png)
+![VS Code — Global Dashboard](docs/images/vscode_global.png)
+
+### Install
+
+```bash
+cd vsc-extension/copilot-usage
+npm install
+npx @vscode/vsce package --allow-missing-repository --skip-license
+```
+
+Then install the generated `.vsix` via **Extensions → ··· → Install from VSIX**.
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
