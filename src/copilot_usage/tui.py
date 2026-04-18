@@ -163,7 +163,7 @@ class CopilotTUI(App):
         """Load data from the database and update the UI."""
         self.run_worker(self._fetch_and_render, thread=True)
 
-    async def _fetch_and_render(self) -> None:
+    def _fetch_and_render(self) -> None:
         """Run queries in a worker thread, then update widgets."""
         from copilot_usage.dashboard.queries import (
             kpi_totals,
@@ -258,7 +258,7 @@ class CopilotTUI(App):
         if pct is not None:
             self.query_one("#scan-progress", ProgressBar).update(progress=pct)
 
-    async def _do_scan(self) -> None:
+    def _do_scan(self) -> None:
         from copilot_usage.db import get_connection
         from copilot_usage.logging import setup_logging
         from copilot_usage.pipeline import run_scan
