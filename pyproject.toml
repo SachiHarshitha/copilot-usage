@@ -7,7 +7,7 @@ packages = ["src/copilot_usage"]
 
 [project]
 name = "copilot-usage"
-version = "0.2.6"
+version = "0.1.0"
 requires-python = ">=3.10"
 description = "Local-first Copilot usage analytics — token tracking, premium estimates, and dashboard"
 authors = [
