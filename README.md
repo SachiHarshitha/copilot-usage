@@ -178,6 +178,22 @@ src/copilot_usage/
     └── queries.py     # DB queries
 ```
 
+## Limitations
+
+Token counts shown by this tool are **estimates** and may not match GitHub's official billing figures. Key reasons:
+
+| Factor | Impact |
+|--------|--------|
+| **No official token API** | GitHub does not expose per-request token counts through any public API. This tool relies on metadata embedded in VS Code's local JSONL session files, which is not guaranteed to be complete or stable. |
+| **Missing token fields** | Some JSONL result entries lack `promptTokens` / `outputTokens` entirely (e.g. cancelled requests, certain agent-mode responses). When missing, the tool falls back to estimating from the raw text using tiktoken's `cl100k_base` encoding — or a ~4 chars/token heuristic if tiktoken is unavailable. |
+| **Tokenizer mismatch** | Different models use different tokenizers. The tool always uses `cl100k_base` (GPT-4 family) for estimation, which may over- or under-count for Claude, Gemini, or newer OpenAI models. |
+| **System prompt & context not visible** | VS Code injects system prompts, file context, and retrieval-augmented content before sending to the model. These hidden tokens are counted by GitHub but are **not** recorded in the local session files, so prompt token counts are typically lower than actual. |
+| **Tool-call overhead** | Agentic requests with multiple tool-call rounds accumulate tokens across rounds. The JSONL files report the final totals, but intermediate round data may be incomplete. |
+| **Premium multiplier estimates** | The cost multiplier table is a manually maintained snapshot. If GitHub changes pricing or introduces new models, estimates may be stale until the table is updated. |
+| **Legacy JSON files** | Older VS Code versions stored sessions as plain JSON instead of JSONL. Token counts are always estimated from text content for these files. |
+
+**Bottom line:** Use the numbers for relative comparisons and trend analysis across your projects — not as an exact billing reconciliation.
+
 ## Requirements
 
 - Python ≥ 3.10
