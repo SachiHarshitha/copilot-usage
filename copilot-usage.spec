@@ -133,5 +133,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=os.path.join(dashboard_root, "assets", "favicon.png") if sys.platform == "win32" else None,
+    icon=None,
 )
