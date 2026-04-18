@@ -49,17 +49,19 @@ def ingest_parsed_file(con: duckdb.DuckDBPyConnection, pf: ParsedFile) -> int:
 
     # Batch insert all events at once
     if pf.requests:
-        rows = []
+        rows_by_id: dict[str, list] = {}
         for req in pf.requests:
             event_id = f"{req.chat_session_id}:{req.request_index}"
             premium = get_multiplier(req.model_id or "") if (req.prompt_tokens or req.output_tokens) else 0.0
-            rows.append([
+            # Last occurrence wins (JSONL may contain duplicate result lines)
+            rows_by_id[event_id] = [
                 event_id, req.chat_session_id, pf.workspace_id,
                 req.request_index, req.request_id, req.model_id,
                 req.timestamp_ms, req.prompt_tokens, req.output_tokens,
                 req.tool_call_rounds, premium,
                 req.tokens_estimated, pf.data_source, source,
-            ])
+            ]
+        rows = list(rows_by_id.values())
 
         # Remove any cross-file duplicates (same event_id from a different source)
         event_ids = [r[0] for r in rows]
@@ -79,4 +81,4 @@ def ingest_parsed_file(con: duckdb.DuckDBPyConnection, pf: ParsedFile) -> int:
             rows,
         )
 
-    return len(pf.requests)
+    return len(rows) if pf.requests else 0
