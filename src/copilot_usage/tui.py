@@ -161,7 +161,7 @@ class CopilotTUI(App):
 
     def _load_data(self) -> None:
         """Load data from the database and update the UI."""
-        self.run_worker(self._fetch_and_render, thread=True)
+        self.run_worker(self._fetch_and_render, thread=True, exit_on_error=False)
 
     def _fetch_and_render(self) -> None:
         """Run queries in a worker thread, then update widgets."""
@@ -246,17 +246,20 @@ class CopilotTUI(App):
         self.query_one("#scan-progress", ProgressBar).update(progress=0)
         self.query_one("#scan-step", Label).update("⏳ Starting scan…")
         self._set_status("Scan in progress…  (steps shown above)")
-        self.run_worker(self._do_scan, thread=True)
+        self.run_worker(self._do_scan, thread=True, exit_on_error=False)
 
     def _scan_progress_cb(self, msg: str, pct: float | None) -> None:
         """Called from the scan worker thread to update UI."""
         self.call_from_thread(self._update_scan_ui, msg, pct)
 
     def _update_scan_ui(self, msg: str, pct: float | None) -> None:
-        step_label = self.query_one("#scan-step", Label)
-        step_label.update(f"⏳ {msg}")
-        if pct is not None:
-            self.query_one("#scan-progress", ProgressBar).update(progress=pct)
+        try:
+            step_label = self.query_one("#scan-step", Label)
+            step_label.update(f"⏳ {msg}")
+            if pct is not None:
+                self.query_one("#scan-progress", ProgressBar).update(progress=pct)
+        except Exception:
+            pass
 
     def _do_scan(self) -> None:
         from copilot_usage.db import get_connection
@@ -274,14 +277,20 @@ class CopilotTUI(App):
                 con.close()
         except Exception as exc:
             def _on_error():
-                self.query_one("#scan-bar").styles.display = "none"
+                try:
+                    self.query_one("#scan-bar").styles.display = "none"
+                except Exception:
+                    pass
                 self.scanning = False
                 self._set_status(f"Scan failed: {exc}")
             self.call_from_thread(_on_error)
             return
 
         def _finish():
-            self.query_one("#scan-bar").styles.display = "none"
+            try:
+                self.query_one("#scan-bar").styles.display = "none"
+            except Exception:
+                pass
             self.scanning = False
             msg = (
                 f"✓ Scan done: {stats.get('files_parsed', 0)} files, "
