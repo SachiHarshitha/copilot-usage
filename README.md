@@ -1,6 +1,7 @@
 # Copilot Usage Analytics
 
 [![PyPI version](https://img.shields.io/pypi/v/copilot-usage?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/copilot-usage/)
+[![VS Code Extension](https://img.shields.io/github/v/release/SachiHarshitha/copilot-usage?filter=ext-v*&label=vscode%20extension&logo=visual-studio-code&logoColor=white&color=007ACC)](https://github.com/SachiHarshitha/copilot-usage/releases?q=ext-v)
 [![GitHub release](https://img.shields.io/github/v/release/SachiHarshitha/copilot-usage?logo=github)](https://github.com/SachiHarshitha/copilot-usage/releases/latest)
 [![Python](https://img.shields.io/pypi/pyversions/copilot-usage?logo=python&logoColor=white)](https://pypi.org/project/copilot-usage/)
 [![License](https://img.shields.io/github/license/SachiHarshitha/copilot-usage)](LICENSE)

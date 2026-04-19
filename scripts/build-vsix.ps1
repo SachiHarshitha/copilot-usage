@@ -1,7 +1,8 @@
 # build-vsix.ps1 — Build the VS Code extension (.vsix) locally
-# Usage: .\scripts\build-vsix.ps1 [-Clean] [-Install]
+# Usage: .\scripts\build-vsix.ps1 [-Clean] [-Install] [-Version 0.2.0]
 
 param(
+    [string]$Version,  # Bump version in package.json before building (e.g. 0.2.0)
     [switch]$Clean,    # Remove previous build artifacts first
     [switch]$Install   # Run npm ci before building
 )
@@ -16,6 +17,32 @@ Write-Host "`n=== Copilot Usage — VS Code Extension Build ===" -ForegroundColo
 Push-Location $extDir
 
 try {
+    # --- Version bump ---
+    if ($Version) {
+        if ($Version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Version must be semver (e.g. 0.2.0). Got: $Version"
+        }
+
+        $pkgPath = Join-Path $extDir "package.json"
+        $pkgContent = Get-Content $pkgPath -Raw
+        if ($pkgContent -match '"version"\s*:\s*"([^"]+)"') {
+            $oldVersion = $Matches[1]
+        } else {
+            throw "Could not find version field in package.json"
+        }
+
+        $pkgContent = $pkgContent -replace '("version"\s*:\s*)"[^"]+"', "`$1`"$Version`""
+        Set-Content -Path $pkgPath -Value $pkgContent -NoNewline
+
+        Write-Host "`n  Version: $oldVersion -> $Version" -ForegroundColor Green
+    } else {
+        $pkgPath = Join-Path $extDir "package.json"
+        $pkgContent = Get-Content $pkgPath -Raw
+        if ($pkgContent -match '"version"\s*:\s*"([^"]+)"') {
+            Write-Host "`n  Version: $($Matches[1])" -ForegroundColor DarkGray
+        }
+    }
+
     # --- Clean ---
     if ($Clean) {
         Write-Host "`n[1/4] Cleaning previous artifacts..." -ForegroundColor Yellow

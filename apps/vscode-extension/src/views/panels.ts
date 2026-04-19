@@ -304,7 +304,7 @@ function commonStyles(): string {
   .kpi { background: var(--vscode-editorWidget-background, #1e293b); border: 1px solid var(--vscode-editorWidget-border, #334155); border-radius: 8px; padding: 12px; text-align: center; }
   .kpi .value { font-size: 1.5em; font-weight: 700; color: var(--vscode-textLink-foreground, #38bdf8); }
   .kpi .label { font-size: 0.75em; color: var(--vscode-descriptionForeground, #94a3b8); margin-top: 2px; }
-  .charts-row { display: flex; gap: 12px; margin-bottom: 16px; flex: 1; min-height: 350px; }
+  .charts-row { display: flex; gap: 12px; margin-bottom: 16px; flex: 1; min-height: 280px; }
   .chart-box { flex: 2; background: var(--vscode-editorWidget-background, #1e293b); border-radius: 8px; padding: 12px; border: 1px solid var(--vscode-editorWidget-border, #334155); position: relative; }
   .chart-box canvas { position: absolute; top: 12px; left: 12px; right: 12px; bottom: 12px; }
   .chart-small { flex: 1; }
