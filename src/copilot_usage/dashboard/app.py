@@ -89,6 +89,16 @@ def create_app() -> dash.Dash:
                             href="/settings", active="exact",
                             className="nav-btn nav-btn-icon ms-2",
                         )),
+                        dbc.NavItem(
+                            html.A(
+                                [html.I(className="bi bi-star me-1"), "Star"],
+                                href="https://github.com/SachiHarshitha/copilot-usage",
+                                target="_blank",
+                                rel="noopener noreferrer",
+                                className="btn btn-outline-warning btn-sm ms-3",
+                                style={"fontSize": "0.8rem"},
+                            ),
+                        ),
                     ],
                     className="ms-auto",
                     pills=True,

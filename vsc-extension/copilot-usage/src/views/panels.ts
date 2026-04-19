@@ -17,6 +17,7 @@ export class WorkspacePanel {
       async (msg) => {
         if (msg.command === 'refresh') { await this.loadData(); }
         if (msg.command === 'openDashboard') { await DashboardPanel.createOrShow(this.extensionUri); }
+        if (msg.command === 'openGitHub') { vscode.env.openExternal(vscode.Uri.parse('https://github.com/SachiHarshitha/copilot-usage')); }
       },
       null,
       this.disposables,
@@ -88,6 +89,7 @@ export class DashboardPanel {
       async (msg) => {
         if (msg.command === 'refresh') { await this.loadData(); }
         if (msg.command === 'openWorkspace') { await WorkspacePanel.createOrShow(this.extensionUri); }
+        if (msg.command === 'openGitHub') { vscode.env.openExternal(vscode.Uri.parse('https://github.com/SachiHarshitha/copilot-usage')); }
       },
       null,
       this.disposables,
@@ -187,6 +189,7 @@ ${commonStyles()}
 <div class="header">
   <h1>${headerIcon()} Copilot Usage — All Workspaces</h1>
   <div class="header-actions">
+    <button class="btn btn-star" onclick="starGitHub()">⭐ Star on GitHub</button>
     <button class="btn btn-secondary" onclick="openWorkspace()">📂 Workspace View</button>
     <button class="btn" onclick="refresh()">↻ Refresh</button>
   </div>
@@ -224,6 +227,7 @@ ${commonStyles()}
 const vscode = acquireVsCodeApi();
 function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openWorkspace() { vscode.postMessage({ command: 'openWorkspace' }); }
+function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 
 new Chart(document.getElementById('dailyChart'), {
   type: 'bar',
@@ -263,6 +267,8 @@ function commonStyles(): string {
   .btn { background: var(--vscode-button-background, #2563eb); color: var(--vscode-button-foreground, #fff); border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
   .btn:hover { opacity: 0.85; }
   .btn-secondary { background: var(--vscode-button-secondaryBackground, #334155); color: var(--vscode-button-secondaryForeground, #e2e8f0); }
+  .btn-star { background: transparent; border: 1px solid #e3b341; color: #e3b341; }
+  .btn-star:hover { background: rgba(227,179,65,0.15); opacity: 1; }
   .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
   .kpi { background: var(--vscode-editorWidget-background, #1e293b); border: 1px solid var(--vscode-editorWidget-border, #334155); border-radius: 8px; padding: 12px; text-align: center; }
   .kpi .value { font-size: 1.5em; font-weight: 700; color: var(--vscode-textLink-foreground, #38bdf8); }
@@ -360,6 +366,7 @@ ${commonStyles()}
 <div class="header">
   <h1>${headerIcon()} Copilot Usage — ${esc(title)}</h1>
   <div class="header-actions">
+    <button class="btn btn-star" onclick="starGitHub()">⭐ Star on GitHub</button>
     <button class="btn btn-secondary" onclick="openDashboard()">🌐 Global Dashboard</button>
     <button class="btn" onclick="refresh()">↻ Refresh</button>
   </div>
@@ -391,6 +398,7 @@ ${commonStyles()}
 const vscode = acquireVsCodeApi();
 function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openDashboard() { vscode.postMessage({ command: 'openDashboard' }); }
+function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 
 new Chart(document.getElementById('dailyChart'), {
   type: 'bar',
