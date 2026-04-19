@@ -1,0 +1,154 @@
+# Publish copilot-usage to PyPI when a version tag is pushed.
+#
+# Usage:
+#   1. Run: .\scripts\release.ps1 -Version 0.2.0
+#      (bumps version, commits, tags, and pushes)
+#
+# Prerequisites:
+#   Add a repository secret named PYPI_API_TOKEN with a PyPI API token
+#   scoped to the copilot-usage project.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 0.2.0). Leave empty to use pyproject.toml version."
+        required: false
+        default: ""
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install build tools
+        run: pip install --upgrade build twine
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            VER=$(python -c "import tomllib; print(tomllib.load(open('apps/cli/pyproject.toml','rb'))['project']['version'])")
+            echo "version=$VER" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build sdist + wheel
+        working-directory: apps/cli
+        run: python -m build
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: twine upload apps/cli/dist/*
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: "v${{ steps.version.outputs.version }}"
+          generate_release_notes: true
+          files: apps/cli/dist/*
+
+  # ── Build standalone executables per platform ───────────────────
+  executables:
+    needs: publish
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: copilot-usage-linux-amd64
+            artifact: copilot-usage-linux-amd64
+          - os: windows-latest
+            name: copilot-usage-windows-amd64
+            artifact: copilot-usage-windows-amd64.exe
+          - os: macos-latest
+            name: copilot-usage-macos-arm64
+            artifact: copilot-usage-macos-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install package and PyInstaller
+        working-directory: apps/cli
+        run: |
+          pip install --upgrade pip
+          pip install . pyinstaller
+
+      - name: Build executable
+        working-directory: apps/cli
+        shell: bash
+        run: |
+          pyinstaller copilot-usage.spec --noconfirm
+          # Rename to platform-specific name
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            mv dist/copilot-usage.exe "dist/${{ matrix.artifact }}"
+          else
+            mv dist/copilot-usage "dist/${{ matrix.artifact }}"
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.publish.outputs.version }}
+          files: apps/cli/dist/${{ matrix.artifact }}
+
+  # ── Build VS Code extension (.vsix) ────────────────────────────
+  vsix:
+    needs: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: apps/vscode-extension
+        run: npm ci
+
+      - name: Package VSIX
+        working-directory: apps/vscode-extension
+        run: npx @vscode/vsce package --allow-missing-repository --skip-license
+
+      - name: Upload VSIX to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.publish.outputs.version }}
+          files: apps/vscode-extension/*.vsix

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="lens" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Magnifying-glass lens -->
+  <circle cx="224" cy="224" r="176" fill="url(#lens)"
+          stroke="#58a6ff" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- Magnifying-glass handle -->
+  <line x1="347" y1="347" x2="492" y2="492"
+        stroke="#58a6ff" stroke-width="28" stroke-linecap="round"/>
+
+  <!-- Copilot helmet dome -->
+  <ellipse cx="224" cy="200" rx="120" ry="100" fill="#e6edf3" opacity="0.92"/>
+  <rect x="104" y="200" width="240" height="60" rx="10" fill="#e6edf3" opacity="0.92"/>
+  <ellipse cx="224" cy="260" rx="120" ry="32" fill="#e6edf3" opacity="0.92"/>
+
+  <!-- Visor -->
+  <rect x="124" y="195" width="200" height="52" rx="20" fill="#0d1117" opacity="0.9"/>
+
+  <!-- Left eye -->
+  <circle cx="179" cy="221" r="18" fill="#58a6ff"/>
+
+  <!-- Right eye -->
+  <circle cx="269" cy="221" r="18" fill="#58a6ff"/>
+</svg>

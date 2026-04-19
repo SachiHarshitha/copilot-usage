@@ -1,0 +1,95 @@
+# Build and release the Copilot Usage VS Code extension when an ext-v* tag is pushed.
+#
+# Usage:
+#   1. Run: .\scripts\release-extension.ps1 -Version 0.2.0
+#      (bumps version, builds VSIX, commits, tags ext-v0.2.0, and pushes)
+#
+# Prerequisites:
+#   - To publish to VS Code Marketplace: add a repository secret named
+#     VSCE_PAT with a Personal Access Token from https://dev.azure.com
+#   - To publish to Open VSX: add a repository secret named OVSX_PAT
+
+name: Release Extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Extension version (e.g. 0.2.0). Leave empty to use package.json version."
+        required: false
+        default: ""
+        type: string
+  push:
+    tags:
+      - "ext-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_REF" == refs/tags/ext-v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/ext-v}" >> "$GITHUB_OUTPUT"
+          else
+            VER=$(node -p "require('./apps/vscode-extension/package.json').version")
+            echo "version=$VER" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        working-directory: apps/vscode-extension
+        run: npm ci
+
+      - name: Compile & lint
+        working-directory: apps/vscode-extension
+        run: npm run compile
+
+      - name: Package VSIX
+        working-directory: apps/vscode-extension
+        run: npx @vscode/vsce package --allow-missing-repository --skip-license
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: apps/vscode-extension/*.vsix
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ext-v${{ steps.version.outputs.version }}
+          name: "Extension v${{ steps.version.outputs.version }}"
+          generate_release_notes: true
+          files: apps/vscode-extension/*.vsix
+
+      # ── Publish to VS Code Marketplace (optional) ──────────────
+      - name: Publish to VS Code Marketplace
+        if: env.VSCE_PAT != ''
+        working-directory: apps/vscode-extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx @vscode/vsce publish --pat "$VSCE_PAT" --allow-missing-repository --skip-license
+
+      # ── Publish to Open VSX (optional) ─────────────────────────
+      - name: Publish to Open VSX
+        if: env.OVSX_PAT != ''
+        working-directory: apps/vscode-extension
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npx ovsx publish --pat "$OVSX_PAT" $(ls *.vsix)
