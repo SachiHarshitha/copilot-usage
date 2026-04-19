@@ -44,10 +44,12 @@ export function computeKpis(files: ParsedFile[], events: RequestEvent[]): KpiTot
 
   let totalPromptTokens = 0;
   let totalOutputTokens = 0;
+  let totalToolCallRounds = 0;
   let totalPremium = 0;
   for (const e of events) {
     totalPromptTokens += e.promptTokens;
     totalOutputTokens += e.outputTokens;
+    totalToolCallRounds += e.toolCallRounds;
     const m = getMultiplier(e.modelId || '');
     if (e.promptTokens || e.outputTokens) {
       totalPremium += m;
@@ -58,6 +60,7 @@ export function computeKpis(files: ParsedFile[], events: RequestEvent[]): KpiTot
     totalRequests: events.length,
     totalPromptTokens,
     totalOutputTokens,
+    totalToolCallRounds,
     totalPremium: Math.round(totalPremium * 100) / 100,
     workspaceCount: workspaceIds.size,
     sessionCount: sessionIds.size,

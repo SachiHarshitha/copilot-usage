@@ -39,6 +39,7 @@ export interface KpiTotals {
   totalRequests: number;
   totalPromptTokens: number;
   totalOutputTokens: number;
+  totalToolCallRounds: number;
   totalPremium: number;
   workspaceCount: number;
   sessionCount: number;

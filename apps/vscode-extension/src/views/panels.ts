@@ -9,6 +9,7 @@ export class WorkspacePanel {
   private readonly panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
   private disposed = false;
+  private autoRefreshSeconds = 0;
 
   private constructor(panel: vscode.WebviewPanel, private extensionUri: vscode.Uri) {
     this.panel = panel;
@@ -17,6 +18,7 @@ export class WorkspacePanel {
     this.panel.webview.onDidReceiveMessage(
       async (msg) => {
         if (msg.command === 'refresh') { await this.loadData(); }
+        if (msg.command === 'setAutoRefresh') { this.autoRefreshSeconds = msg.seconds; }
         if (msg.command === 'openDashboard') { await DashboardPanel.createOrShow(this.extensionUri); }
         if (msg.command === 'openGitHub') { vscode.env.openExternal(vscode.Uri.parse('https://github.com/SachiHarshitha/copilot-usage')); }
       },
@@ -29,6 +31,7 @@ export class WorkspacePanel {
     const column = vscode.ViewColumn.Beside;
     if (WorkspacePanel.currentPanel) {
       WorkspacePanel.currentPanel.panel.reveal(column);
+      WorkspacePanel.currentPanel.showLoading();
       await WorkspacePanel.currentPanel.loadData();
       return;
     }
@@ -41,6 +44,7 @@ export class WorkspacePanel {
     );
 
     WorkspacePanel.currentPanel = new WorkspacePanel(panel, extensionUri);
+    WorkspacePanel.currentPanel.showLoading();
     await WorkspacePanel.currentPanel.loadData();
   }
 
@@ -48,10 +52,14 @@ export class WorkspacePanel {
     if (!this.disposed) { this.panel.webview.html = html; }
   }
 
+  private showLoading(): void {
+    this.setHtml(loadingPage());
+  }
+
   private async loadData(): Promise<void> {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
-      this.setHtml(getWorkspaceHtml(undefined, undefined, undefined, undefined, 'No workspace folder open.', true));
+      this.setHtml(getWorkspaceHtml(undefined, undefined, undefined, undefined, 'No workspace folder open.', true, this.autoRefreshSeconds));
       return;
     }
 
@@ -63,7 +71,7 @@ export class WorkspacePanel {
         ? `workspace file: ${vscode.workspace.workspaceFile!.fsPath}`
         : folderPaths.join(', ');
       this.setHtml(getWorkspaceHtml(undefined, undefined, undefined, undefined,
-        `No Copilot session data found for this workspace.\n\nLooked for: ${searched}`, true));
+        `No Copilot session data found for this workspace.\n\nLooked for: ${searched}`, true, this.autoRefreshSeconds));
       return;
     }
 
@@ -73,7 +81,7 @@ export class WorkspacePanel {
     const models = computeModelStats(events);
     const daily = computeDailyStats(events);
 
-    this.setHtml(getWorkspaceHtml(kpis, models, daily, ws.workspacePath));
+    this.setHtml(getWorkspaceHtml(kpis, models, daily, ws.workspacePath, undefined, false, this.autoRefreshSeconds));
   }
 
   private dispose(): void {
@@ -91,6 +99,7 @@ export class DashboardPanel {
   private readonly panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
   private disposed = false;
+  private autoRefreshSeconds = 0;
 
   private constructor(panel: vscode.WebviewPanel, private extensionUri: vscode.Uri) {
     this.panel = panel;
@@ -99,6 +108,7 @@ export class DashboardPanel {
     this.panel.webview.onDidReceiveMessage(
       async (msg) => {
         if (msg.command === 'refresh') { await this.loadData(); }
+        if (msg.command === 'setAutoRefresh') { this.autoRefreshSeconds = msg.seconds; }
         if (msg.command === 'openWorkspace') { await WorkspacePanel.createOrShow(this.extensionUri); }
         if (msg.command === 'openGitHub') { vscode.env.openExternal(vscode.Uri.parse('https://github.com/SachiHarshitha/copilot-usage')); }
       },
@@ -139,7 +149,7 @@ export class DashboardPanel {
   private async loadData(): Promise<void> {
     const workspaces = await discoverWorkspaces();
     if (workspaces.length === 0) {
-      this.setHtml(getDashboardHtml(undefined, undefined, undefined, undefined, 'No Copilot session data found.'));
+      this.setHtml(getDashboardHtml(undefined, undefined, undefined, undefined, 'No Copilot session data found.', this.autoRefreshSeconds));
       return;
     }
 
@@ -151,7 +161,7 @@ export class DashboardPanel {
 
     const wsStats = computeWorkspaceStats(parsed, events);
 
-    this.setHtml(getDashboardHtml(kpis, models, daily, wsStats));
+    this.setHtml(getDashboardHtml(kpis, models, daily, wsStats, undefined, this.autoRefreshSeconds));
   }
 
   private dispose(): void {
@@ -173,6 +183,7 @@ function getDashboardHtml(
   daily?: DailyStats[],
   wsStats?: WorkspaceStats[],
   error?: string,
+  autoRefreshSeconds = 0,
 ): string {
   if (error || !kpis) {
     return errorPage(error || 'No data');
@@ -205,9 +216,10 @@ ${commonStyles()}
 <div class="header">
   <h1>${headerIcon()} Copilot Usage — All Workspaces</h1>
   <div class="header-actions">
-    <button class="btn btn-star" onclick="starGitHub()">⭐ Star on GitHub</button>
-    <button class="btn btn-secondary" onclick="openWorkspace()">📂 Workspace View</button>
-    <button class="btn" onclick="refresh()">↻ Refresh</button>
+    <button class="btn btn-star" onclick="starGitHub()" title="Star on GitHub">⭐</button>
+    <button class="btn btn-secondary" onclick="openWorkspace()" title="Open Workspace View">📂</button>
+    <button class="btn" onclick="refresh()" title="Refresh data">↻</button>
+    ${autoRefreshSelect(autoRefreshSeconds)}
   </div>
 </div>
 
@@ -215,6 +227,7 @@ ${commonStyles()}
   ${kpiCard('Requests', fmt(kpis.totalRequests))}
   ${kpiCard('Prompt Tokens', fmt(kpis.totalPromptTokens))}
   ${kpiCard('Output Tokens', fmt(kpis.totalOutputTokens))}
+  ${kpiCard('Tool Rounds', fmt(kpis.totalToolCallRounds))}
   ${kpiCard('Premium', kpis.totalPremium.toFixed(1) + '×')}
   ${kpiCard('Workspaces', String(kpis.workspaceCount))}
   ${kpiCard('Sessions', String(kpis.sessionCount))}
@@ -244,6 +257,7 @@ const vscode = acquireVsCodeApi();
 function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openWorkspace() { vscode.postMessage({ command: 'openWorkspace' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
+${autoRefreshScript()}
 
 new Chart(document.getElementById('dailyChart'), {
   type: 'bar',
@@ -280,11 +294,12 @@ function commonStyles(): string {
   .header h1 { font-size: 1.3em; display: flex; align-items: center; gap: 8px; }
   .header h1 svg { width: 1.4em; height: 1.4em; flex-shrink: 0; }
   .header-actions { display: flex; gap: 8px; align-items: center; }
-  .btn { background: var(--vscode-button-background, #2563eb); color: var(--vscode-button-foreground, #fff); border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
+  .btn { background: var(--vscode-button-background, #2563eb); color: var(--vscode-button-foreground, #fff); border: none; padding: 0; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; font-size: 1.05em; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
   .btn:hover { opacity: 0.85; }
   .btn-secondary { background: var(--vscode-button-secondaryBackground, #334155); color: var(--vscode-button-secondaryForeground, #e2e8f0); }
   .btn-star { background: transparent; border: 1px solid #e3b341; color: #e3b341; }
   .btn-star:hover { background: rgba(227,179,65,0.15); opacity: 1; }
+  .auto-refresh-select { background: var(--vscode-dropdown-background, #1e293b); color: var(--vscode-dropdown-foreground, #e2e8f0); border: 1px solid var(--vscode-dropdown-border, #334155); height: 30px; padding: 0 8px; border-radius: 4px; font-size: 0.8em; cursor: pointer; }
   .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
   .kpi { background: var(--vscode-editorWidget-background, #1e293b); border: 1px solid var(--vscode-editorWidget-border, #334155); border-radius: 8px; padding: 12px; text-align: center; }
   .kpi .value { font-size: 1.5em; font-weight: 700; color: var(--vscode-textLink-foreground, #38bdf8); }
@@ -312,6 +327,33 @@ function commonStyles(): string {
 
 function kpiCard(label: string, value: string): string {
   return `<div class="kpi"><div class="value">${esc(value)}</div><div class="label">${esc(label)}</div></div>`;
+}
+
+function autoRefreshSelect(seconds: number): string {
+  const opts = [
+    { v: 0, l: 'Auto: Off' },
+    { v: 30, l: '⏱ 30s' },
+    { v: 60, l: '⏱ 1m' },
+    { v: 120, l: '⏱ 2m' },
+    { v: 300, l: '⏱ 5m' },
+  ];
+  const options = opts.map(o =>
+    `<option value="${o.v}"${o.v === seconds ? ' selected' : ''}>${esc(o.l)}</option>`
+  ).join('');
+  return `<select class="auto-refresh-select" id="autoRefreshSelect" onchange="setAutoRefresh(this.value)" title="Auto-refresh interval">${options}</select>`;
+}
+
+function autoRefreshScript(): string {
+  return `
+let _art = null;
+function setAutoRefresh(v) {
+  if (_art) { clearInterval(_art); _art = null; }
+  var s = parseInt(v, 10);
+  if (s > 0) { _art = setInterval(function() { refresh(); }, s * 1000); }
+  vscode.postMessage({ command: 'setAutoRefresh', seconds: s });
+}
+(function() { var el = document.getElementById('autoRefreshSelect'); if (el && parseInt(el.value, 10) > 0) { setAutoRefresh(el.value); } })();
+`;
 }
 
 function errorPage(msg: string, showDashboardButton = false): string {
@@ -358,6 +400,7 @@ function getWorkspaceHtml(
   wsPath?: string,
   error?: string,
   showDashboardButton = false,
+  autoRefreshSeconds = 0,
 ): string {
   if (error || !kpis) {
     return errorPage(error || 'No data', showDashboardButton);
@@ -387,9 +430,10 @@ ${commonStyles()}
 <div class="header">
   <h1>${headerIcon()} Copilot Usage — ${esc(title)}</h1>
   <div class="header-actions">
-    <button class="btn btn-star" onclick="starGitHub()">⭐ Star on GitHub</button>
-    <button class="btn btn-secondary" onclick="openDashboard()">🌐 Global Dashboard</button>
-    <button class="btn" onclick="refresh()">↻ Refresh</button>
+    <button class="btn btn-star" onclick="starGitHub()" title="Star on GitHub">⭐</button>
+    <button class="btn btn-secondary" onclick="openDashboard()" title="Open Global Dashboard">🌐</button>
+    <button class="btn" onclick="refresh()" title="Refresh data">↻</button>
+    ${autoRefreshSelect(autoRefreshSeconds)}
   </div>
 </div>
 
@@ -397,6 +441,7 @@ ${commonStyles()}
   ${kpiCard('Requests', fmt(kpis.totalRequests))}
   ${kpiCard('Prompt Tokens', fmt(kpis.totalPromptTokens))}
   ${kpiCard('Output Tokens', fmt(kpis.totalOutputTokens))}
+  ${kpiCard('Tool Rounds', fmt(kpis.totalToolCallRounds))}
   ${kpiCard('Premium', kpis.totalPremium.toFixed(1) + '×')}
   ${kpiCard('Sessions', String(kpis.sessionCount))}
 </div>
@@ -420,6 +465,7 @@ const vscode = acquireVsCodeApi();
 function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openDashboard() { vscode.postMessage({ command: 'openDashboard' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
+${autoRefreshScript()}
 
 new Chart(document.getElementById('dailyChart'), {
   type: 'bar',
