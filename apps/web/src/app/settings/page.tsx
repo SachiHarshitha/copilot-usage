@@ -195,7 +195,7 @@ export default function SettingsPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={badgeUrl} alt="Badge preview" className="mb-2" />
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
-            {`![Copilot Usage](${badgeUrl})`}
+            {`![promptstreak.dev](${badgeUrl})`}
           </code>
         </div>
         <div>
@@ -203,7 +203,7 @@ export default function SettingsPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={cardUrl} alt="Card preview" className="mb-2 max-w-[400px]" />
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
-            {`![Copilot Usage](${cardUrl})`}
+            {`![promptstreak.dev](${cardUrl})`}
           </code>
         </div>
       </Section>

@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Copilot Usage',
-  description: 'Track your GitHub Copilot usage. Share it publicly. Embed it in your README.',
+  title: 'promptstreak.dev',
+  description: 'Track your GitHub Copilot usage on promptstreak.dev. Share it publicly. Embed it in your README.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -12,7 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen">
         <nav className="border-b border-[#30363d] px-6 py-3 flex items-center justify-between">
           <a href="/" className="text-lg font-semibold text-white no-underline hover:no-underline">
-            ⚡ Copilot Usage
+            ⚡ promptstreak.dev
           </a>
           <div className="flex items-center gap-4 text-sm">
             <a href="/leaderboard">Leaderboard</a>

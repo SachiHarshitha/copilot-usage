@@ -116,17 +116,17 @@ export default async function ProfilePage({
         <div className="mb-4">
           <p className="text-xs text-[#8b949e] mb-1">Badge:</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={badgeUrl} alt="Copilot Usage badge" className="mb-2" />
+          <img src={badgeUrl} alt="promptstreak.dev badge" className="mb-2" />
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
-            {`![Copilot Usage](${typeof window !== 'undefined' ? window.location.origin : ''}${badgeUrl})`}
+            {`![promptstreak.dev](${typeof window !== 'undefined' ? window.location.origin : ''}${badgeUrl})`}
           </code>
         </div>
         <div>
           <p className="text-xs text-[#8b949e] mb-1">Stat Card:</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={cardUrl} alt="Copilot Usage card" className="mb-2 max-w-[400px]" />
+          <img src={cardUrl} alt="promptstreak.dev card" className="mb-2 max-w-[400px]" />
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
-            {`![Copilot Usage](${typeof window !== 'undefined' ? window.location.origin : ''}${cardUrl})`}
+            {`![promptstreak.dev](${typeof window !== 'undefined' ? window.location.origin : ''}${cardUrl})`}
           </code>
         </div>
       </div>

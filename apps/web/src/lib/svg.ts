@@ -50,13 +50,13 @@ export function generateCardSvg({
   totalRequests,
   topModel,
 }: CardOptions): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="180" viewBox="0 0 400 180" fill="none" role="img" aria-label="Copilot Usage stats for ${escapeXml(username)}">
-  <title>Copilot Usage - ${escapeXml(username)}</title>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="180" viewBox="0 0 400 180" fill="none" role="img" aria-label="promptstreak.dev stats for ${escapeXml(username)}">
+  <title>promptstreak.dev - ${escapeXml(username)}</title>
   <rect width="400" height="180" rx="8" fill="#0d1117"/>
   <rect width="400" height="180" rx="8" stroke="#30363d" stroke-width="1" fill="none"/>
 
   <text x="20" y="32" fill="#c9d1d9" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="600">
-    ${escapeXml(username)}'s Copilot Usage
+    ${escapeXml(username)} on promptstreak.dev
   </text>
   <line x1="20" y1="44" x2="380" y2="44" stroke="#21262d"/>
 
@@ -72,7 +72,7 @@ export function generateCardSvg({
   <text x="20" y="144" fill="#8b949e" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12">Top Model</text>
   <text x="380" y="144" fill="#c9d1d9" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="12" text-anchor="end">${escapeXml(topModel || 'N/A')}</text>
 
-  <text x="200" y="170" fill="#484f58" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="10" text-anchor="middle">copilot-usage.dev</text>
+  <text x="200" y="170" fill="#484f58" font-family="Segoe UI,Helvetica,Arial,sans-serif" font-size="10" text-anchor="middle">promptstreak.dev</text>
 </svg>`;
 }
 

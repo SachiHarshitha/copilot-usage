@@ -14,7 +14,7 @@ export async function GET(
   username = username.replace(/\.svg$/, '');
 
   const stat = request.nextUrl.searchParams.get('stat') || 'tokens';
-  const label = request.nextUrl.searchParams.get('label') || 'Copilot Usage';
+  const label = request.nextUrl.searchParams.get('label') || 'promptstreak.dev';
 
   const user = await prisma.user.findUnique({
     where: { username },

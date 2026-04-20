@@ -1,11 +1,11 @@
-# Copilot Usage Web App — Implementation Plan
+# promptstreak.dev Web App — Implementation Plan
 
 ---
 
 ## 1. Product Goals
 
 ### What it is for
-A **voluntary public layer** on top of the local-first product. Users who want to share their Copilot usage stats can log in with GitHub, push a snapshot from the VS Code extension or CLI, and get a public profile page, embeddable README badges, and a community leaderboard — all opt-in.
+A **voluntary public layer** on top of the local-first product. Users who want to share their Copilot usage stats can log in with GitHub, push a snapshot from the VS Code extension or CLI, and get a public profile page, embeddable README badges, and a community leaderboard on promptstreak.dev — all opt-in.
 
 ### What it is not for
 - Replacing the local tool. If a user never logs in, nothing changes.
@@ -109,7 +109,7 @@ packages/shared-schema/
 
 The extension gets a **short-lived upload token** from the web app after the user links their account once. Flow:
 
-1. User clicks "Sync to copilot-usage.dev" in the extension
+1. User clicks "Sync to promptstreak.dev" in the extension
 2. Extension opens browser to `/connect?code=[random]` 
 3. User logs in (GitHub OAuth), the web app ties `code` to their account and returns a **device token** (long-lived opaque random token stored in VS Code `SecretStorage`)
 4. On each sync, extension calls `POST /api/upload` with Bearer device token + snapshot JSON
@@ -385,7 +385,7 @@ Each `date` in `dailyBuckets` must be ≤ `clientUploadedAt` (can't report futur
 ## 8. Page Structure
 
 ### `/` — Landing
-- Hero: "Track your Copilot usage. Share it publicly. Embed it in your README."
+- Hero: "Track your Copilot usage. Share it on promptstreak.dev. Embed it in your README."
 - Two CTAs: "Connect VS Code" and "View Leaderboard"
 - 3 feature bullets
 - Example badge/card preview
@@ -559,7 +559,7 @@ apps/web/
 | **Model multipliers drift** | Medium | `shared-schema` owns the multiplier table — update one place, both extension and web stay in sync. |
 
 ### Open Questions to Decide Before Coding
-1. **Domain name** — `copilot-usage.dev`? Pick it before Phase 3.
+1. **Domain name** — `promptstreak.dev`.
 2. **Device token UX** — Browser redirect back to VS Code via `vscode://` URI scheme vs manual paste? URI scheme is slicker but requires registering a URI handler in the extension's package.json.
 3. **`last 30 days` leaderboard filter** — Based on event dates (when the Copilot requests happened), not upload dates. `UsageDaily.date` is always the event date. This is what the `(date, userId)` index is designed for.
 4. **Public by default?** — I recommend private by default (toggle to publish). Opt-in is safer for trust and GDPR-adjacent concerns.

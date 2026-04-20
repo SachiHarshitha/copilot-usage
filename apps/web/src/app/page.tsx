@@ -4,13 +4,13 @@ export default function Home() {
       <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight">
         Track your Copilot usage.
         <br />
-        <span className="text-brand-400">Share it publicly.</span>
+        <span className="text-brand-400">Share it on promptstreak.dev.</span>
         <br />
         Embed it in your README.
       </h1>
 
       <p className="text-[#8b949e] max-w-xl text-lg">
-        A voluntary public layer on top of the local-first Copilot Usage tool.
+        promptstreak.dev is the voluntary public layer on top of the local-first Copilot Usage tool.
         Log in with GitHub, push a snapshot, and get a public profile, badges,
         and a community leaderboard — all opt-in.
       </p>
@@ -57,7 +57,7 @@ export default function Home() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/badge/demo.svg?label=Copilot%20Tokens&stat=tokens"
-          alt="Example Copilot Usage badge"
+          alt="Example promptstreak.dev badge"
           className="inline-block"
         />
       </div>

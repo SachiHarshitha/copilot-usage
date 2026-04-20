@@ -1,5 +1,5 @@
 {
-  "name": "@copilot-usage/web",
+  "name": "@promptstreak/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {

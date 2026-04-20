@@ -2,12 +2,12 @@
   "name": "copilot-usage-monorepo",
   "private": true,
   "scripts": {
-    "dev:web": "pnpm --filter @copilot-usage/web dev",
-    "build:web": "pnpm --filter @copilot-usage/web build",
+    "dev:web": "pnpm --filter @promptstreak/web dev",
+    "build:web": "pnpm --filter @promptstreak/web build",
     "build:schema": "pnpm --filter @copilot-usage/shared-schema build",
-    "lint:web": "pnpm --filter @copilot-usage/web lint",
-    "db:push": "pnpm --filter @copilot-usage/web db:push",
-    "db:migrate": "pnpm --filter @copilot-usage/web db:migrate",
-    "db:generate": "pnpm --filter @copilot-usage/web db:generate"
+    "lint:web": "pnpm --filter @promptstreak/web lint",
+    "db:push": "pnpm --filter @promptstreak/web db:push",
+    "db:migrate": "pnpm --filter @promptstreak/web db:migrate",
+    "db:generate": "pnpm --filter @promptstreak/web db:generate"
   }
 }
