@@ -1,0 +1,13 @@
+# User-agent: *
+# Allow: /
+# Allow: /leaderboard
+# Allow: /u/
+# Disallow: /api/
+# Disallow: /settings
+# Disallow: /connect
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /settings
+Disallow: /connect

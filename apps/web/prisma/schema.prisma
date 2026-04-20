@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String     @id @default(cuid())
+  githubId      Int        @unique
+  username      String     @unique
+  displayName   String?
+  avatarUrl     String?
+  profilePublic Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  devices    Device[]
+  usageDaily UsageDaily[]
+  uploadLogs UploadLog[]
+  userStat   UserStat?
+  repoStats  RepoStat[]
+}
+
+model Device {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String?
+  tokenId    String    @unique
+  secretHash String
+  lastSeenAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UsageDaily {
+  id              String   @id @default(cuid())
+  userId          String
+  deviceId        String
+  date            DateTime @db.Date
+  totalRequests   Int      @default(0)
+  promptTokens    BigInt   @default(0)
+  outputTokens    BigInt   @default(0)
+  totalTokens     BigInt   @default(0)
+  premiumRequests Float    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId, date])
+  @@index([date, userId])
+}
+
+model UploadLog {
+  id           String   @id @default(cuid())
+  userId       String
+  deviceId     String
+  uploadedAt   DateTime @default(now())
+  ipHash       String
+  payloadBytes Int
+  bucketCount  Int
+  earliestDate DateTime?
+  latestDate   DateTime?
+  accepted     Boolean
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserStat {
+  userId          String   @id
+  totalRequests   Int      @default(0)
+  promptTokens    BigInt   @default(0)
+  outputTokens    BigInt   @default(0)
+  totalTokens     BigInt   @default(0)
+  premiumRequests Float    @default(0)
+  workspaceCount  Int      @default(0)
+  sessionCount    Int      @default(0)
+  topModel        String?
+  lastSyncedAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([totalTokens(sort: Desc)])
+  @@index([premiumRequests(sort: Desc)])
+}
+
+model RepoStat {
+  id            String  @id @default(cuid())
+  userId        String
+  repoIdentity  String
+  displayMode   String
+  githubRepo    String?
+  aliasLabel    String?
+  isPublic      Boolean @default(false)
+  requests      Int     @default(0)
+  promptTokens  BigInt  @default(0)
+  outputTokens  BigInt  @default(0)
+  totalTokens   BigInt  @default(0)
+  premiumReqs   Float   @default(0)
+  topModel      String?
+  lastSyncedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, repoIdentity])
+}

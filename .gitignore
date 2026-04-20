@@ -16,6 +16,11 @@ venv/
 env/
 ENV/
 
+# Node / JS
+node_modules/
+.next/
+*.tsbuildinfo
+
 # IDE
 .vscode/
 .idea/
@@ -27,6 +32,11 @@ ENV/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
 
 # DuckDB local data
 *.duckdb
