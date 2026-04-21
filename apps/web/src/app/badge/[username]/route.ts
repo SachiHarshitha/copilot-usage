@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPublicBadgeStats } from '@/lib/badge-stats';
-import { formatCompactNumber, renderPillBadge } from '@/lib/badge-svg';
+import { PRIVATE_BADGE, formatCompactNumber, getPublicUserBadgeSummary, renderBadgeSvg } from '@/lib/badges';
 
 /**
  * GET /badge/[username].svg?stat=tokens|requests|premium&label=Custom+Label
@@ -16,15 +15,9 @@ export async function GET(
   const stat = request.nextUrl.searchParams.get('stat') || 'tokens';
   const label = request.nextUrl.searchParams.get('label') || 'promptstreak.dev';
 
-  const stats = await getPublicBadgeStats(username);
+  const stats = await getPublicUserBadgeSummary(username);
   if (!stats) {
-    const svg = renderPillBadge({
-      icon: '🔒',
-      label,
-      value: 'PRIVATE OR MISSING',
-      accent: '#4b5563',
-      accent2: '#d1d5db',
-    });
+    const svg = renderBadgeSvg({ ...PRIVATE_BADGE, label });
     return new NextResponse(svg, {
       headers: {
         'Content-Type': 'image/svg+xml; charset=utf-8',
@@ -57,7 +50,7 @@ export async function GET(
       break;
   }
 
-  const svg = renderPillBadge({
+  const svg = renderBadgeSvg({
     icon,
     label,
     value,

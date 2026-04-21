@@ -57,6 +57,8 @@ htmlcov/
 .ruff_cache/
 
 badges/
+!apps/web/src/lib/badges/
+!apps/web/src/lib/badges/**
 .github/skills/
 .github/agents/
 
