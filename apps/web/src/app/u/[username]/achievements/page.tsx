@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
+import { getSessionUser } from '@/lib/auth';
+import { canViewProfile } from '@/lib/profile-policy';
 import {
   computeUnlockedLifetime,
   computeUnlockedStreak,
@@ -14,13 +16,22 @@ export default async function AchievementsPage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
+  const sessionUser = await getSessionUser();
 
   const user = await prisma.user.findUnique({
     where: { username },
     include: { userStat: true },
   });
 
-  if (!user || !user.profilePublic || !user.userStat) {
+  if (
+    !user ||
+    !canViewProfile({
+      profilePublic: user.profilePublic,
+      ownerUserId: user.id,
+      viewerUserId: sessionUser?.userId || null,
+    }) ||
+    !user.userStat
+  ) {
     notFound();
   }
 

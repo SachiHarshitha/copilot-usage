@@ -2,6 +2,8 @@ import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { computeRank, computeUnlockedLifetime, computeUnlockedStreak } from '@/lib/badge-stats';
+import { getSessionUser } from '@/lib/auth';
+import { canViewProfile } from '@/lib/profile-policy';
 
 export default async function ProfilePage({
   params,
@@ -9,6 +11,7 @@ export default async function ProfilePage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
+  const sessionUser = await getSessionUser();
 
   const user = await prisma.user.findUnique({
     where: { username },
@@ -22,7 +25,14 @@ export default async function ProfilePage({
     },
   });
 
-  if (!user || !user.profilePublic) {
+  if (
+    !user ||
+    !canViewProfile({
+      profilePublic: user.profilePublic,
+      ownerUserId: user.id,
+      viewerUserId: sessionUser?.userId || null,
+    })
+  ) {
     notFound();
   }
 

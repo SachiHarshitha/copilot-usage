@@ -2,11 +2,22 @@ import NextAuth, { type NextAuthOptions } from 'next-auth';
 import GitHubProvider from 'next-auth/providers/github';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from './db';
-import { shouldEnableDevLogin } from './auth-policy';
+import {
+  getDeterministicDevGithubId,
+  getDevTestAccountConfig,
+  shouldAutoCreateDevTestAccount,
+  shouldEnableDevLogin,
+} from './auth-policy';
 
 const enableDevLogin = shouldEnableDevLogin(process.env);
+const devTestAccount = getDevTestAccountConfig(process.env);
 
 const providers: NextAuthOptions['providers'] = [];
+
+function normalizeUsername(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase();
+}
 
 // GitHub OAuth (production + dev if configured)
 if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
@@ -18,20 +29,55 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   );
 }
 
-// Dev-only credentials provider — sign in as any seeded user
+// Dev-only credentials provider — sign in as a seeded user or an explicitly configured local test account
 if (enableDevLogin) {
   providers.push(
     CredentialsProvider({
       id: 'dev-login',
       name: 'Dev Login',
       credentials: {
-        username: { label: 'Username', type: 'text', placeholder: 'demouser' },
+        username: { label: 'Username', type: 'text', placeholder: devTestAccount.username },
       },
       async authorize(credentials) {
-        if (!credentials?.username) return null;
-        const user = await prisma.user.findUnique({
-          where: { username: credentials.username },
-        });
+        const requestedUsername = normalizeUsername(credentials?.username);
+        if (!requestedUsername) return null;
+
+        let user = await prisma.user.findUnique({ where: { username: requestedUsername } });
+
+        if (!user && shouldAutoCreateDevTestAccount(requestedUsername, process.env)) {
+          const githubId = getDeterministicDevGithubId(devTestAccount.username);
+          const conflictingUser = await prisma.user.findUnique({
+            where: { githubId },
+            select: { username: true },
+          });
+
+          if (conflictingUser && conflictingUser.username !== devTestAccount.username) {
+            return null;
+          }
+
+          user = await prisma.user.upsert({
+            where: { username: devTestAccount.username },
+            update: {
+              displayName: devTestAccount.displayName,
+              avatarUrl: devTestAccount.avatarUrl,
+              profilePublic: devTestAccount.profilePublic,
+            },
+            create: {
+              githubId,
+              username: devTestAccount.username,
+              displayName: devTestAccount.displayName,
+              avatarUrl: devTestAccount.avatarUrl,
+              profilePublic: devTestAccount.profilePublic,
+            },
+          });
+
+          await prisma.userStat.upsert({
+            where: { userId: user.id },
+            update: { lastSyncedAt: new Date() },
+            create: { userId: user.id },
+          });
+        }
+
         if (!user) return null;
         return { id: String(user.githubId), name: user.username, image: user.avatarUrl };
       },
@@ -82,9 +128,13 @@ export const authOptions: NextAuthOptions = {
           const sessionWithUser = session as typeof session & {
             userId?: string;
             username?: string;
+            avatarUrl?: string | null;
+            displayName?: string;
           };
           sessionWithUser.userId = dbUser.id;
           sessionWithUser.username = dbUser.username;
+          sessionWithUser.avatarUrl = dbUser.avatarUrl;
+          sessionWithUser.displayName = dbUser.displayName || dbUser.username;
         }
       }
       return session;
@@ -103,9 +153,6 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
   },
-  pages: {
-    signIn: '/api/auth/signin',
-  },
   session: {
     strategy: 'jwt',
   },
@@ -119,7 +166,17 @@ export async function getSessionUser() {
   const { getServerSession } = await import('next-auth/next');
   const session = await getServerSession(authOptions);
   if (!session) return null;
-  const s = session as typeof session & { userId?: string; username?: string };
+  const s = session as typeof session & {
+    userId?: string;
+    username?: string;
+    avatarUrl?: string | null;
+    displayName?: string;
+  };
   if (!s.userId) return null;
-  return { userId: s.userId, username: s.username || '' };
+  return {
+    userId: s.userId,
+    username: s.username || '',
+    avatarUrl: s.avatarUrl || null,
+    displayName: s.displayName || s.username || '',
+  };
 }

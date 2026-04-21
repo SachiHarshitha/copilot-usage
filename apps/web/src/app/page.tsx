@@ -1,6 +1,9 @@
 import Link from 'next/link';
+import { getSessionUser } from '@/lib/auth';
 
-export default function Home() {
+export default async function Home() {
+  const sessionUser = await getSessionUser();
+
   return (
     <div className="flex flex-col items-center text-center gap-10 py-16">
       <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight">
@@ -18,19 +21,44 @@ export default function Home() {
       </p>
 
       <div className="flex gap-4">
-        <Link
-          href="/api/auth/signin"
-          className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg no-underline font-medium"
-        >
-          Connect VS Code
-        </Link>
-        <Link
-          href="/leaderboard"
-          className="border border-[#30363d] hover:border-[#8b949e] text-[#c9d1d9] px-5 py-2.5 rounded-lg no-underline font-medium"
-        >
-          View Leaderboard
-        </Link>
+        {sessionUser ? (
+          <>
+            <Link
+              href={`/u/${sessionUser.username}`}
+              className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg no-underline font-medium"
+            >
+              View My Profile
+            </Link>
+            <Link
+              href="/settings"
+              className="border border-[#30363d] hover:border-[#8b949e] text-[#c9d1d9] px-5 py-2.5 rounded-lg no-underline font-medium"
+            >
+              Open Settings
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              href="/api/auth/signin?callbackUrl=%2Fsettings"
+              className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg no-underline font-medium"
+            >
+              Connect VS Code
+            </Link>
+            <Link
+              href="/leaderboard"
+              className="border border-[#30363d] hover:border-[#8b949e] text-[#c9d1d9] px-5 py-2.5 rounded-lg no-underline font-medium"
+            >
+              View Leaderboard
+            </Link>
+          </>
+        )}
       </div>
+
+      {sessionUser && (
+        <p className="text-sm text-[#8b949e] -mt-6">
+          Signed in as <span className="text-white">@{sessionUser.username}</span>
+        </p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 max-w-3xl w-full">
         <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-6 text-left">

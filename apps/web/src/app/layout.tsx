@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { getSessionUser } from '@/lib/auth';
+import { ProfileMenu } from './components/profile-menu';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -7,7 +9,9 @@ export const metadata: Metadata = {
   description: 'Track your GitHub Copilot usage on promptstreak.dev. Share it publicly. Embed it in your README.',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const sessionUser = await getSessionUser();
+
   return (
     <html lang="en">
       <body className="min-h-screen">
@@ -17,9 +21,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </Link>
           <div className="flex items-center gap-4 text-sm">
             <Link href="/leaderboard">Leaderboard</Link>
-            <Link href="/api/auth/signin" className="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-md no-underline text-sm">
-              Sign in with GitHub
-            </Link>
+            {sessionUser ? (
+              <ProfileMenu username={sessionUser.username} avatarUrl={sessionUser.avatarUrl} />
+            ) : (
+              <Link href="/api/auth/signin?callbackUrl=%2Fsettings" className="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-md no-underline text-sm">
+                Sign in with GitHub
+              </Link>
+            )}
           </div>
         </nav>
         <main className="max-w-5xl mx-auto px-6 py-8">{children}</main>

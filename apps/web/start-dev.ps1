@@ -85,6 +85,11 @@ $env:NEXTAUTH_SECRET = "dev-secret-change-in-production"
 $env:NEXTAUTH_URL = "http://localhost:3000"
 $env:ENABLE_DEV_LOGIN = "true"
 $env:ALLOW_DEV_LOGIN_NONLOCAL = "false"
+$env:ENABLE_DEV_TEST_ACCOUNT = "true"
+$env:DEV_TEST_ACCOUNT_USERNAME = "localtest"
+$env:DEV_TEST_ACCOUNT_DISPLAY_NAME = "Local Test User"
+$env:DEV_TEST_ACCOUNT_PROFILE_PUBLIC = "true"
+$env:DEV_TEST_ACCOUNT_AVATAR_URL = ""
 $env:GITHUB_CLIENT_ID = "dummy-client-id"
 $env:GITHUB_CLIENT_SECRET = "dummy-client-secret"
 $script:PnpmCommand = Get-PnpmCommand
@@ -159,6 +164,11 @@ try {
             'NEXTAUTH_URL="http://localhost:3000"'
             'ENABLE_DEV_LOGIN="true"'
             'ALLOW_DEV_LOGIN_NONLOCAL="false"'
+            'ENABLE_DEV_TEST_ACCOUNT="true"'
+            'DEV_TEST_ACCOUNT_USERNAME="localtest"'
+            'DEV_TEST_ACCOUNT_DISPLAY_NAME="Local Test User"'
+            'DEV_TEST_ACCOUNT_PROFILE_PUBLIC="true"'
+            'DEV_TEST_ACCOUNT_AVATAR_URL=""'
             'GITHUB_CLIENT_ID=dummy-client-id'
             'GITHUB_CLIENT_SECRET=dummy-client-secret'
         ) | Set-Content $envPath
