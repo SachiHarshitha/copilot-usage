@@ -2,8 +2,9 @@ import NextAuth, { type NextAuthOptions } from 'next-auth';
 import GitHubProvider from 'next-auth/providers/github';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from './db';
+import { shouldEnableDevLogin } from './auth-policy';
 
-const isDev = process.env.NODE_ENV === 'development';
+const enableDevLogin = shouldEnableDevLogin(process.env);
 
 const providers: NextAuthOptions['providers'] = [];
 
@@ -18,7 +19,7 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
 }
 
 // Dev-only credentials provider — sign in as any seeded user
-if (isDev) {
+if (enableDevLogin) {
   providers.push(
     CredentialsProvider({
       id: 'dev-login',
@@ -41,7 +42,7 @@ if (isDev) {
 export const authOptions: NextAuthOptions = {
   providers,
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ account, profile }) {
       // Dev credentials provider — user already exists in DB
       if (account?.provider === 'dev-login') {
         return true;
@@ -78,15 +79,22 @@ export const authOptions: NextAuthOptions = {
           where: { githubId: parseInt(token.sub, 10) },
         });
         if (dbUser) {
-          (session as any).userId = dbUser.id;
-          (session as any).username = dbUser.username;
+          const sessionWithUser = session as typeof session & {
+            userId?: string;
+            username?: string;
+          };
+          sessionWithUser.userId = dbUser.id;
+          sessionWithUser.username = dbUser.username;
         }
       }
       return session;
     },
     async jwt({ token, profile, user }) {
       if (profile) {
-        token.sub = String((profile as any).id);
+        const profileWithId = profile as { id?: number };
+        if (typeof profileWithId.id === 'number') {
+          token.sub = String(profileWithId.id);
+        }
       }
       // Dev credentials: user.id is the githubId string
       if (user && !profile) {
@@ -111,7 +119,7 @@ export async function getSessionUser() {
   const { getServerSession } = await import('next-auth/next');
   const session = await getServerSession(authOptions);
   if (!session) return null;
-  const s = session as any;
+  const s = session as typeof session & { userId?: string; username?: string };
   if (!s.userId) return null;
-  return { userId: s.userId as string, username: s.username as string };
+  return { userId: s.userId, username: s.username || '' };
 }

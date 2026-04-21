@@ -83,6 +83,8 @@ $DATABASE_URL = "postgresql://${PG_USER}:${PG_PASS}@localhost:${PG_PORT}/${PG_DB
 $env:DATABASE_URL = $DATABASE_URL
 $env:NEXTAUTH_SECRET = "dev-secret-change-in-production"
 $env:NEXTAUTH_URL = "http://localhost:3000"
+$env:ENABLE_DEV_LOGIN = "true"
+$env:ALLOW_DEV_LOGIN_NONLOCAL = "false"
 $env:GITHUB_CLIENT_ID = "dummy-client-id"
 $env:GITHUB_CLIENT_SECRET = "dummy-client-secret"
 $script:PnpmCommand = Get-PnpmCommand
@@ -155,6 +157,8 @@ try {
             'DATABASE_URL="' + $DATABASE_URL + '"'
             'NEXTAUTH_SECRET="dev-secret-change-in-production"'
             'NEXTAUTH_URL="http://localhost:3000"'
+            'ENABLE_DEV_LOGIN="true"'
+            'ALLOW_DEV_LOGIN_NONLOCAL="false"'
             'GITHUB_CLIENT_ID=dummy-client-id'
             'GITHUB_CLIENT_SECRET=dummy-client-secret'
         ) | Set-Content $envPath

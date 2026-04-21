@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "tsx --test src/**/*.test.ts",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

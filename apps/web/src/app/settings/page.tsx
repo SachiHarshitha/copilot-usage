@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 interface UserSettings {
@@ -29,12 +30,12 @@ export default function SettingsPage() {
     return (
       <div className="text-center py-12">
         <p className="text-[#8b949e] mb-4">You need to sign in to access settings.</p>
-        <a
+        <Link
           href="/api/auth/signin"
           className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg no-underline"
         >
           Sign in with GitHub
-        </a>
+        </Link>
       </div>
     );
   }
@@ -86,7 +87,6 @@ export default function SettingsPage() {
   }
 
   const baseUrl = 'https://promptstreak.dev';
-  const badgeUrl = `/badge/${settings.username}.svg?stat=tokens&label=PromptStreak`;
   const cardUrl = `/card/${settings.username}.svg`;
   const streakBadgeUrl = `/api/badges/${settings.username}/streak.svg`;
   const lifetimeBadgeUrl = `/api/badges/${settings.username}/lifetime.svg`;

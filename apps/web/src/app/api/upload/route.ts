@@ -6,6 +6,56 @@ import bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
 import { computeStreaks } from '@/lib/streak';
 
+interface RejectedUploadLogInput {
+  userId: string;
+  deviceId: string;
+  ipHash: string;
+  payloadBytes: number;
+  bucketCount?: number;
+  earliestDate?: Date | null;
+  latestDate?: Date | null;
+}
+
+function getClientIp(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    const first = forwarded.split(',')[0]?.trim();
+    if (first) return first;
+  }
+
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) return realIp;
+
+  return 'unknown';
+}
+
+async function logRejectedUpload({
+  userId,
+  deviceId,
+  ipHash,
+  payloadBytes,
+  bucketCount = 0,
+  earliestDate = null,
+  latestDate = null,
+}: RejectedUploadLogInput): Promise<void> {
+  try {
+    await prisma.uploadLog.create({
+      data: {
+        userId,
+        deviceId,
+        ipHash,
+        payloadBytes,
+        bucketCount,
+        earliestDate,
+        latestDate,
+        accepted: false,
+      },
+    });
+  } catch {
+    // Best effort only.
+  }
+}
+
 /**
  * POST /api/upload
  * Authenticated upload endpoint. Validates payload, upserts UsageDaily + UserStat + RepoStat.
@@ -42,9 +92,10 @@ export async function POST(request: NextRequest) {
 
   const userId = device.userId;
   const deviceId = device.id;
+  const ipHash = createHash('sha256').update(getClientIp(request)).digest('hex');
 
   // --- Rate limit ---
-  const rateCheck = await checkRateLimit(deviceId);
+  const rateCheck = await checkRateLimit({ deviceId, userId, ipHash });
   if (!rateCheck.allowed) {
     return NextResponse.json(
       { error: 'Rate limit exceeded.' },
@@ -54,18 +105,39 @@ export async function POST(request: NextRequest) {
 
   // --- Parse and validate payload ---
   let body: unknown;
+  let rawPayload = '';
   try {
-    const raw = await request.text();
-    if (raw.length > 65536) {
+    rawPayload = await request.text();
+    if (rawPayload.length > 65536) {
+      await logRejectedUpload({
+        userId,
+        deviceId,
+        ipHash,
+        payloadBytes: rawPayload.length,
+      });
       return NextResponse.json({ error: 'Payload too large (64KB max).' }, { status: 413 });
     }
-    body = JSON.parse(raw);
+    body = JSON.parse(rawPayload);
   } catch {
+    await logRejectedUpload({
+      userId,
+      deviceId,
+      ipHash,
+      payloadBytes: rawPayload.length,
+    });
     return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 });
   }
 
+  const payloadBytes = rawPayload.length;
+
   const parsed = SnapshotPayloadSchema.safeParse(body);
   if (!parsed.success) {
+    await logRejectedUpload({
+      userId,
+      deviceId,
+      ipHash,
+      payloadBytes,
+    });
     return NextResponse.json(
       { error: 'Validation failed.', details: parsed.error.issues.slice(0, 5) },
       { status: 400 }
@@ -78,12 +150,30 @@ export async function POST(request: NextRequest) {
   const clientTime = new Date(payload.clientUploadedAt).getTime();
   const now = Date.now();
   if (clientTime < now - 24 * 60 * 60 * 1000 || clientTime > now + 5 * 60 * 1000) {
+    await logRejectedUpload({
+      userId,
+      deviceId,
+      ipHash,
+      payloadBytes,
+      bucketCount: payload.dailyBuckets.length,
+      earliestDate: payload.dailyBuckets.length > 0 ? new Date(payload.dailyBuckets[0].date) : null,
+      latestDate: payload.dailyBuckets.length > 0 ? new Date(payload.dailyBuckets[payload.dailyBuckets.length - 1].date) : null,
+    });
     return NextResponse.json({ error: 'clientUploadedAt is out of allowed time window.' }, { status: 400 });
   }
 
   // --- Validate daily bucket dates ---
   for (const bucket of payload.dailyBuckets) {
     if (new Date(bucket.date).getTime() > clientTime) {
+      await logRejectedUpload({
+        userId,
+        deviceId,
+        ipHash,
+        payloadBytes,
+        bucketCount: payload.dailyBuckets.length,
+        earliestDate: payload.dailyBuckets.length > 0 ? new Date(payload.dailyBuckets[0].date) : null,
+        latestDate: payload.dailyBuckets.length > 0 ? new Date(payload.dailyBuckets[payload.dailyBuckets.length - 1].date) : null,
+      });
       return NextResponse.json({ error: `Daily bucket date ${bucket.date} is in the future.` }, { status: 400 });
     }
   }
@@ -253,16 +343,12 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('Upload transaction failed:', err);
     // Log failed upload
-    const ipHash = createHash('sha256')
-      .update(request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown')
-      .digest('hex');
-
     await prisma.uploadLog.create({
       data: {
         userId,
         deviceId,
         ipHash,
-        payloadBytes: JSON.stringify(body).length,
+        payloadBytes,
         bucketCount: payload.dailyBuckets.length,
         earliestDate: payload.dailyBuckets.length > 0 ? new Date(payload.dailyBuckets[0].date) : null,
         latestDate: payload.dailyBuckets.length > 0 ? new Date(payload.dailyBuckets[payload.dailyBuckets.length - 1].date) : null,
@@ -274,16 +360,12 @@ export async function POST(request: NextRequest) {
   }
 
   // --- Audit log (best-effort, outside transaction) ---
-  const ipHash = createHash('sha256')
-    .update(request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown')
-    .digest('hex');
-
   const log = await prisma.uploadLog.create({
     data: {
       userId,
       deviceId,
       ipHash,
-      payloadBytes: JSON.stringify(body).length,
+      payloadBytes,
       bucketCount: payload.dailyBuckets.length,
       earliestDate: payload.dailyBuckets.length > 0 ? new Date(payload.dailyBuckets[0].date) : null,
       latestDate: payload.dailyBuckets.length > 0 ? new Date(payload.dailyBuckets[payload.dailyBuckets.length - 1].date) : null,

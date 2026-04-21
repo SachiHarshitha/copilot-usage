@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Home() {
   return (
     <div className="flex flex-col items-center text-center gap-10 py-16">
@@ -16,18 +18,18 @@ export default function Home() {
       </p>
 
       <div className="flex gap-4">
-        <a
+        <Link
           href="/api/auth/signin"
           className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg no-underline font-medium"
         >
           Connect VS Code
-        </a>
-        <a
+        </Link>
+        <Link
           href="/leaderboard"
           className="border border-[#30363d] hover:border-[#8b949e] text-[#c9d1d9] px-5 py-2.5 rounded-lg no-underline font-medium"
         >
           View Leaderboard
-        </a>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 max-w-3xl w-full">

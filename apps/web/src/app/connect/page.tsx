@@ -25,7 +25,13 @@ function ConnectInner() {
       return;
     }
 
-    fetch(`/api/connect?code=${encodeURIComponent(code)}`)
+    fetch('/api/connect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ code }),
+    })
       .then(async (res) => {
         if (res.ok) {
           const data = await res.json();
