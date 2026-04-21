@@ -28,6 +28,7 @@ export default async function LeaderboardPage({
     totalRequests: number;
     topModel: string | null;
     workspaceCount: number;
+    currentStreakDays: number;
   }[] = [];
 
   if (!since) {
@@ -51,6 +52,7 @@ export default async function LeaderboardPage({
       totalRequests: s.totalRequests,
       topModel: s.topModel,
       workspaceCount: s.workspaceCount,
+        currentStreakDays: s.currentStreakDays,
     }));
   } else {
     // Date-filtered: aggregate UsageDaily
@@ -98,6 +100,7 @@ export default async function LeaderboardPage({
         totalRequests: r.totalRequests,
         topModel: user?.userStat?.topModel || null,
         workspaceCount: user?.userStat?.workspaceCount || 0,
+        currentStreakDays: user?.userStat?.currentStreakDays || 0,
       };
     });
   }
@@ -123,7 +126,9 @@ export default async function LeaderboardPage({
             <tr className="border-b border-[#30363d] text-[#8b949e]">
               <th className="text-left py-3 px-2 w-12">#</th>
               <th className="text-left py-3 px-2">User</th>
+              <th className="text-left py-3 px-2">Rank</th>
               <th className="text-right py-3 px-2">Total Tokens</th>
+              <th className="text-right py-3 px-2">Streak</th>
               <th className="text-right py-3 px-2">Premium Reqs</th>
               <th className="text-right py-3 px-2">Requests</th>
               <th className="text-right py-3 px-2">Top Model</th>
@@ -133,7 +138,7 @@ export default async function LeaderboardPage({
           <tbody>
             {entries.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-[#8b949e]">
+                <td colSpan={9} className="py-12 text-center text-[#8b949e]">
                   No public users yet. Be the first to share your stats!
                 </td>
               </tr>
@@ -150,7 +155,12 @@ export default async function LeaderboardPage({
                     <span className="text-white font-medium">{e.username}</span>
                   </Link>
                 </td>
+                <td className="py-3 px-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/badges/${e.username}/rank.svg`} alt={`${e.username} rank`} className="h-7 w-auto" />
+                </td>
                 <td className="py-3 px-2 text-right font-mono">{Number(e.totalTokens).toLocaleString()}</td>
+                <td className="py-3 px-2 text-right font-mono">🔥 {e.currentStreakDays}</td>
                 <td className="py-3 px-2 text-right font-mono">{e.premiumRequests.toFixed(1)}</td>
                 <td className="py-3 px-2 text-right font-mono">{e.totalRequests.toLocaleString()}</td>
                 <td className="py-3 px-2 text-right text-[#8b949e]">{e.topModel || '–'}</td>

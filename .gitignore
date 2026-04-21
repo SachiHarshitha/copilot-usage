@@ -57,3 +57,7 @@ htmlcov/
 .ruff_cache/
 
 badges/
+.github/skills/
+.github/agents/
+
+.github/copilot-instructions.md

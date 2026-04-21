@@ -75,7 +75,11 @@ model UserStat {
   promptTokens    BigInt   @default(0)
   outputTokens    BigInt   @default(0)
   totalTokens     BigInt   @default(0)
+  weeklyTokens    BigInt   @default(0)
+  rolling30DayTokens BigInt @default(0)
   premiumRequests Float    @default(0)
+  currentStreakDays Int    @default(0)
+  bestStreakDays  Int      @default(0)
   workspaceCount  Int      @default(0)
   sessionCount    Int      @default(0)
   topModel        String?
@@ -99,6 +103,7 @@ model RepoStat {
   promptTokens  BigInt  @default(0)
   outputTokens  BigInt  @default(0)
   totalTokens   BigInt  @default(0)
+  tokens30d     BigInt  @default(0)
   premiumReqs   Float   @default(0)
   topModel      String?
   lastSyncedAt  DateTime @default(now())
@@ -106,4 +111,6 @@ model RepoStat {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, repoIdentity])
+  @@index([isPublic, totalTokens(sort: Desc)])
+  @@index([githubRepo])
 }

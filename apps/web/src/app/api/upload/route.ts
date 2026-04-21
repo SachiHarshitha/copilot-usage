@@ -4,6 +4,7 @@ import { SnapshotPayloadSchema } from '@copilot-usage/shared-schema';
 import { checkRateLimit } from '@/lib/ratelimit';
 import bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
+import { computeStreaks } from '@/lib/streak';
 
 /**
  * POST /api/upload
@@ -130,6 +131,39 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      const usageRows = await tx.usageDaily.findMany({
+        where: { userId },
+        select: {
+          date: true,
+          totalTokens: true,
+        },
+        orderBy: { date: 'asc' },
+      });
+
+      const { currentStreakDays, bestStreakDays } = computeStreaks(usageRows);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const weekStart = new Date(today);
+      weekStart.setDate(weekStart.getDate() - 6);
+
+      const rolling30Start = new Date(today);
+      rolling30Start.setDate(rolling30Start.getDate() - 29);
+
+      let weeklyTokens = BigInt(0);
+      let rolling30DayTokens = BigInt(0);
+      for (const row of usageRows) {
+        const bucketDate = new Date(row.date);
+        bucketDate.setHours(0, 0, 0, 0);
+        if (bucketDate >= weekStart) {
+          weeklyTokens += row.totalTokens;
+        }
+        if (bucketDate >= rolling30Start) {
+          rolling30DayTokens += row.totalTokens;
+        }
+      }
+
       // Find top model from the payload's model breakdown
       let topModel: string | null = null;
       if (payload.modelBreakdown.length > 0) {
@@ -143,7 +177,11 @@ export async function POST(request: NextRequest) {
           promptTokens: agg._sum.promptTokens || BigInt(0),
           outputTokens: agg._sum.outputTokens || BigInt(0),
           totalTokens: agg._sum.totalTokens || BigInt(0),
+          weeklyTokens,
+          rolling30DayTokens,
           premiumRequests: agg._sum.premiumRequests || 0,
+          currentStreakDays,
+          bestStreakDays,
           workspaceCount: payload.workspaceCount,
           sessionCount: payload.sessionCount,
           topModel,
@@ -155,7 +193,11 @@ export async function POST(request: NextRequest) {
           promptTokens: agg._sum.promptTokens || BigInt(0),
           outputTokens: agg._sum.outputTokens || BigInt(0),
           totalTokens: agg._sum.totalTokens || BigInt(0),
+          weeklyTokens,
+          rolling30DayTokens,
           premiumRequests: agg._sum.premiumRequests || 0,
+          currentStreakDays,
+          bestStreakDays,
           workspaceCount: payload.workspaceCount,
           sessionCount: payload.sessionCount,
           topModel,
@@ -180,6 +222,7 @@ export async function POST(request: NextRequest) {
             promptTokens: repo.promptTokens,
             outputTokens: repo.outputTokens,
             totalTokens: repo.promptTokens + repo.outputTokens,
+            tokens30d: repo.promptTokens + repo.outputTokens,
             premiumReqs: repo.premiumRequests,
             topModel: repo.topModel,
             lastSyncedAt: new Date(),
@@ -194,6 +237,7 @@ export async function POST(request: NextRequest) {
             promptTokens: repo.promptTokens,
             outputTokens: repo.outputTokens,
             totalTokens: repo.promptTokens + repo.outputTokens,
+            tokens30d: repo.promptTokens + repo.outputTokens,
             premiumReqs: repo.premiumRequests,
             topModel: repo.topModel,
           },

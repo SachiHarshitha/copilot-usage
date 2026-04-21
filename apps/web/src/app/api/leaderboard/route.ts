@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
         totalTokens: s.totalTokens.toString(),
         premiumRequests: s.premiumRequests,
         totalRequests: s.totalRequests,
+        currentStreakDays: s.currentStreakDays,
+        rolling30DayTokens: s.rolling30DayTokens.toString(),
         topModel: s.topModel,
         workspaceCount: s.workspaceCount,
       })),
@@ -76,6 +78,8 @@ export async function GET(request: NextRequest) {
         totalTokens: r.totalTokens.toString(),
         premiumRequests: r.premiumRequests,
         totalRequests: r.totalRequests,
+        currentStreakDays: 0,
+        rolling30DayTokens: r.totalTokens.toString(),
         topModel: null,
         workspaceCount: 0,
       };

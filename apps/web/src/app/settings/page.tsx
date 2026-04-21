@@ -85,8 +85,18 @@ export default function SettingsPage() {
     }
   }
 
-  const badgeUrl = `/badge/${settings.username}.svg?stat=tokens&label=Copilot%20Tokens`;
+  const baseUrl = 'https://promptstreak.dev';
+  const badgeUrl = `/badge/${settings.username}.svg?stat=tokens&label=PromptStreak`;
   const cardUrl = `/card/${settings.username}.svg`;
+  const streakBadgeUrl = `/api/badges/${settings.username}/streak.svg`;
+  const lifetimeBadgeUrl = `/api/badges/${settings.username}/lifetime.svg`;
+  const rankBadgeUrl = `/api/badges/${settings.username}/rank.svg`;
+  const weeklyBadgeUrl = `/api/badges/${settings.username}/weekly.svg`;
+  const repoBadgeUrl = `/api/badges/${settings.username}/repo.svg`;
+
+  const publicGithubRepo = settings.repos.find((r) => r.isPublic && r.displayMode === 'github' && r.githubRepo)?.githubRepo;
+  const repoOwner = publicGithubRepo?.split('/')[0] || 'owner';
+  const repoName = publicGithubRepo?.split('/')[1] || 'repo';
 
   return (
     <div className="max-w-2xl">
@@ -189,21 +199,59 @@ export default function SettingsPage() {
       </Section>
 
       {/* Badge Preview */}
-      <Section title="Badge & Card">
+      <Section title="Badges">
         <div className="mb-4">
-          <p className="text-xs text-[#8b949e] mb-1">Badge Preview:</p>
+          <p className="text-xs text-[#8b949e] mb-1">User Badge Preview:</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={badgeUrl} alt="Badge preview" className="mb-2" />
+          <img src={streakBadgeUrl} alt="Streak badge preview" className="mb-2" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lifetimeBadgeUrl} alt="Lifetime badge preview" className="mb-2" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={rankBadgeUrl} alt="Rank badge preview" className="mb-2" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={weeklyBadgeUrl} alt="Weekly badge preview" className="mb-2" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={repoBadgeUrl} alt="Top repo badge preview" className="mb-2" />
+        </div>
+
+        <div className="mb-4">
+          <p className="text-xs text-[#8b949e] mb-1">README snippets (user):</p>
+          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+            {`[![PromptStreak Streak](${baseUrl}${streakBadgeUrl})](${baseUrl}/u/${settings.username})`}
+          </code>
+          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+            {`[![PromptStreak Lifetime](${baseUrl}${lifetimeBadgeUrl})](${baseUrl}/u/${settings.username})`}
+          </code>
+          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+            {`[![PromptStreak Rank](${baseUrl}${rankBadgeUrl})](${baseUrl}/u/${settings.username})`}
+          </code>
+          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+            {`[![PromptStreak Weekly](${baseUrl}${weeklyBadgeUrl})](${baseUrl}/u/${settings.username})`}
+          </code>
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
-            {`![promptstreak.dev](${badgeUrl})`}
+            {`[![PromptStreak Top Repo](${baseUrl}${repoBadgeUrl})](${baseUrl}/u/${settings.username})`}
           </code>
         </div>
+
         <div>
-          <p className="text-xs text-[#8b949e] mb-1">Card Preview:</p>
+          <p className="text-xs text-[#8b949e] mb-1">Legacy card:</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={cardUrl} alt="Card preview" className="mb-2 max-w-[400px]" />
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
-            {`![promptstreak.dev](${cardUrl})`}
+            {`![promptstreak.dev](${baseUrl}${cardUrl})`}
+          </code>
+        </div>
+
+        <div className="mt-5">
+          <p className="text-xs text-[#8b949e] mb-1">README snippets (repo):</p>
+          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+            {`[![PromptStreak Rank](${baseUrl}/api/badges/repo/${repoOwner}/${repoName}/leaderboard.svg)](${baseUrl}/r/${settings.username}/${repoOwner}/${repoName})`}
+          </code>
+          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+            {`[![PromptStreak Tokens](${baseUrl}/api/badges/repo/${repoOwner}/${repoName}/tokens.svg)](${baseUrl}/r/${settings.username}/${repoOwner}/${repoName})`}
+          </code>
+          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
+            {`[![PromptStreak Models](${baseUrl}/api/badges/repo/${repoOwner}/${repoName}/models.svg)](${baseUrl}/r/${settings.username}/${repoOwner}/${repoName})`}
           </code>
         </div>
       </Section>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { generateBadgeSvg, formatNumber } from '@/lib/svg';
+import { getPublicBadgeStats } from '@/lib/badge-stats';
+import { formatCompactNumber, renderPillBadge } from '@/lib/badge-svg';
 
 /**
  * GET /badge/[username].svg?stat=tokens|requests|premium&label=Custom+Label
@@ -16,46 +16,58 @@ export async function GET(
   const stat = request.nextUrl.searchParams.get('stat') || 'tokens';
   const label = request.nextUrl.searchParams.get('label') || 'promptstreak.dev';
 
-  const user = await prisma.user.findUnique({
-    where: { username },
-    include: { userStat: true },
-  });
-
-  if (!user || !user.profilePublic || !user.userStat) {
-    // Return a "not found" badge
-    const svg = generateBadgeSvg({ label, value: 'N/A', color: '#555' });
+  const stats = await getPublicBadgeStats(username);
+  if (!stats) {
+    const svg = renderPillBadge({
+      icon: '🔒',
+      label,
+      value: 'PRIVATE OR MISSING',
+      accent: '#4b5563',
+      accent2: '#d1d5db',
+    });
     return new NextResponse(svg, {
       headers: {
-        'Content-Type': 'image/svg+xml',
+        'Content-Type': 'image/svg+xml; charset=utf-8',
         'Cache-Control': 'public, max-age=300',
       },
     });
   }
 
-  const s = user.userStat;
   let value: string;
-  let color = '#4c6ef5';
+  let icon = '⚡';
+  let accent = '#4f46e5';
+  let accent2 = '#c7d2fe';
 
   switch (stat) {
     case 'requests':
-      value = formatNumber(s.totalRequests);
-      color = '#2ea043';
+      value = formatCompactNumber(stats.totalRequests);
+      icon = '🧾';
+      accent = '#2ea043';
+      accent2 = '#86efac';
       break;
     case 'premium':
-      value = s.premiumRequests.toFixed(1);
-      color = '#d29922';
+      value = stats.premiumRequests.toFixed(1);
+      icon = '💎';
+      accent = '#d29922';
+      accent2 = '#fef08a';
       break;
     case 'tokens':
     default:
-      value = formatNumber(s.totalTokens);
+      value = `${formatCompactNumber(stats.lifetimeTokens)} TOKENS`;
       break;
   }
 
-  const svg = generateBadgeSvg({ label, value, color });
+  const svg = renderPillBadge({
+    icon,
+    label,
+    value,
+    accent,
+    accent2,
+  });
 
   return new NextResponse(svg, {
     headers: {
-      'Content-Type': 'image/svg+xml',
+      'Content-Type': 'image/svg+xml; charset=utf-8',
       'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
     },
   });
