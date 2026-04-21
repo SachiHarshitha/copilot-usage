@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { computeBadgeLayout } from './layout';
 import { renderAchievementCardSvg, renderBadgeSvg, renderRankCardSvg } from './render';
 
 test('renderBadgeSvg includes escaped content and watermark', () => {
@@ -16,6 +17,41 @@ test('renderBadgeSvg includes escaped content and watermark', () => {
   assert.equal(svg.includes('A&amp;B'), true);
   assert.equal(svg.includes('promptstreak.dev'), true);
   assert.equal(svg.includes('rgba(255,255,255,.22)'), true);
+  assert.equal(svg.includes('clipPath'), true);
+});
+
+test('renderBadgeSvg adapts width and clamps by badge type', () => {
+  const svg = renderBadgeSvg({
+    badgeType: 'models',
+    icon: '🤖',
+    label: 'Models Tracked',
+    value: 'GPT-5, CLAUDE SONNET 4, O4-MINI, GEMINI 2.5 PRO',
+    secondaryText: 'PRIMARY MODEL: CLAUDE SONNET 4',
+    accent: '#111111',
+    accent2: '#222222',
+  });
+
+  const widthMatch = svg.match(/<svg[^>]*width="(\d+)"/);
+  assert.notEqual(widthMatch, null);
+
+  const width = Number.parseInt(widthMatch?.[1] ?? '0', 10);
+  assert.equal(width, 250);
+  assert.equal(svg.includes('…'), true);
+});
+
+test('layout-derived render values never exceed available content width', () => {
+  const layout = computeBadgeLayout({
+    badgeType: 'summary',
+    icon: '✨',
+    label: 'PUBLIC REPO',
+    value: '#17',
+    secondaryText: '12,483,221 lifetime tokens · GPT-5, CLAUDE SONNET 4, O4-MINI',
+    watermark: 'promptstreak.dev',
+  });
+
+  assert.equal(layout.valueWidth <= layout.availableValueWidth, true);
+  assert.equal(layout.secondaryWidth <= layout.availableSecondaryWidth, true);
+  assert.equal(layout.width <= layout.constraint.maxWidth, true);
 });
 
 test('renderRankCardSvg and renderAchievementCardSvg include key fields', () => {

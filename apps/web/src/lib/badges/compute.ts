@@ -75,19 +75,23 @@ export function summarizeModels(models: string[]): string {
 }
 
 export function getRepoLeaderboardBadge(rank: number | null, percentile?: number | null): BadgeDescriptor {
-  const top = typeof percentile === 'number' && Number.isFinite(percentile)
-    ? ` · TOP ${Math.max(1, Math.round(100 - percentile + 1))}%`
-    : '';
+  const top =
+    typeof percentile === 'number' && Number.isFinite(percentile)
+      ? `TOP ${Math.max(1, Math.round(100 - percentile + 1))}%`
+      : '';
 
   return {
     ...REPO_BADGE_PRESETS.leaderboard,
-    value: rank ? `#${rank}${top}` : 'UNRANKED',
+    badgeType: 'leaderboard',
+    value: rank ? `#${rank}` : 'UNRANKED',
+    secondaryText: top,
   };
 }
 
 export function getRepoModelsBadge(models: string[]): BadgeDescriptor {
   return {
     ...REPO_BADGE_PRESETS.models,
+    badgeType: 'models',
     value: summarizeModels(models).toUpperCase(),
   };
 }
@@ -99,7 +103,9 @@ export function getRepoSummaryBadge(stats: PublicRepoBadgeSummary): BadgeDescrip
 
   return {
     ...REPO_BADGE_PRESETS.summary,
-    value: `${rank} · ${tokens} · ${models}`,
+    badgeType: 'summary',
+    value: rank,
+    secondaryText: `${tokens} · ${models}`,
   };
 }
 
@@ -110,6 +116,7 @@ export function getUserBadgeByType(type: string, stats: PublicUserBadgeSummary):
     case 'streak': {
       const tier = getStreakTier(stats.currentStreakDays);
       return {
+        badgeType: 'streak',
         icon: tier.icon,
         label: USER_BADGE_PRESETS.streak.label,
         value: `${stats.currentStreakDays} DAYS`,
@@ -120,6 +127,7 @@ export function getUserBadgeByType(type: string, stats: PublicUserBadgeSummary):
     case 'lifetime': {
       const tier = getLifetimeTier(stats.lifetimeTokens);
       return {
+        badgeType: 'lifetime',
         icon: tier.icon,
         label: USER_BADGE_PRESETS.lifetime.label,
         value: `${formatCompactNumber(stats.lifetimeTokens)} TOKENS`,
@@ -130,6 +138,7 @@ export function getUserBadgeByType(type: string, stats: PublicUserBadgeSummary):
     case 'rank': {
       const rank = getRankTier(stats.rolling30DayTokens);
       return {
+        badgeType: 'rank',
         icon: USER_BADGE_PRESETS.rank.icon,
         label: USER_BADGE_PRESETS.rank.label,
         value: rank.label.toUpperCase(),
@@ -140,16 +149,19 @@ export function getUserBadgeByType(type: string, stats: PublicUserBadgeSummary):
     case 'weekly':
       return {
         ...USER_BADGE_PRESETS.weekly,
+        badgeType: 'weekly',
         value: `${formatCompactNumber(stats.weeklyTokens)} TOKENS`,
       };
     case 'repo':
       return {
         ...USER_BADGE_PRESETS.repo,
+        badgeType: 'repo',
         value: (stats.topRepoName || 'NO PUBLIC REPO').toUpperCase(),
       };
     default:
       return {
         ...USER_BADGE_PRESETS.lifetime,
+        badgeType: 'generic',
         label: 'PROMPTSTREAK',
         value: stats.username.toUpperCase(),
       };
@@ -165,11 +177,13 @@ export function getRepoBadgeByType(type: string, stats: PublicRepoBadgeSummary):
     case 'tokens':
       return {
         ...REPO_BADGE_PRESETS.tokens,
+        badgeType: 'tokens',
         value: `${formatCompactNumber(stats.totalTokens)} TOKENS`,
       };
     case 'tokens-30d':
       return {
         ...REPO_BADGE_PRESETS.tokens30d,
+        badgeType: 'tokens30d',
         value: `${formatCompactNumber(stats.tokens30d)} TOKENS`,
       };
     case 'models':
@@ -177,6 +191,7 @@ export function getRepoBadgeByType(type: string, stats: PublicRepoBadgeSummary):
     case 'primary-model':
       return {
         ...REPO_BADGE_PRESETS.primaryModel,
+        badgeType: 'primary-model',
         value: sanitizeBadgeText(stats.primaryModel || 'UNKNOWN').toUpperCase(),
       };
     case 'summary':
@@ -184,6 +199,7 @@ export function getRepoBadgeByType(type: string, stats: PublicRepoBadgeSummary):
     default:
       return {
         ...REPO_BADGE_PRESETS.summary,
+        badgeType: 'generic',
         value: stats.repoSlug.toUpperCase(),
       };
   }

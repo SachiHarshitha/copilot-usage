@@ -1,5 +1,6 @@
 import { BADGE_WATERMARK } from './config';
 import { escapeXml } from './format';
+import { computeBadgeLayout } from './layout';
 import type { AchievementCardDescriptor, BadgeDescriptor, RankCardDescriptor } from './types';
 
 export interface RenderBadgeSvgInput extends BadgeDescriptor {
@@ -14,47 +15,96 @@ export interface RenderAchievementCardSvgInput extends AchievementCardDescriptor
   watermark?: string;
 }
 
+function createSvgIdSuffix(seed: string): string {
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  return hash.toString(36);
+}
+
 export function renderBadgeSvg({
+  badgeType,
   label,
   value,
+  secondaryText,
   icon,
   accent,
   accent2,
   watermark = BADGE_WATERMARK,
   ariaLabel,
 }: RenderBadgeSvgInput): string {
-  const escapedLabel = escapeXml(label.toUpperCase());
-  const escapedValue = escapeXml(value.toUpperCase());
+  const layout = computeBadgeLayout({
+    badgeType,
+    icon,
+    label,
+    value,
+    secondaryText,
+    watermark,
+  });
+
+  const idSuffix = createSvgIdSuffix(
+    `${layout.badgeType}|${layout.label}|${layout.value}|${layout.secondaryText}|${accent}|${accent2}`
+  );
+
+  const bgId = `bg-${idSuffix}`;
+  const glowId = `glow-${idSuffix}`;
+  const softId = `soft-${idSuffix}`;
+  const labelClipId = `label-clip-${idSuffix}`;
+  const valueClipId = `value-clip-${idSuffix}`;
+
+  const escapedLabel = escapeXml(layout.label);
+  const escapedValue = escapeXml(layout.value);
+  const escapedSecondary = escapeXml(layout.secondaryText);
   const escapedIcon = escapeXml(icon);
-  const escapedWatermark = escapeXml(watermark);
-  const escapedAria = escapeXml(ariaLabel || `${label} ${value}`);
+  const escapedWatermark = escapeXml(layout.watermark);
+  const escapedAria = escapeXml(
+    ariaLabel || `${label} ${value}${secondaryText ? ` ${secondaryText}` : ''}`.trim()
+  );
+
+  const iconCenterX = layout.constraint.iconBoxX + Math.round(layout.constraint.iconBoxWidth / 2);
+  const iconCenterY = layout.constraint.iconBoxY + Math.round(layout.constraint.iconBoxHeight / 2);
+  const outerWidth = layout.width - 4;
+  const outerHeight = layout.height - 4;
+  const labelClipY = layout.constraint.labelY - 16;
+  const valueClipY = layout.constraint.valueY - 24;
+  const contentClipWidth = Math.max(0, layout.availableValueWidth);
+  const progressY = layout.constraint.barY;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="420" height="96" viewBox="0 0 420 96" role="img" aria-label="${escapedAria}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}" role="img" aria-label="${escapedAria}">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="${bgId}" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#0f172a"/>
       <stop offset="100%" stop-color="#111827"/>
     </linearGradient>
-    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="0">
+    <linearGradient id="${glowId}" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="${accent}"/>
       <stop offset="100%" stop-color="${accent2}"/>
     </linearGradient>
-    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+    <filter id="${softId}" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="12" result="blur"/>
       <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .35 0"/>
     </filter>
+    <clipPath id="${labelClipId}">
+      <rect x="${layout.labelX}" y="${labelClipY}" width="${contentClipWidth}" height="22"/>
+    </clipPath>
+    <clipPath id="${valueClipId}">
+      <rect x="${layout.valueX}" y="${valueClipY}" width="${contentClipWidth}" height="30"/>
+    </clipPath>
   </defs>
-  <rect x="2" y="2" rx="26" ry="26" width="416" height="92" fill="url(#bg)" stroke="rgba(255,255,255,.08)"/>
-  <rect x="10" y="10" rx="20" ry="20" width="96" height="76" fill="#0b1220" stroke="rgba(255,255,255,.06)"/>
-  <rect x="10" y="10" rx="20" ry="20" width="96" height="76" fill="url(#glow)" opacity=".16"/>
-  <circle cx="58" cy="48" r="22" fill="${accent}" opacity=".15" filter="url(#soft)"/>
-  <text x="58" y="56" text-anchor="middle" font-size="28" font-family="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, sans-serif">${escapedIcon}</text>
-  <text x="126" y="39" font-size="15" font-weight="700" fill="#dbeafe" opacity=".9" letter-spacing="1.2" font-family="Inter, Arial, sans-serif">${escapedLabel}</text>
-  <text x="126" y="68" font-size="26" font-weight="800" fill="#ffffff" font-family="Inter, Arial, sans-serif">${escapedValue}</text>
-  <text x="404" y="78" text-anchor="end" font-size="10" fill="rgba(255,255,255,.22)" letter-spacing=".8" font-family="Inter, Arial, sans-serif">${escapedWatermark}</text>
-  <rect x="126" y="76" width="278" height="4" rx="2" fill="rgba(255,255,255,.06)"/>
-  <rect x="126" y="76" width="112" height="4" rx="2" fill="url(#glow)" opacity=".9"/>
+  <rect x="2" y="2" rx="26" ry="26" width="${outerWidth}" height="${outerHeight}" fill="url(#${bgId})" stroke="rgba(255,255,255,.08)"/>
+  <rect x="${layout.constraint.iconBoxX}" y="${layout.constraint.iconBoxY}" rx="20" ry="20" width="${layout.constraint.iconBoxWidth}" height="${layout.constraint.iconBoxHeight}" fill="#0b1220" stroke="rgba(255,255,255,.06)"/>
+  <rect x="${layout.constraint.iconBoxX}" y="${layout.constraint.iconBoxY}" rx="20" ry="20" width="${layout.constraint.iconBoxWidth}" height="${layout.constraint.iconBoxHeight}" fill="url(#${glowId})" opacity=".16"/>
+  <circle cx="${iconCenterX}" cy="${iconCenterY}" r="22" fill="${accent}" opacity=".15" filter="url(#${softId})"/>
+  <text x="${iconCenterX}" y="${iconCenterY + 8}" text-anchor="middle" font-size="28" font-family="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, sans-serif">${escapedIcon}</text>
+  <text x="${layout.labelX}" y="${layout.constraint.labelY}" clip-path="url(#${labelClipId})" font-size="15" font-weight="700" fill="#dbeafe" opacity=".9" letter-spacing="1.2" font-family="Inter, Arial, sans-serif">${escapedLabel}</text>
+  <text x="${layout.valueX}" y="${layout.constraint.valueY}" clip-path="url(#${valueClipId})" font-size="24" font-weight="800" fill="#ffffff" font-family="Inter, Arial, sans-serif">${escapedValue}</text>
+  ${layout.secondaryText ? `<text x="${layout.secondaryX}" y="${layout.constraint.secondaryY}" clip-path="url(#${valueClipId})" font-size="14" font-weight="700" fill="rgba(255,255,255,.86)" font-family="Inter, Arial, sans-serif">· ${escapedSecondary}</text>` : ''}
+  <text x="${layout.watermarkEndX}" y="${layout.constraint.watermarkY}" text-anchor="end" font-size="10" fill="rgba(255,255,255,.22)" letter-spacing=".8" font-family="Inter, Arial, sans-serif">${escapedWatermark}</text>
+  <rect x="${layout.barX}" y="${progressY}" width="${layout.barWidth}" height="4" rx="2" fill="rgba(255,255,255,.06)"/>
+  <rect x="${layout.barX}" y="${progressY}" width="${layout.barFillWidth}" height="4" rx="2" fill="url(#${glowId})" opacity=".9"/>
 </svg>`;
 }
 

@@ -3,10 +3,26 @@ export interface BadgePalette {
   accent2: string;
 }
 
+export type BadgeType =
+  | 'generic'
+  | 'streak'
+  | 'lifetime'
+  | 'rank'
+  | 'weekly'
+  | 'repo'
+  | 'leaderboard'
+  | 'tokens'
+  | 'tokens30d'
+  | 'models'
+  | 'primary-model'
+  | 'summary';
+
 export interface BadgeDescriptor extends BadgePalette {
   icon: string;
   label: string;
   value: string;
+  secondaryText?: string;
+  badgeType?: BadgeType;
   ariaLabel?: string;
 }
 

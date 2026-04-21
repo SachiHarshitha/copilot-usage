@@ -21,6 +21,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </Link>
           <div className="flex items-center gap-4 text-sm">
             <Link href="/leaderboard">Leaderboard</Link>
+            <Link href="/leaderboard/repos">Repo Board</Link>
             {sessionUser ? (
               <ProfileMenu username={sessionUser.username} avatarUrl={sessionUser.avatarUrl} />
             ) : (

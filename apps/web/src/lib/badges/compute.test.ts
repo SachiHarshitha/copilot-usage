@@ -32,7 +32,9 @@ test('repo badge helpers cover missing and known values', () => {
   const leaderboardMissing = getRepoLeaderboardBadge(null, null);
 
   assert.equal(leaderboardKnown.label, 'REPO RANK');
-  assert.equal(leaderboardKnown.value.startsWith('#3'), true);
+  assert.equal(leaderboardKnown.badgeType, 'leaderboard');
+  assert.equal(leaderboardKnown.value, '#3');
+  assert.equal(leaderboardKnown.secondaryText, 'TOP 3%');
   assert.equal(leaderboardMissing.value, 'UNRANKED');
 
   const unknownModels = getRepoModelsBadge([]);
@@ -53,7 +55,7 @@ test('repo badge helpers cover missing and known values', () => {
     primaryModel: 'gpt-4o',
   });
 
-  assert.equal(summary.value.includes('#7'), true);
-  assert.equal(summary.value.includes('50.0M'), true);
-  assert.equal(summary.value.includes('GPT-4O'), true);
+  assert.equal(summary.value, '#7');
+  assert.equal(summary.secondaryText?.includes('50.0M'), true);
+  assert.equal(summary.secondaryText?.includes('GPT-4O'), true);
 });
