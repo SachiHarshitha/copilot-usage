@@ -10,6 +10,7 @@ export const MODEL_MULTIPLIERS: Record<string, number> = {
   'copilot/gemini-2.5-flash': 0.0,
   // Premium models
   'copilot/claude-opus-4.6': 3.0,
+  'copilot/claude-opus-4.7': 7.5,
   'copilot/o3': 3.0,
   'copilot/o4-mini': 1.0,
   'copilot/gemini-2.5-pro': 1.0,
