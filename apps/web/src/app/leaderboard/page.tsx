@@ -109,6 +109,21 @@ export default async function LeaderboardPage({
     <div>
       <h1 className="text-2xl font-bold text-white mb-6">Leaderboard</h1>
 
+      <div className="flex gap-3 mb-4 flex-wrap">
+        <Link
+          href="/leaderboard/repos"
+          className="text-sm border border-[#30363d] text-[#8b949e] px-3 py-1 rounded-md no-underline hover:border-[#8b949e] hover:text-white"
+        >
+          Repo Leaderboard
+        </Link>
+        <Link
+          href="/leaderboard/ides"
+          className="text-sm border border-[#30363d] text-[#8b949e] px-3 py-1 rounded-md no-underline hover:border-[#8b949e] hover:text-white"
+        >
+          IDE Ranking
+        </Link>
+      </div>
+
       {/* Filters */}
       <div className="flex gap-3 mb-6 flex-wrap">
         <FilterLink href="/leaderboard" active={!since} label="All Time" />

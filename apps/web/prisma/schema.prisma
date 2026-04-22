@@ -22,6 +22,15 @@ model User {
   uploadLogs UploadLog[]
   userStat   UserStat?
   repoStats  RepoStat[]
+
+  // Agent-agnostic (v2) relations — additive; legacy reads remain on the
+  // tables above until the migration window closes.
+  agentRuns         AgentRun[]
+  modelUsageDaily   ModelUsageDaily[]
+  actionUsageDaily  ActionUsageDaily[]
+  productStats      ProductStat[]
+  providerStats     ProviderStat[]
+  modelStats        ModelStat[]
 }
 
 model Device {
@@ -113,4 +122,162 @@ model RepoStat {
   @@unique([userId, repoIdentity])
   @@index([isPublic, totalTokens(sort: Desc)])
   @@index([githubRepo])
+}
+
+// ---------------------------------------------------------------------------
+// Agent-agnostic (v2) tables
+//
+// These are additive. They co-exist with UsageDaily/UserStat/RepoStat during
+// the migration window. The upload route writes both legacy and canonical
+// rows; existing read paths stay on the legacy tables until UI/API is
+// switched over (Task 6, Task 10).
+// ---------------------------------------------------------------------------
+
+/// Registered agent adapters and their capability flags. Optional table —
+/// adapters not registered here are still accepted on upload but appear
+/// without metadata in admin views.
+model AgentAdapter {
+  id                            String   @id // e.g. "github-copilot-vscode"
+  provider                      String
+  product                       String
+  surface                       String
+  displayName                   String?
+  supportsTokens                Boolean  @default(false)
+  supportsCosts                 Boolean  @default(false)
+  supportsRunIds                Boolean  @default(false)
+  supportsRepoAttribution       Boolean  @default(false)
+  supportsToolActions           Boolean  @default(false)
+  supportsVerifiedProviderData  Boolean  @default(false)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  @@index([provider, product])
+}
+
+/// One normalized agent run (session) as reported by an adapter.
+model AgentRun {
+  id              String    @id @default(cuid())
+  userId          String
+  deviceId        String
+  adapter         String
+  provider        String
+  product         String
+  surface         String
+  runExternalId   String
+  startedAt       DateTime?
+  endedAt         DateTime?
+  repoIdentity    String?
+  trustLevel      String    // "verified" | "observed" | "inferred"
+  observedAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, adapter, runExternalId])
+  @@index([userId, observedAt])
+  @@index([provider, product])
+  @@index([repoIdentity])
+}
+
+/// Daily aggregated model usage by full agent dimensions.
+model ModelUsageDaily {
+  id                String   @id @default(cuid())
+  userId            String
+  deviceId          String
+  date              DateTime @db.Date
+  provider          String
+  product           String
+  surface           String
+  modelId           String
+  repoIdentity      String?
+  trustLevel        String   @default("observed")
+  requestCount      Int      @default(0)
+  inputTokens       BigInt   @default(0)
+  outputTokens      BigInt   @default(0)
+  totalTokens       BigInt   @default(0)
+  cacheReadTokens   BigInt   @default(0)
+  cacheWriteTokens  BigInt   @default(0)
+  costMicros        BigInt   @default(0)
+  premiumRequests   Float    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId, date, provider, product, surface, modelId, repoIdentity])
+  @@index([date, userId])
+  @@index([userId, provider, product])
+  @@index([userId, modelId])
+}
+
+/// Daily aggregated action counts (tool calls, terminal commands, edits, …).
+model ActionUsageDaily {
+  id            String   @id @default(cuid())
+  userId        String
+  deviceId      String
+  date          DateTime @db.Date
+  provider      String
+  product       String
+  surface       String
+  repoIdentity  String?
+  actionType    String   // "tool_call" | "terminal_command" | "file_edit" | …
+  count         Int      @default(0)
+  filesTouched  Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId, date, provider, product, surface, actionType, repoIdentity])
+  @@index([date, userId])
+  @@index([userId, provider, product])
+}
+
+/// Per-user × product rollup. Powers profile breakdowns ("62% Copilot, …").
+model ProductStat {
+  id              String   @id @default(cuid())
+  userId          String
+  provider        String
+  product         String
+  totalRequests   Int      @default(0)
+  totalTokens     BigInt   @default(0)
+  costMicros      BigInt   @default(0)
+  premiumRequests Float    @default(0)
+  lastSyncedAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, product])
+  @@index([provider, product, totalTokens(sort: Desc)])
+}
+
+/// Per-user × provider rollup.
+model ProviderStat {
+  id              String   @id @default(cuid())
+  userId          String
+  provider        String
+  totalRequests   Int      @default(0)
+  totalTokens     BigInt   @default(0)
+  costMicros      BigInt   @default(0)
+  premiumRequests Float    @default(0)
+  lastSyncedAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([provider, totalTokens(sort: Desc)])
+}
+
+/// Per-user × model rollup. Powers "favorite model" surfaces.
+model ModelStat {
+  id              String   @id @default(cuid())
+  userId          String
+  provider        String
+  product         String
+  modelId         String
+  totalRequests   Int      @default(0)
+  totalTokens     BigInt   @default(0)
+  costMicros      BigInt   @default(0)
+  premiumRequests Float    @default(0)
+  lastSyncedAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, product, modelId])
+  @@index([modelId, totalTokens(sort: Desc)])
 }

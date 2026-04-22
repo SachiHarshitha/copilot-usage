@@ -2,6 +2,22 @@ import { unstable_cache } from 'next/cache';
 import { prisma } from '@/lib/db';
 import type { PublicRepoBadgeSummary, PublicUserBadgeSummary } from './types';
 
+export function computeRankPercentile(
+  rank: number | bigint | null | undefined,
+  repoCount: number | bigint | null | undefined
+): number | null {
+  if (rank == null || repoCount == null) return null;
+
+  const rankNum = typeof rank === 'bigint' ? Number(rank) : rank;
+  const repoCountNum = typeof repoCount === 'bigint' ? Number(repoCount) : repoCount;
+
+  if (!Number.isFinite(rankNum) || !Number.isFinite(repoCountNum) || repoCountNum <= 0 || rankNum <= 0) {
+    return null;
+  }
+
+  return Number((((repoCountNum - rankNum + 1) / repoCountNum) * 100).toFixed(2));
+}
+
 function formatRepoDisplay(repo: {
   displayMode: string;
   githubRepo: string | null;
@@ -81,7 +97,7 @@ const getPublicRepoBadgeSummaryCached = unstable_cache(
       return null;
     }
 
-    const rankRows = await prisma.$queryRaw<{ repo_rank: number; repo_count: number }[]>`
+    const rankRows = await prisma.$queryRaw<{ repo_rank: number | bigint; repo_count: number | bigint }[]>`
       WITH repo_totals AS (
         SELECT rs."githubRepo" AS "githubRepo", SUM(rs."totalTokens")::bigint AS total_tokens
         FROM "RepoStat" rs
@@ -124,8 +140,7 @@ const getPublicRepoBadgeSummaryCached = unstable_cache(
       select: { topModel: true },
     });
 
-    const percentile =
-      rank && repoCount && repoCount > 0 ? Number((((repoCount - rank + 1) / repoCount) * 100).toFixed(2)) : null;
+    const percentile = computeRankPercentile(rank, repoCount);
 
     return {
       repoSlug,

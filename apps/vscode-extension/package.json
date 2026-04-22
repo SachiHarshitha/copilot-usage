@@ -4,7 +4,7 @@
   "publisher": "emagin8",
   "author": "Sachith Liyanagama, liyanagama@outlook.de",
   "description": "A **local-first** analytics dashboard that parses your VS Code Copilot chat session data and visualises token usage, premium request estimates, and model distribution — all without sending any data externally.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.100.0"

@@ -1,11 +1,15 @@
 # promptstreak.dev Web App — Implementation Plan
 
+> **Status (April 2026):** Phases 0–2 complete. Phase 3 (profile page UI, `/r/` route) in progress. Phase 4 (badge/card SVG) next. See [Section 10](#10-step-by-step-delivery-plan) for current status.
+
 ---
 
 ## 1. Product Goals
 
 ### What it is for
-A **voluntary public layer** on top of the local-first product. Users who want to share their Copilot usage stats can log in with GitHub, push a snapshot from the VS Code extension or CLI, and get a public profile page, embeddable README badges, and a community leaderboard on promptstreak.dev — all opt-in.
+A **voluntary public layer** for coding-agent usage. Users who track any coding agent (GitHub Copilot, Claude Code, Codex CLI, Cursor, etc.) can log in with GitHub, push a normalized snapshot from the VS Code extension or CLI, and get a public profile page, embeddable README badges, and a community leaderboard on promptstreak.dev — all opt-in.
+
+GitHub Copilot is the first supported adapter. The architecture is agent-agnostic by design.
 
 ### What it is not for
 - Replacing the local tool. If a user never logs in, nothing changes.
@@ -21,19 +25,36 @@ A **voluntary public layer** on top of the local-first product. Users who want t
 
 ---
 
-## 2. v1 Feature Scope
+## 2. Feature Scope
 
-| Feature | Notes |
-|---------|-------|
-| GitHub OAuth login | Auth.js, read-only GitHub scope (`read:user`) |
-| Public profile page | `/u/[username]` — token totals, model breakdown, top repos |
-| Leaderboard | `/leaderboard` — all public users ranked by total tokens or premium requests; date-filterable |
-| Repo/project stats | Attached to each profile; top 5 repos by tokens, with per-repo public page at `/r/[username]/[repo]` |
-| Badge/card endpoints | `/badge/[username].svg` and `/card/[username].svg` — Shields.io-compatible SVG responses |
-| Upload API | `POST /api/upload` — authenticated JSON snapshot from extension/CLI, rate-limited, schema-validated |
-| Privacy controls | Per-repo visibility toggle (public/hidden), global profile visibility (public/private), delete account |
-| Publish/unpublish | Snapshots are always ingested privately; user explicitly publishes. Default = private |
-| Repo identity control | Per-workspace choice: link to a GitHub repo (`owner/repo`), show a custom alias, or redact entirely. Auto-detected from git remote; user confirms before first upload. |
+### v1 — Copilot Adapter (largely complete)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| GitHub OAuth login | ✅ Done | Auth.js, `read:user` scope; dev-login supported via `ENABLE_DEV_LOGIN` |
+| Upload API (v1) | ✅ Done | `POST /api/upload` — accepts `SnapshotPayload` from Copilot extension/CLI |
+| Upload API (v2) | ✅ Done | Accepts `AgentSnapshot` envelope; v1 payloads auto-translated |
+| Device linking | ✅ Done | Split-token device auth; `POST /api/connect`; CSRF-protected |
+| Leaderboard | ✅ Done | `/leaderboard` — ranked by tokens or premium requests; 7d/30d/all-time |
+| Settings | ✅ Done | Profile visibility, repo visibility, device management, account deletion |
+| Streak tracking | ✅ Done | Current + best streaks (≥10K tokens/day threshold) |
+| Public profile page | 🚧 In progress | `/u/[username]` — API route done; page component pending |
+| Repo/project stats | 🚧 In progress | `/r/[username]/[repo]` pending |
+| Badge/card endpoints | 📋 Next | `/badge/[username].svg` and `/card/[username].svg` — SVG generation pending |
+| Repo identity control | ✅ Done (server) | Per-workspace: GitHub link / alias / redacted. Extension UI pending |
+
+### v1.5 — Agent-Agnostic Foundation (infrastructure complete)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `AgentSnapshot` schema | ✅ Done | Canonical v2 envelope in `packages/shared-schema` |
+| Adapter-agnostic DB tables | ✅ Done | `AgentRun`, `ModelUsageDaily`, `ActionUsageDaily`, dimensional rollups |
+| V1→V2 translation layer | ✅ Done | `upload-translate.ts` auto-converts legacy payloads |
+| Canonical ingest pipeline | ✅ Done | `agent-ingest.ts` writes to v2 tables transactionally |
+| ProductStat / ProviderStat / ModelStat rollups | ✅ Done | Computed on each upload |
+| TrustLevel tracking | ✅ Done | `verified` / `observed` / `inferred` per model call |
+| Multi-product leaderboard tabs | 📋 Future | UI for per-product/provider filtering |
+| Claude Code adapter | 📋 Future | v1.5 milestone |
 
 ---
 
@@ -51,11 +72,11 @@ A **voluntary public layer** on top of the local-first product. Users who want t
 
 ---
 
-## 4. Recommended Architecture
+## 4. Architecture
 
 ### Shape: Next.js monolith in `apps/web`
 
-Everything lives in one Next.js app. API Routes (or Route Handlers in App Router) serve as the backend. No separate API server, no microservices. This is the right call for a solo developer.
+Everything lives in one Next.js app. API Routes (App Router) serve as the backend. No separate API server, no microservices.
 
 ```
 Browser ──→ Next.js (App Router)
@@ -64,46 +85,69 @@ Browser ──→ Next.js (App Router)
                └─ Prisma → PostgreSQL  Single DB for everything
 ```
 
-**Why no separate backend?** You have one developer, one database, and modest traffic. A separate Express/FastAPI backend doubles infrastructure with zero benefit at this scale. When you need to scale reads (leaderboard), add a Redis cache in front of the leaderboard query — still one deployment.
+**Why no separate backend?** One developer, one database, modest traffic. When leaderboard reads need caching, add a server-side cache keyed per time-bucket — no extra deployment.
 
-### Two-layer data model
+### Dual-track data model (v1 + v2 coexisting)
 
-The database uses two distinct layers that are always written in the **same DB transaction**:
+The upload pipeline writes two independent tracks in a single transaction:
 
 ```
-Upload write
-  ├─ UPSERT UsageDaily[]  ← one row per (userId, deviceId, date); cross-device safe
-  ├─ UPSERT UserStat      ← recomputed as SUM of all UsageDaily for this user (across all devices)
-  ├─ UPSERT RepoStat[]    ← denormalized rollup per public repo identity
-  └─ INSERT UploadLog     ← audit record (outside transaction, best-effort)
+POST /api/upload
+  │
+  ├─ detect payload version (v1 SnapshotPayload | v2 AgentSnapshot)
+  ├─ v1: translateV1ToV2() → AgentSnapshot  (adapter: "github-copilot-vscode")
+  │
+  ├─ Track 1 — Legacy Copilot tables (backward compat)
+  │   ├─ UPSERT UsageDaily[]     ← (userId, deviceId, date)
+  │   ├─ UPSERT UserStat         ← recomputed SUM across all devices + streaks
+  │   └─ UPSERT RepoStat[]       ← per repoIdentity
+  │
+  ├─ Track 2 — Agent-agnostic tables (additive)
+  │   ├─ UPSERT AgentRun[]       ← (userId, adapter, runExternalId)
+  │   ├─ UPSERT ModelUsageDaily[]← (userId, date, provider, product, surface, modelId)
+  │   ├─ UPSERT ActionUsageDaily[]
+  │   ├─ UPSERT ProductStat[]    ← per user+product
+  │   ├─ UPSERT ProviderStat[]   ← per user+provider
+  │   └─ UPSERT ModelStat[]      ← per user+model
+  │
+  └─ INSERT UploadLog            ← best-effort audit (outside transaction)
 ```
 
 | Layer | Table(s) | Purpose |
 |-------|----------|---------|
-| **History** | `UsageDaily` | Powers real date-range filters and future trend charts. One row per `(userId, deviceId, date)` — multi-device safe. Upserted on each sync. |
-| **Rollup** | `UserStat`, `RepoStat` | Powers fast profile pages, leaderboard, badge SVG. One row per user / per user+workspace — recomputed from `UsageDaily` on each sync; never aggregated at query time. |
-| **Audit** | `UploadLog` | One row per sync attempt. Records device, timestamp, IP hash, bucket count. Never queried for stats. |
+| **History (v1)** | `UsageDaily` | Date-range leaderboard filters, trend charts. One row per `(userId, deviceId, date)`. |
+| **Rollup (v1)** | `UserStat`, `RepoStat` | Fast profile pages, leaderboard, badge SVG. Recomputed from facts on each sync. |
+| **Facts (v2)** | `AgentRun`, `ModelUsageDaily`, `ActionUsageDaily` | Agent-agnostic raw events per session/day. Immutable facts. |
+| **Rollup (v2)** | `ProductStat`, `ProviderStat`, `ModelStat` | Fast per-product/provider/model profile sections. |
+| **Audit** | `UploadLog` | One row per sync attempt. IP hash, payload metadata. |
 
-**Why real tables, not views or materialized views?** PostgreSQL materialized views don't auto-refresh on write — they need `REFRESH MATERIALIZED VIEW CONCURRENTLY` on a schedule. A regular view computing `SUM` across uploads is too slow for leaderboard queries at scale. Application-level upserts in the same transaction are simpler, consistent, and require no background jobs.
+**Rollup strategy:** All rollup tables are recomputed from facts on each upload — never incremented. This makes retries idempotent and eliminates drift.
 
-### Interaction with `packages/shared-schema`
-
-Create `packages/shared-schema` as a TypeScript package containing:
-- `SnapshotPayload` Zod schema (the upload contract)
-- `MODEL_MULTIPLIERS` constant (single source of truth, shared by extension + web)
-- TypeScript types generated from the schema
-
-Both `apps/web` and vscode-extension import from `packages/shared-schema`. The CLI (cli) keeps its own Python copy for now; generate from the same schema JSON if divergence becomes a problem.
+### `packages/shared-schema` — actual contents
 
 ```
 packages/shared-schema/
   src/
-    snapshot.ts         # Zod schema for upload payload
-    multipliers.ts      # Model multiplier table
-    types.ts            # Inferred TypeScript types
+    snapshot.ts        # Legacy v1 Zod schema — SnapshotPayload, DailyBucketSchema, RepoEntrySchema
+    agent-snapshot.ts  # V2 Zod schema — AgentSnapshotSchema, AgentRun, AgentModelCall, AgentAction
+    enums.ts           # TrustLevel, Surface, ActionType, RepoRefMode, KNOWN_PROVIDERS, KNOWN_PRODUCTS
+    multipliers.ts     # MODEL_REGISTRY — canonical model records with provider/product/multiplier
+    types.ts           # RepoRefPrefs — workspace-level repo identity preferences
+    index.ts           # Re-exports all schemas and types
   package.json
   tsconfig.json
 ```
+
+Both `apps/web` and `apps/vscode-extension` import from `@copilot-usage/shared-schema`. The Python CLI maintains its own schema copy.
+
+### Adapter layer
+
+Each agent integration wraps raw telemetry into the `AgentSnapshot` envelope:
+
+- **`github-copilot-vscode`** — current VS Code extension (trust level: `observed`)
+- Future: `claude-code-local`, `cursor-local`, `codex-cli-local`
+
+The `upload-translate.ts` module handles v1→v2 translation server-side, so older extension versions continue to work without changes.
 
 ### How the VS Code Extension Sends Data
 
@@ -126,6 +170,10 @@ The extension gets a **short-lived upload token** from the web app after the use
 
 ## 5. Data Model
 
+The schema has two generations that coexist. V1 tables support the current Copilot adapter and leaderboard. V2 tables are the agent-agnostic foundation, populated in parallel on every upload.
+
+### V1 — Copilot-optimized tables (active)
+
 ```prisma
 model User {
   id            String    @id @default(cuid())
@@ -133,164 +181,138 @@ model User {
   username      String    @unique        // github login
   displayName   String?
   avatarUrl     String?
-  profilePublic Boolean   @default(false) // opt-in
+  profilePublic Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-
-  devices       Device[]
-  usageDaily    UsageDaily[]
-  uploadLogs    UploadLog[]
-  userStat      UserStat?
-  repoStats     RepoStat[]
+  // relations: devices, usageDaily, uploadLogs, userStat, repoStats, agentRuns, ...
 }
 
-// A linked VS Code / CLI installation
 model Device {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String?                     // e.g. "Work MacBook"
-  // Split token: extension stores the raw token as "tokenId.secret".
-  // Server fetches by tokenId (fast indexed lookup), then verifies bcrypt(secret) == secretHash.
-  tokenId     String   @unique            // public prefix — used to find the Device row quickly
-  secretHash  String                      // bcrypt hash of the secret suffix — never stored in plain text
-  lastSeenAt  DateTime?
+  tokenId     String   @unique    // public prefix for fast lookup
+  secretHash  String              // bcrypt(secret) — never stored plain
   revokedAt   DateTime?
-  createdAt   DateTime @default(now())
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // split token: extension holds "tokenId.secret"
 }
 
-// One row per (userId, deviceId, date) — device-aware; multiple devices can sync independently without collision.
-// Upserted on each sync. Retrying a sync from the same device is a safe no-op.
-// UserStat is recomputed as the SUM across ALL devices for this user.
+// One row per (userId, deviceId, date) — multi-device safe, idempotent upsert
 model UsageDaily {
-  id              String   @id @default(cuid())
-  userId          String
-  deviceId        String                      // which device this bucket came from
-  date            DateTime @db.Date           // calendar date these stats cover (event date, not upload date)
-  totalRequests   Int      @default(0)
-  promptTokens    BigInt   @default(0)
-  outputTokens    BigInt   @default(0)
-  totalTokens     BigInt   @default(0)        // promptTokens + outputTokens; denormalized for fast sort/index
-  premiumRequests Float    @default(0)
-
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@unique([userId, deviceId, date])
-  @@index([date, userId])                    // date-first: fast cross-user range scans for date-filtered leaderboard
+  // @@unique([userId, deviceId, date])
+  // @@index([date, userId])  — date-first for leaderboard range scans
+  totalRequests, promptTokens, outputTokens, totalTokens, premiumRequests
 }
 
-// Audit log of each sync attempt — written outside the main transaction (best-effort).
-model UploadLog {
-  id           String   @id @default(cuid())
-  userId       String
-  deviceId     String
-  uploadedAt   DateTime @default(now())
-  ipHash       String               // SHA-256 of IP, never raw
-  payloadBytes Int
-  bucketCount  Int                  // number of UsageDaily upserts in this sync
-  earliestDate DateTime?            // earliest date bucket
-  latestDate   DateTime?            // latest date bucket
-  accepted     Boolean
-
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// Denormalized rollup per user — one row per user, recomputed from UsageDaily on each sync.
-// Powers leaderboard, profile KPIs, and badge SVG. Never aggregated at query time.
+// Recomputed from UsageDaily SUM on each upload. Also holds streak and rolling window fields.
 model UserStat {
-  userId          String   @id
-  totalRequests   Int      @default(0)
-  promptTokens    BigInt   @default(0)
-  outputTokens    BigInt   @default(0)
-  totalTokens     BigInt   @default(0)        // promptTokens + outputTokens; indexed for leaderboard sort
-  premiumRequests Float    @default(0)
-  workspaceCount  Int      @default(0)
-  sessionCount    Int      @default(0)
-  topModel        String?
-  lastSyncedAt    DateTime @default(now())
-
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalRequests, promptTokens, outputTokens, totalTokens, premiumRequests
+  workspaceCount, sessionCount, topModel
+  currentStreak, bestStreak        // contiguous days ≥ 10,000 tokens
+  tokens30d, tokens7d              // rolling windows
+  lastSyncedAt
 }
 
-// Denormalized rollup per public repo identity — keyed by the user-approved display name, not the raw workspace source.
-// Multiple workspaces (or the same workspace from multiple devices) pointing to the same
-// GitHub repo or alias collapse into a single row here.
-// Last upload wins for stats (all totals are cumulative from the device's local DB).
+// Per user+repoIdentity rollup. Key: "github:owner/repo" or "alias:My Project"
 model RepoStat {
-  id            String       @id @default(cuid())
-  userId        String
-  // Normalized public identity — the rollup key.
-  // Format: "github:owner/repo" or "alias:My Project"
-  // Derived server-side from displayMode + githubRepo/aliasLabel in the upload payload.
-  repoIdentity  String
-  displayMode   String                    // "github" | "alias"
-  githubRepo    String?                   // "owner/repo" — when displayMode = 'github'
-  aliasLabel    String?                   // when displayMode = 'alias'
-  isPublic      Boolean      @default(false)
-  requests      Int          @default(0)
-  promptTokens  BigInt       @default(0)
-  outputTokens  BigInt       @default(0)
-  totalTokens   BigInt       @default(0)  // promptTokens + outputTokens; denormalized for sorting
-  premiumReqs   Float        @default(0)
-  topModel      String?
-  lastSyncedAt  DateTime     @default(now())
+  // @@unique([userId, repoIdentity])
+  repoIdentity, displayMode, githubRepo, aliasLabel, isPublic
+  requests, promptTokens, outputTokens, totalTokens, premiumReqs, topModel
+}
 
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@unique([userId, repoIdentity])
+model UploadLog {
+  // best-effort audit: ipHash, payloadBytes, bucketCount, earliestDate, latestDate, accepted
 }
 ```
 
-**Intentional omissions**: No `BadgeConfig` table in v1. Badge appearance is derived from the user's public stats on demand; no user-customisable badge config needed until there is demand.
+### V2 — Agent-agnostic tables (additive, populated in parallel)
+
+```prisma
+// Registry of known adapter capabilities
+model AgentAdapter {
+  adapterId    String  @id  // "github-copilot-vscode"
+  provider, product, surface
+  supportsTokens, supportsCosts, supportsRunIds
+  supportsRepoAttribution, supportsToolActions, supportsVerifiedProviderData
+}
+
+// One row per normalized session/run
+model AgentRun {
+  // @@unique([userId, adapterId, runExternalId])
+  userId, deviceId, adapterId
+  provider, product, surface
+  startedAt?, endedAt?, repoIdentity, trustLevel
+}
+
+// Daily aggregation by all dimensions
+model ModelUsageDaily {
+  // @@unique([userId, deviceId, date, provider, product, surface, modelId, repoIdentity])
+  requestCount, inputTokens, outputTokens, totalTokens
+  costMicros, cacheReadTokens, cacheWriteTokens, trustLevel
+}
+
+model ActionUsageDaily {
+  // @@unique([userId, deviceId, date, provider, product, surface, repoIdentity, actionType])
+  count, filesTouched
+}
+
+// Fast rollup tables — recomputed on each upload from ModelUsageDaily facts
+model ProductStat  { // @@unique([userId, product]);   totalTokens, requestCount, lastSyncedAt }
+model ProviderStat { // @@unique([userId, provider]);  totalTokens, requestCount, lastSyncedAt }
+model ModelStat    { // @@unique([userId, modelId]);   totalTokens, requestCount, lastSyncedAt }
+```
+
+**No `BadgeConfig` table.** Badge appearance is derived from public stats on demand.
 
 ---
 
 ## 6. API Design
 
 ### Auth
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/auth/[...nextauth]` | Auth.js catch-all — GitHub OAuth |
-| `GET /api/connect?code=X` | Device linking — exchange a one-time code for a device token |
-| `DELETE /api/devices/[id]` | Revoke a device token |
+| Endpoint | Status | Purpose |
+|----------|--------|---------|
+| `GET /api/auth/[...nextauth]` | ✅ | Auth.js catch-all — GitHub OAuth + dev credentials |
+| `POST /api/connect` | ✅ | Device linking — validates code, issues split token, returns `{ token }` |
+| `DELETE /api/devices/[id]` | ✅ | Revoke a device token (sets `revokedAt`) |
 
 ### Upload
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /api/upload` | Authenticated upload. Validates payload with Zod schema from `shared-schema`. In a single transaction: UPSERTs `UsageDaily[]` by `(userId, deviceId, date)`, recomputes and UPSERTs `UserStat` (SUM of all `UsageDaily` across all devices), UPSERTs `RepoStat[]` by `(userId, repoIdentity)`. Writes `UploadLog` outside the transaction (best-effort). Rate-limited. Returns `{ ok, logId }` |
+| Endpoint | Status | Purpose |
+|----------|--------|---------|
+| `POST /api/upload` | ✅ | Authenticated upload. Detects v1/v2 payload. v1 auto-translated to `AgentSnapshot`. Single transaction writes both v1 and v2 tables. DB-based rate limiting (device: 10/hr, 50/day; user: 60/hr, 240/day; IP: 120/hr, 400/day). Returns `{ ok, logId }`. |
 
 ### Profile & Leaderboard
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/profile/[username]` | Reads from `UserStat` + public `RepoStat` rows — only if `profilePublic = true` |
-| `GET /api/leaderboard` | Reads from `UserStat` JOIN `User` for all-time view — one indexed read, no aggregation. Date-filtered views (`since=7d`/`30d`) aggregate `UsageDaily WHERE date >= ? GROUP BY userId` — `date` is the event date, not the upload date. Uses the `(date, userId)` index so the scan is bounded by the date range across all users. Cached or precomputed; not inline on each page request. |
-| `GET /api/repo/[username]/[...repo]` | Public repo stats for one repo — only if `RepoStat.isPublic = true` |
+| Endpoint | Status | Purpose |
+|----------|--------|---------|
+| `GET /api/profile/[username]` | ✅ | `UserStat` + public `RepoStat[]` — only if `profilePublic = true` |
+| `GET /api/leaderboard` | ✅ | All-time: `UserStat` indexed scan. Date-filtered: `UsageDaily WHERE date >= ?` with `(date, userId)` index. |
+| `GET /api/leaderboard/repos` | ✅ | Repo-level leaderboard from public `RepoStat` rows |
+| `GET /api/repo/[username]/[...repo]` | 📋 | Pending — individual repo stat page |
 
 ### Badges/Cards
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /badge/[username].svg` | Shields.io-style SVG. Query params: `label`, `stat` (tokens/requests/premium). Cache-Control 1h |
-| `GET /card/[username].svg` | Larger stat card SVG for embedding in READMEs. Cache-Control 1h |
+| Endpoint | Status | Purpose |
+|----------|--------|---------|
+| `GET /badge/[username].svg` | 📋 Next | Shields.io-style SVG. `?stat=tokens\|requests\|premium\|top-model\|top-product`. `Cache-Control: public, max-age=3600`. |
+| `GET /card/[username].svg` | 📋 Next | Wider stat card SVG. `Cache-Control: public, max-age=3600`. |
 
 ### Settings & Actions
-| Endpoint | Purpose |
-|----------|---------|
-| `PATCH /api/settings/profile` | Toggle `profilePublic`, update display name |
-| `PATCH /api/settings/repos` | Bulk update `isPublic` per `repoIdentity` |
-| `DELETE /api/account` | Hard delete — wipes User + all cascades |
+| Endpoint | Status | Purpose |
+|----------|--------|---------|
+| `GET /api/settings/profile` | ✅ | Return current profile settings |
+| `PATCH /api/settings/profile` | ✅ | Toggle `profilePublic`, update `displayName` |
+| `PATCH /api/settings/repos` | ✅ | Bulk update `isPublic` per `repoIdentity` |
+| `DELETE /api/account` | ✅ | Hard delete — wipes `User` + all cascades |
 
 ---
 
 ## 7. Sync and Trust Model
 
-### What IS uploaded (inside each snapshot payload)
+### What IS uploaded
+
+The server accepts two payload versions:
+
+**V1 — `SnapshotPayload`** (legacy, from Copilot extension/CLI):
 ```ts
 {
-  clientUploadedAt: string,          // ISO timestamp — when the upload was initiated
+  clientUploadedAt: string,          // ISO timestamp
   workspaceCount: number,
   sessionCount: number,
-  // Daily usage buckets — one per calendar day per device. Upserted server-side by (userId, deviceId, date).
-  // Natural idempotency: retrying the same sync re-upserts identical rows.
-  // Built from the extension's computeDailyStats() / CLI's agg_daily table.
   dailyBuckets: [{
     date: string,                    // "YYYY-MM-DD"
     requests: number,
@@ -319,6 +341,34 @@ model RepoStat {
     requests: number,
     totalTokens: number,
   }],
+}
+```
+
+V1 payloads are auto-translated to `AgentSnapshot` via `upload-translate.ts` with adapter `"github-copilot-vscode"`.
+
+**V2 — `AgentSnapshot`** (canonical, adapter-agnostic):
+```ts
+{
+  schemaVersion: 2,
+  clientUploadedAt: string,
+  source: {
+    adapter: string,           // "github-copilot-vscode" | "claude-code" | ...
+    adapterVersion: string,
+    provider: string,          // "github" | "anthropic" | "openai" | ...
+    product: string,           // "copilot" | "claude-code" | ...
+    surface: string,           // "vscode" | "terminal" | "browser" | ...
+    capabilities: { supportsTokens, supportsCosts, supportsRunIds, ... }
+  },
+  deviceId: string,
+  runs: [{
+    runId: string,
+    startedAt?, endedAt?,
+    workspaceKey?,
+    repoRef?: { mode: "github" | "alias" | "redacted", ... },
+    modelCalls: [{ modelId, inputTokens, outputTokens, requestCount, costMicros, sourceOfTruth }],
+    actions: [{ type, count, filesTouched }],
+    dailyBuckets?: [{ date, modelId, inputTokens, outputTokens, requestCount }]
+  }]
 }
 ```
 
@@ -377,8 +427,13 @@ Upload retries are safe by design: `UsageDaily` rows are upserted by `(userId, d
 
 Each `date` in `dailyBuckets` must be ≤ `clientUploadedAt` (can't report future usage). Zod validates this per bucket.
 
-### Verified vs Unverified
-**Don't add a verified badge in v1.** All stats are user-supplied estimates from an unofficial local parser. Label the leaderboard clearly: *"Stats are self-reported estimates from local Copilot session data."* This one footer sentence handles it. Adding a verification mechanism when the underlying data is inherently estimated is kabuki theater.
+### Trust levels
+Every model call record stores a `sourceOfTruth` / trust level:
+- `"verified"` — provider-confirmed billing/metrics data
+- `"observed"` — local client directly observed requests
+- `"inferred"` — estimated from partial data or heuristics
+
+Current Copilot adapter trust level: `"observed"`. The leaderboard footer states: *"Stats are self-reported estimates from local session data."* No verification badge in v1.
 
 ---
 
@@ -430,117 +485,112 @@ Each `date` in `dailyBuckets` must be ≤ `clientUploadedAt` (can't report futur
 
 ```
 apps/web/
-├── app/
-│   ├── (public)/
-│   │   ├── page.tsx                   # Landing
-│   │   ├── leaderboard/page.tsx
-│   │   ├── u/[username]/page.tsx      # Profile
-│   │   └── r/[username]/[...repo]/page.tsx
-│   ├── (auth)/
-│   │   ├── settings/page.tsx
-│   │   └── connect/page.tsx
-│   ├── api/
-│   │   ├── auth/[...nextauth]/route.ts
-│   │   ├── upload/route.ts
-│   │   ├── connect/route.ts
-│   │   ├── profile/[username]/route.ts
-│   │   ├── leaderboard/route.ts
-│   │   ├── settings/
-│   │   │   ├── profile/route.ts
-│   │   │   └── repos/route.ts
-│   │   ├── devices/[id]/route.ts
-│   │   └── account/route.ts
-│   ├── badge/[username]/route.ts      # SVG badge
-│   ├── card/[username]/route.ts       # SVG card
-│   ├── layout.tsx
-│   └── globals.css
-├── components/
-│   ├── ui/                            # shadcn/ui primitives
-│   ├── LeaderboardTable.tsx
-│   ├── ProfileKpis.tsx
-│   ├── RepoTable.tsx
-│   ├── BadgePreview.tsx
-│   └── DeviceList.tsx
-├── lib/
-│   ├── auth.ts                        # Auth.js config
-│   ├── db.ts                          # Prisma client singleton
-│   ├── ratelimit.ts                   # Upstash Redis or DB-based limiter
-│   └── svg.ts                         # Badge/card SVG generation
+├── src/
+│   ├── app/
+│   │   ├── page.tsx                        # Landing ✅
+│   │   ├── leaderboard/page.tsx            # Leaderboard ✅
+│   │   ├── settings/page.tsx               # Settings ✅
+│   │   ├── connect/page.tsx                # Device linking ✅
+│   │   ├── u/[username]/page.tsx           # Profile 🚧
+│   │   ├── r/[username]/[...repo]/         # Repo page 📋
+│   │   ├── badge/[username]/route.ts       # SVG badge 📋
+│   │   ├── card/[username]/route.ts        # SVG card 📋
+│   │   ├── api/
+│   │   │   ├── auth/[...nextauth]/route.ts # ✅
+│   │   │   ├── upload/route.ts             # ✅ v1+v2
+│   │   │   ├── connect/route.ts            # ✅
+│   │   │   ├── leaderboard/route.ts        # ✅
+│   │   │   ├── leaderboard/repos/route.ts  # ✅
+│   │   │   ├── profile/[username]/route.ts # ✅
+│   │   │   ├── settings/profile/route.ts   # ✅
+│   │   │   ├── settings/repos/route.ts     # ✅
+│   │   │   ├── devices/[id]/route.ts       # ✅
+│   │   │   └── account/route.ts            # ✅
+│   │   ├── layout.tsx
+│   │   ├── globals.css
+│   │   └── components/
+│   └── lib/
+│       ├── auth.ts                         # Auth.js config (GitHub OAuth + dev login)
+│       ├── auth-policy.ts                  # Dev login gating, dev account config
+│       ├── db.ts                           # Prisma singleton
+│       ├── ratelimit.ts                    # DB-based rate limiter (device/user/IP)
+│       ├── agent-ingest.ts                 # V2 canonical ingest: aggregateCanonical + writeCanonical
+│       ├── upload-translate.ts             # V1→V2 translation (detectPayloadVersion, translateV1ToV2)
+│       ├── streak.ts                       # Streak computation (current + best)
+│       ├── connect-policy.ts               # Device code validation, CSRF origin check
+│       └── profile-policy.ts               # canViewProfile
 ├── prisma/
-│   ├── schema.prisma
+│   ├── schema.prisma                       # Full v1+v2 schema
+│   ├── seed.ts
 │   └── migrations/
-├── public/
-│   └── og-image.png
 ├── package.json
 ├── tsconfig.json
 ├── tailwind.config.ts
 ├── next.config.ts
 └── .env.example
+
+packages/shared-schema/
+├── src/
+│   ├── snapshot.ts        # V1 Zod schemas
+│   ├── agent-snapshot.ts  # V2 AgentSnapshot Zod schema
+│   ├── enums.ts           # TrustLevel, Surface, ActionType, KNOWN_PROVIDERS, KNOWN_PRODUCTS
+│   ├── multipliers.ts     # MODEL_REGISTRY with getMultiplier, lookupModel
+│   ├── types.ts           # RepoRefPrefs
+│   └── index.ts
+└── package.json
 ```
 
 ---
 
 ## 10. Step-by-Step Delivery Plan
 
-### Phase 0 — Project Setup (Day 1–2)
-- `npx create-next-app@latest apps/web --typescript --tailwind --app`
-- Add to root `pnpm-workspace.yaml`
-- Set up `packages/shared-schema` with the `SnapshotPayload` Zod schema (including `RepoRef` union type for `github`/`alias` display modes), model multipliers, and `RepoRefPrefs` TypeScript type; publish as `@copilot-usage/shared-schema` workspace package
-- Add `prisma`, `@prisma/client`, `next-auth`, `zod` to `apps/web`
-- Set up Prisma schema (all models above), run initial migration against local Postgres
-- Add `.env.example` with all required vars (`DATABASE_URL`, `NEXTAUTH_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`)
-- Set up Vercel project (or Railway) pointing to `apps/web` as the root directory
+### Phase 0 — Project Setup ✅ COMPLETE
+- Next.js 15 App Router, Tailwind, TypeScript
+- `packages/shared-schema` with V1 + V2 Zod schemas, `MODEL_REGISTRY`, enums, `RepoRefPrefs`
+- Prisma schema with V1 + V2 tables, initial migrations run
+- `.env.example` with all required vars
 
-### Phase 1 — Auth + Database (Day 3–5)
-- Auth.js with GitHub provider, storing `githubId` and `username` in `User`
-- Session middleware for API routes
-- Settings page scaffold (auth-gated)
-- Device linking flow: `GET /connect?code=X` generates a **split device token** (`tokenId.secret` — both random, urlsafe base64). Stores `tokenId` and `bcrypt(secret)` as `secretHash` in the `Device` table. Returns full `tokenId.secret` once to the browser (user copies to VS Code or extension reads via redirect).
-- Return device token once to the browser (user copies it to VS Code settings, or extension reads it via the browser redirect)
-- Device list page with revoke
+### Phase 1 — Auth + Database ✅ COMPLETE
+- Auth.js with GitHub OAuth provider; dev credentials provider (gated by `ENABLE_DEV_LOGIN=true` + `NODE_ENV=development`)
+- Session enriched with `userId`, `username`, `displayName`, `avatarUrl`
+- Split device token flow: `POST /api/connect` validates code, issues `tokenId.secret`, stores `bcrypt(secret)` in DB
+- Device list + revoke in settings
+- `auth-policy.ts` for dev login gating; `connect-policy.ts` for CSRF + code validation
 
-### Phase 2 — Upload API + Schema Validation (Day 6–9)
-- Implement `POST /api/upload` with:
-  - Bearer token extraction: split on `.` to get `tokenId`, look up `Device` by `tokenId` (indexed), verify `bcrypt(secret) == device.secretHash`. Reject if device is revoked.
-  - Zod validation against `SnapshotPayload` from `shared-schema` (validates `dailyBuckets[]`, each `date` ≤ `clientUploadedAt`, all counts non-negative)
-  - Rate limit check (start simple: count rows in `UploadLog` in last hour)
-  - **Single Prisma transaction**: UPSERT `UsageDaily[]` by `(userId, deviceId, date)` + recompute and UPSERT `UserStat` (SUM of all `UsageDaily` across all devices for this user) + UPSERT `RepoStat[]` by `(userId, repoIdentity)` (derived from `displayMode`+`githubRepo`/`aliasLabel`)
-  - Write `UploadLog` outside the transaction (best-effort audit)
-  - Returns `{ ok, logId }`
-- Implement upload in the VS Code extension:
-  - Add `RepoRefPrefs` store in `globalState` (keyed by `workspaceId` — the hex hash `discovery.ts` already uses)
-  - Use `WorkspaceInfo.workspaceId` directly as `workspaceKey` in the payload — already opaque, no extra UUID needed
-  - For each workspace, run `git remote get-url origin`, normalize to `owner/repo` if GitHub
-  - Show per-workspace confirmation modal on first upload (GitHub link / alias / redact); persist choice
-  - Use `computeDailyStats()` to build `dailyBuckets`; read device token from `SecretStorage`, post to API
-- Manual test with the extension against localhost
+### Phase 2 — Upload API + Schema Validation ✅ COMPLETE
+- `POST /api/upload`: detects v1/v2, translates v1 via `upload-translate.ts`, validates with Zod
+- Three-dimensional DB-based rate limiting (device / user / IP)
+- Single Prisma transaction: v1 tables + v2 canonical tables via `agent-ingest.ts`
+- Streak computation via `streak.ts` (current + best, 10K token threshold)
+- `UploadLog` written outside transaction (best-effort)
 
-### Phase 3 — Public Profile + Leaderboard (Day 10–14)
-- Profile page `/u/[username]` — reads `UserStat` for KPIs and public `RepoStat[]` for repo table; no upload aggregation at query time
-- Leaderboard page `/leaderboard` — query public users ordered by tokens, paginate
-- Privacy controls in settings: toggle profile public/private, toggle per-repo visibility
-- Repo identity settings table: list of all tracked workspaces, their auto-detected remote, and current display mode (GitHub / alias / redacted) with inline edit
-- Link between profile and repo pages
-- Add `robots.txt` (allow leaderboard/profiles, disallow `/api/*` and `/settings`)
+### Phase 3 — Public Profile + Leaderboard 🚧 IN PROGRESS
+- ✅ Leaderboard page + `/api/leaderboard` (all-time + 7d/30d, tokens + premium sort)
+- ✅ `/api/leaderboard/repos` repo-level leaderboard
+- ✅ Settings: profile visibility, repo visibility, device management
+- ✅ `/api/profile/[username]` API route
+- 🚧 `/u/[username]` profile page component (directory exists, page pending)
+- 📋 `/r/[username]/[...repo]` repo detail page
+- 📋 Repo identity settings table (workspace → display mode mapping)
 
-### Phase 4 — Badges / Cards (Day 15–18)
-- `GET /badge/[username].svg` — minimal Shields.io-style SVG; stat param selects what to show
-- `GET /card/[username].svg` — wider stat card with 3-4 KPIs in a dark card design
-- Both return `Cache-Control: public, max-age=3600, stale-while-revalidate=86400`
-- Settings page "Badge" section with live preview + Markdown/HTML copy snippets
-- Test that GitHub renders the badge in a README (whitelist at `api.github.com` is the badge service's issue, not yours, since you serve SVG directly)
+### Phase 4 — Badges / Cards 📋 NEXT
+- `GET /badge/[username].svg` — Shields.io-style; `?stat=tokens|requests|premium|top-model|top-product|top-provider`
+- `GET /card/[username].svg` — wider stat card with 3–4 KPIs
+- Both: `Cache-Control: public, max-age=3600, stale-while-revalidate=86400`
+- Settings page badge section: live preview + Markdown/HTML copy snippets
 
-### Phase 5 — Polish and Moderation (Day 19–22)
-- Landing page copywriting + OG image
-- Add a `reportedAt` flag to `User` for basic moderation (no UI yet, just DB column + manual admin query)
-- `DELETE /api/account` — cascade delete everything
-- Add clearly visible disclaimer on leaderboard: *"Stats are self-reported estimates from local VS Code session data. Not affiliated with GitHub or Microsoft."*
-- Load test the leaderboard query; DB indexes to add:
-  - `UserStat(totalTokens DESC)` and `UserStat(premiumRequests DESC)` — for all-time leaderboard sort
-  - `User(profilePublic)` — partial index filtering public-only users
-  - `UsageDaily(date, userId)` — **date-first** composite; lets the DB scan a date range across all users for date-filtered leaderboards without a per-user full scan
-  - The `@@unique([userId, deviceId, date])` on `UsageDaily` also covers per-device upsert lookups
-- Set up GitHub Actions CI for `apps/web`: `tsc --noEmit`, lint, Prisma schema validation on every push to `main`
+### Phase 5 — VS Code Extension Sync Command 📋
+- `RepoRefPrefs` store in `globalState` (keyed by `workspaceId`)
+- Per-workspace GitHub remote detection + first-upload confirmation modal
+- `computeDailyStats()` → `AgentSnapshot` build → `POST /api/upload` via `SecretStorage` token
+- `vscode://` URI handler for seamless device-link redirect
+
+### Phase 6 — Polish + Production Readiness 📋
+- Landing page OG image, final copy: *"Track your coding-agent usage across Copilot, Claude Code, and more"*
+- `reportedAt` flag on `User` for basic moderation
+- DB indexes audit: `UserStat(totalTokens DESC)`, `(date, userId)` on `UsageDaily`
+- GitHub Actions CI: `tsc --noEmit`, lint, `prisma validate` on push to `main`
+- Set up Vercel deployment (see Section 12)
 
 ---
 
@@ -556,7 +606,117 @@ apps/web/
 | **Vercel free tier + Postgres size** | Low | Neon or Supabase free tier is fine for months. The schema is narrow and snapshots are small. |
 | **VS Code extension sync complexity** | Medium | The sync command adds the device-link flow and the per-workspace repo-identity confirmation modal. Budget extra time for Phase 1/2. |
 | **Next.js App Router RSC + Auth.js complexity** | Medium | Don't overthink this. Use the basic Auth.js `getServerSession` pattern everywhere. Don't try to use RSC streaming for auth-gated routes. |
-| **Model multipliers drift** | Medium | `shared-schema` owns the multiplier table — update one place, both extension and web stay in sync. |
+| **Model multipliers drift** | Medium | `shared-schema` owns `MODEL_REGISTRY` — update one place, both extension and web stay in sync. |
+| **V1/V2 rollup drift** | Low | Both tracks write in the same Prisma transaction. If either fails, both roll back. An admin recompute endpoint can rebuild rollups from facts at any time. |
+| **Adapter trust inflation** | Low | Every model call records `sourceOfTruth`. UI can show "observed" vs "inferred" so viewers understand reliability. |
+
+---
+
+## 12. Deployment
+
+### Infrastructure
+
+| Service | Purpose | Recommended option |
+|---------|---------|-------------------|
+| **Next.js hosting** | App server + API routes | Vercel (free tier sufficient to start) |
+| **PostgreSQL** | Primary database | Neon (free tier: 512MB, auto-suspend) or Supabase |
+| **GitHub OAuth App** | User authentication | Register at github.com/settings/developers |
+
+No Redis or queue service required — rate limiting and leaderboard are DB-based.
+
+### Environment Variables
+
+```env
+# Database (required)
+DATABASE_URL=postgresql://user:pass@host:5432/promptstreak?sslmode=require
+
+# Auth.js (required)
+NEXTAUTH_SECRET=<random 32+ byte secret>
+NEXTAUTH_URL=https://promptstreak.dev          # exact production URL, no trailing slash
+
+# GitHub OAuth (required in production)
+GITHUB_CLIENT_ID=<GitHub OAuth App client ID>
+GITHUB_CLIENT_SECRET=<GitHub OAuth App client secret>
+
+# Dev-only (never set in production)
+ENABLE_DEV_LOGIN=false
+ENABLE_DEV_TEST_ACCOUNT=false
+DEV_TEST_ACCOUNT_USERNAME=
+DEV_TEST_ACCOUNT_GITHUB_ID=
+```
+
+### GitHub OAuth App Setup
+
+1. Go to **github.com/settings/developers** → OAuth Apps → New OAuth App
+2. **Application name**: `promptstreak.dev`
+3. **Homepage URL**: `https://promptstreak.dev`
+4. **Authorization callback URL**: `https://promptstreak.dev/api/auth/callback/github`
+5. Copy `Client ID` and generate a `Client Secret` → set as env vars
+
+For local dev: create a second OAuth App with callback `http://localhost:3000/api/auth/callback/github`.
+
+### Vercel Setup
+
+This is a pnpm monorepo. Vercel needs to build from the repo root so workspace package resolution works.
+
+**Recommended Vercel project settings:**
+1. Import repository at vercel.com
+2. Leave **Root Directory** empty (repo root)
+3. Set **Framework Preset** to `Next.js`
+4. Set **Install Command** to `pnpm install --frozen-lockfile`
+5. Set **Build Command** to `pnpm --filter @promptstreak/web build`
+6. Set **Output Directory** to `apps/web/.next`
+
+> **Why root directory?** Setting root to `apps/web` breaks resolution of `packages/shared-schema` since pnpm workspace links are relative to the repo root.
+
+Add `postinstall` to `apps/web/package.json` so Prisma client generates in the Vercel build environment:
+```json
+{
+  "scripts": {
+    "postinstall": "prisma generate"
+  }
+}
+```
+
+### Prisma Migrations
+
+Vercel does not run migrations automatically. Run before each deployment:
+
+```bash
+# From repo root
+pnpm db:migrate    # runs prisma migrate deploy in apps/web
+```
+
+Or add a pre-deploy CI step:
+```yaml
+- name: Run migrations
+  run: pnpm --filter @promptstreak/web exec prisma migrate deploy
+  env:
+    DATABASE_URL: ${{ secrets.DATABASE_URL }}
+```
+
+### Neon Database Setup
+
+1. Create a project at **neon.tech**
+2. Use the **pooled connection string** (pgbouncer, port 5432) for `DATABASE_URL`
+3. Set `DATABASE_URL` in Vercel environment variables (Production + Preview)
+4. Run initial migration: `DATABASE_URL=<neon-url> pnpm --filter @promptstreak/web exec prisma migrate deploy`
+
+Neon free tier: 512MB storage, auto-suspends after 5 min inactivity (cold start ~1s — acceptable).
+
+### Pre-Launch Checklist
+
+- [ ] `NEXTAUTH_URL` matches exact production domain (no trailing slash)
+- [ ] GitHub OAuth callback URL matches `NEXTAUTH_URL/api/auth/callback/github`
+- [ ] `NEXTAUTH_SECRET` is a unique random value (not the dev placeholder)
+- [ ] `ENABLE_DEV_LOGIN` is `false` or unset in production
+- [ ] `DATABASE_URL` uses SSL (`?sslmode=require` for Neon)
+- [ ] Prisma migrations applied to production DB before first deploy
+- [ ] `postinstall: prisma generate` in `apps/web/package.json`
+- [ ] Vercel build command targets `apps/web` via workspace filter
+- [ ] `robots.txt` deployed (disallows `/api/*`, `/settings`)
+- [ ] Leaderboard disclaimer visible: *"Stats are self-reported estimates from local session data. Not affiliated with GitHub or Microsoft."*
+- [ ] Dogfood: publish your own stats on day 1
 
 ### Open Questions to Decide Before Coding
 1. **Domain name** — `promptstreak.dev`.

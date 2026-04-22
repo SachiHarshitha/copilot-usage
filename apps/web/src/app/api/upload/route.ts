@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { SnapshotPayloadSchema } from '@copilot-usage/shared-schema';
+import {
+  AgentSnapshotSchema,
+  SnapshotPayloadSchema,
+  type AgentSnapshot,
+} from '@copilot-usage/shared-schema';
 import { checkRateLimit } from '@/lib/ratelimit';
 import bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
 import { computeStreaks } from '@/lib/streak';
+import { aggregateCanonical, writeCanonical } from '@/lib/agent-ingest';
+import { detectPayloadVersion, translateV1ToV2 } from '@/lib/upload-translate';
 
 interface RejectedUploadLogInput {
   userId: string;
@@ -130,6 +136,20 @@ export async function POST(request: NextRequest) {
 
   const payloadBytes = rawPayload.length;
 
+  // Dispatch on payload contract version. Both legacy (v1) and canonical
+  // (v2) snapshots are accepted during the migration window.
+  const version = detectPayloadVersion(body);
+
+  if (version === 'v2') {
+    return handleV2Upload({
+      body,
+      userId,
+      deviceId,
+      ipHash,
+      payloadBytes,
+    });
+  }
+
   const parsed = SnapshotPayloadSchema.safeParse(body);
   if (!parsed.success) {
     await logRejectedUpload({
@@ -145,6 +165,9 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = parsed.data;
+  const canonical = aggregateCanonical(
+    translateV1ToV2(payload, payload.clientUploadedAt)
+  );
 
   // --- Time window check ---
   const clientTime = new Date(payload.clientUploadedAt).getTime();
@@ -333,6 +356,10 @@ export async function POST(request: NextRequest) {
           },
         });
       }
+
+      // 4. Canonical (v2) writes: ProductStat / ProviderStat / ModelStat etc.
+      //    Additive — does not affect legacy reads.
+      await writeCanonical(tx, userId, deviceId, canonical);
     });
 
     // Update device last seen
@@ -374,4 +401,89 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ ok: true, logId: log.id });
+}
+
+// ---------------------------------------------------------------------------
+// V2 (agent-agnostic) upload handler
+//
+// Validates an `AgentSnapshot`, enforces the same time-window guard as the
+// legacy path, then writes only the canonical (v2) tables. Legacy tables are
+// not touched because v2 payloads may originate from non-Copilot adapters.
+// ---------------------------------------------------------------------------
+async function handleV2Upload({
+  body,
+  userId,
+  deviceId,
+  ipHash,
+  payloadBytes,
+}: {
+  body: unknown;
+  userId: string;
+  deviceId: string;
+  ipHash: string;
+  payloadBytes: number;
+}): Promise<NextResponse> {
+  const parsed = AgentSnapshotSchema.safeParse(body);
+  if (!parsed.success) {
+    await logRejectedUpload({ userId, deviceId, ipHash, payloadBytes });
+    return NextResponse.json(
+      { error: 'Validation failed.', details: parsed.error.issues.slice(0, 5) },
+      { status: 400 }
+    );
+  }
+
+  const snapshot: AgentSnapshot = parsed.data;
+
+  const observed = new Date(snapshot.observedAt).getTime();
+  const now = Date.now();
+  if (observed < now - 24 * 60 * 60 * 1000 || observed > now + 5 * 60 * 1000) {
+    await logRejectedUpload({ userId, deviceId, ipHash, payloadBytes });
+    return NextResponse.json(
+      { error: 'observedAt is out of allowed time window.' },
+      { status: 400 }
+    );
+  }
+
+  const canonical = aggregateCanonical(snapshot);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await writeCanonical(tx, userId, deviceId, canonical);
+    });
+
+    await prisma.device.update({
+      where: { id: deviceId },
+      data: { lastSeenAt: new Date() },
+    });
+  } catch (err) {
+    console.error('V2 upload transaction failed:', err);
+    await prisma.uploadLog.create({
+      data: {
+        userId,
+        deviceId,
+        ipHash,
+        payloadBytes,
+        bucketCount: snapshot.dailyBuckets?.length ?? 0,
+        earliestDate: null,
+        latestDate: null,
+        accepted: false,
+      },
+    });
+    return NextResponse.json({ error: 'Internal server error during upload.' }, { status: 500 });
+  }
+
+  const log = await prisma.uploadLog.create({
+    data: {
+      userId,
+      deviceId,
+      ipHash,
+      payloadBytes,
+      bucketCount: snapshot.dailyBuckets?.length ?? 0,
+      earliestDate: null,
+      latestDate: null,
+      accepted: true,
+    },
+  });
+
+  return NextResponse.json({ ok: true, logId: log.id, contract: 'v2' });
 }

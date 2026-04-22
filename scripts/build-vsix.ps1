@@ -55,7 +55,7 @@ try {
     # --- Install ---
     if ($Install -or -not (Test-Path "node_modules")) {
         Write-Host "`n[2/4] Installing dependencies..." -ForegroundColor Yellow
-        npm ci
+        npm ci --legacy-peer-deps
         if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
         Write-Host "  Dependencies installed." -ForegroundColor Green
     } else {
@@ -64,7 +64,7 @@ try {
 
     # --- Package ---
     Write-Host "`n[3/4] Packaging VSIX..." -ForegroundColor Yellow
-    npx @vscode/vsce package --allow-missing-repository --skip-license
+    npx @vscode/vsce package --allow-missing-repository --skip-license --no-dependencies
     if ($LASTEXITCODE -ne 0) { throw "vsce package failed" }
 
     $vsix = Get-ChildItem -Filter "*.vsix" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
