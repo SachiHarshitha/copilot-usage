@@ -27,6 +27,12 @@ export class WorkspacePanel {
     );
   }
 
+  public static async refresh(): Promise<void> {
+    if (WorkspacePanel.currentPanel) {
+      await WorkspacePanel.currentPanel.loadData();
+    }
+  }
+
   public static async createOrShow(extensionUri: vscode.Uri): Promise<void> {
     const column = vscode.ViewColumn.Beside;
     if (WorkspacePanel.currentPanel) {
@@ -115,6 +121,12 @@ export class DashboardPanel {
       null,
       this.disposables,
     );
+  }
+
+  public static async refresh(): Promise<void> {
+    if (DashboardPanel.currentPanel) {
+      await DashboardPanel.currentPanel.loadData();
+    }
   }
 
   public static async createOrShow(extensionUri: vscode.Uri): Promise<void> {
@@ -258,27 +270,7 @@ function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openWorkspace() { vscode.postMessage({ command: 'openWorkspace' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 ${autoRefreshScript()}
-
-new Chart(document.getElementById('dailyChart'), {
-  type: 'bar',
-  data: {
-    labels: ${dailyLabels},
-    datasets: [
-      { label: 'Prompt Tokens', data: ${dailyPrompt}, backgroundColor: 'rgba(56,189,248,0.7)' },
-      { label: 'Output Tokens', data: ${dailyOutput}, backgroundColor: 'rgba(168,85,247,0.7)' },
-    ],
-  },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Daily Token Usage', color: '#e2e8f0' }, legend: { labels: { color: '#e2e8f0' } } }, scales: { x: { stacked: true, ticks: { color: '#94a3b8' } }, y: { stacked: true, ticks: { color: '#94a3b8' } } } },
-});
-
-new Chart(document.getElementById('modelChart'), {
-  type: 'doughnut',
-  data: {
-    labels: ${modelLabels},
-    datasets: [{ data: ${modelData}, backgroundColor: ['#38bdf8','#a855f7','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316'] }],
-  },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Model Distribution', color: '#e2e8f0' }, legend: { position: 'right', labels: { color: '#e2e8f0', font: { size: 10 }, boxWidth: 12, padding: 6 } } } },
-});
+${chartsScript(dailyLabels, dailyPrompt, dailyOutput, modelLabels, modelData)}
 </script>
 </body></html>`;
 }
@@ -319,7 +311,7 @@ function commonStyles(): string {
   table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
   th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--vscode-editorWidget-border, #334155); color: var(--vscode-descriptionForeground, #94a3b8); font-weight: 600; }
   td { padding: 5px 8px; border-bottom: 1px solid var(--vscode-editorWidget-border, #1e293b); }
-  tr:hover td { background: rgba(56,189,248,0.05); }
+  tr:hover td { background: var(--vscode-list-hoverBackground, rgba(0,0,0,0.05)); }
   .error { text-align: center; padding: 60px 20px; color: var(--vscode-descriptionForeground, #94a3b8); }
   .error h2 { margin-bottom: 8px; }
   </style>`;
@@ -327,6 +319,42 @@ function commonStyles(): string {
 
 function kpiCard(label: string, value: string): string {
   return `<div class="kpi"><div class="value">${esc(value)}</div><div class="label">${esc(label)}</div></div>`;
+}
+
+function chartsScript(
+  dailyLabels: string,
+  dailyPrompt: string,
+  dailyOutput: string,
+  modelLabels: string,
+  modelData: string,
+): string {
+  return `
+var _cs = getComputedStyle(document.body);
+var _fg = _cs.getPropertyValue('--vscode-foreground').trim() || _cs.getPropertyValue('--vscode-editor-foreground').trim() || '#1e293b';
+var _muted = _fg;
+var _grid = _cs.getPropertyValue('--vscode-editorWidget-border').trim() || _cs.getPropertyValue('--vscode-panel-border').trim() || '#cbd5e1';
+
+new Chart(document.getElementById('dailyChart'), {
+  type: 'bar',
+  data: {
+    labels: ${dailyLabels},
+    datasets: [
+      { label: 'Prompt Tokens', data: ${dailyPrompt}, backgroundColor: 'rgba(56,189,248,0.7)' },
+      { label: 'Output Tokens', data: ${dailyOutput}, backgroundColor: 'rgba(168,85,247,0.7)' },
+    ],
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Daily Token Usage', color: _fg }, legend: { labels: { color: _fg } } }, scales: { x: { stacked: true, ticks: { color: _muted }, grid: { color: _grid } }, y: { stacked: true, ticks: { color: _muted }, grid: { color: _grid } } } },
+});
+
+new Chart(document.getElementById('modelChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ${modelLabels},
+    datasets: [{ data: ${modelData}, backgroundColor: ['#38bdf8','#a855f7','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316'] }],
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Model Distribution', color: _fg }, legend: { position: 'right', labels: { color: _fg, font: { size: 10 }, boxWidth: 12, padding: 6 } } } },
+});
+`;
 }
 
 function autoRefreshSelect(seconds: number): string {
@@ -466,27 +494,7 @@ function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openDashboard() { vscode.postMessage({ command: 'openDashboard' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 ${autoRefreshScript()}
-
-new Chart(document.getElementById('dailyChart'), {
-  type: 'bar',
-  data: {
-    labels: ${dailyLabels},
-    datasets: [
-      { label: 'Prompt Tokens', data: ${dailyPrompt}, backgroundColor: 'rgba(56,189,248,0.7)' },
-      { label: 'Output Tokens', data: ${dailyOutput}, backgroundColor: 'rgba(168,85,247,0.7)' },
-    ],
-  },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Daily Token Usage', color: '#e2e8f0' }, legend: { labels: { color: '#e2e8f0' } } }, scales: { x: { stacked: true, ticks: { color: '#94a3b8' } }, y: { stacked: true, ticks: { color: '#94a3b8' } } } },
-});
-
-new Chart(document.getElementById('modelChart'), {
-  type: 'doughnut',
-  data: {
-    labels: ${modelLabels},
-    datasets: [{ data: ${modelData}, backgroundColor: ['#38bdf8','#a855f7','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6','#f97316'] }],
-  },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Model Distribution', color: '#e2e8f0' }, legend: { position: 'right', labels: { color: '#e2e8f0', font: { size: 10 }, boxWidth: 12, padding: 6 } } } },
-});
+${chartsScript(dailyLabels, dailyPrompt, dailyOutput, modelLabels, modelData)}
 </script>
 </body></html>`;
 }

@@ -233,11 +233,17 @@ function handleResult(state: ParseState, v: Record<string, unknown>, requestInde
 
   const chatSessionId = state.anchor?.chatSessionId || '';
 
+  // resolvedModel uses dashes and no prefix (e.g. "claude-opus-4-7") — normalise to "copilot/claude-opus-4.7"
+  const rawResolved = str(md.resolvedModel);
+  const resolvedModel = rawResolved
+    ? 'copilot/' + rawResolved.replace(/(?<=-\d+)-(\d+)$/, '.$1')  // only last -minor patch: dash → dot
+    : undefined;
+
   state.requests.push({
     chatSessionId,
     requestIndex,
     requestId: state.requestIds.get(requestIndex),
-    modelId: str(md.modelId),
+    modelId: str(md.modelId) || resolvedModel,
     timestampMs,
     promptTokens,
     outputTokens,

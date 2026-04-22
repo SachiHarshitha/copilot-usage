@@ -20,14 +20,6 @@ export class StatusBarManager implements vscode.Disposable {
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()),
     );
 
-    // Refresh on JSONL changes
-    const watcher = vscode.workspace.createFileSystemWatcher('**/chatSessions/*.jsonl');
-    this.disposables.push(
-      watcher,
-      watcher.onDidCreate(() => this.refresh()),
-      watcher.onDidChange(() => this.refresh()),
-    );
-
     this.refresh();
   }
 
