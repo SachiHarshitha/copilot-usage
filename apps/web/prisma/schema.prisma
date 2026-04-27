@@ -8,14 +8,14 @@ datasource db {
 }
 
 model User {
-  id            String     @id @default(cuid())
-  githubId      Int        @unique
-  username      String     @unique
+  id            String   @id @default(cuid())
+  githubId      Int      @unique
+  username      String   @unique
   displayName   String?
   avatarUrl     String?
-  profilePublic Boolean    @default(false)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  profilePublic Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   devices    Device[]
   usageDaily UsageDaily[]
@@ -25,12 +25,12 @@ model User {
 
   // Agent-agnostic (v2) relations — additive; legacy reads remain on the
   // tables above until the migration window closes.
-  agentRuns         AgentRun[]
-  modelUsageDaily   ModelUsageDaily[]
-  actionUsageDaily  ActionUsageDaily[]
-  productStats      ProductStat[]
-  providerStats     ProviderStat[]
-  modelStats        ModelStat[]
+  agentRuns        AgentRun[]
+  modelUsageDaily  ModelUsageDaily[]
+  actionUsageDaily ActionUsageDaily[]
+  productStats     ProductStat[]
+  providerStats    ProviderStat[]
+  modelStats       ModelStat[]
 }
 
 model Device {
@@ -64,10 +64,10 @@ model UsageDaily {
 }
 
 model UploadLog {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   userId       String
   deviceId     String
-  uploadedAt   DateTime @default(now())
+  uploadedAt   DateTime  @default(now())
   ipHash       String
   payloadBytes Int
   bucketCount  Int
@@ -79,20 +79,20 @@ model UploadLog {
 }
 
 model UserStat {
-  userId          String   @id
-  totalRequests   Int      @default(0)
-  promptTokens    BigInt   @default(0)
-  outputTokens    BigInt   @default(0)
-  totalTokens     BigInt   @default(0)
-  weeklyTokens    BigInt   @default(0)
-  rolling30DayTokens BigInt @default(0)
-  premiumRequests Float    @default(0)
-  currentStreakDays Int    @default(0)
-  bestStreakDays  Int      @default(0)
-  workspaceCount  Int      @default(0)
-  sessionCount    Int      @default(0)
-  topModel        String?
-  lastSyncedAt    DateTime @default(now())
+  userId             String   @id
+  totalRequests      Int      @default(0)
+  promptTokens       BigInt   @default(0)
+  outputTokens       BigInt   @default(0)
+  totalTokens        BigInt   @default(0)
+  weeklyTokens       BigInt   @default(0)
+  rolling30DayTokens BigInt   @default(0)
+  premiumRequests    Float    @default(0)
+  currentStreakDays  Int      @default(0)
+  bestStreakDays     Int      @default(0)
+  workspaceCount     Int      @default(0)
+  sessionCount       Int      @default(0)
+  topModel           String?
+  lastSyncedAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -101,21 +101,21 @@ model UserStat {
 }
 
 model RepoStat {
-  id            String  @id @default(cuid())
-  userId        String
-  repoIdentity  String
-  displayMode   String
-  githubRepo    String?
-  aliasLabel    String?
-  isPublic      Boolean @default(false)
-  requests      Int     @default(0)
-  promptTokens  BigInt  @default(0)
-  outputTokens  BigInt  @default(0)
-  totalTokens   BigInt  @default(0)
-  tokens30d     BigInt  @default(0)
-  premiumReqs   Float   @default(0)
-  topModel      String?
-  lastSyncedAt  DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  repoIdentity String
+  displayMode  String
+  githubRepo   String?
+  aliasLabel   String?
+  isPublic     Boolean  @default(false)
+  requests     Int      @default(0)
+  promptTokens BigInt   @default(0)
+  outputTokens BigInt   @default(0)
+  totalTokens  BigInt   @default(0)
+  tokens30d    BigInt   @default(0)
+  premiumReqs  Float    @default(0)
+  topModel     String?
+  lastSyncedAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -137,38 +137,38 @@ model RepoStat {
 /// adapters not registered here are still accepted on upload but appear
 /// without metadata in admin views.
 model AgentAdapter {
-  id                            String   @id // e.g. "github-copilot-vscode"
-  provider                      String
-  product                       String
-  surface                       String
-  displayName                   String?
-  supportsTokens                Boolean  @default(false)
-  supportsCosts                 Boolean  @default(false)
-  supportsRunIds                Boolean  @default(false)
-  supportsRepoAttribution       Boolean  @default(false)
-  supportsToolActions           Boolean  @default(false)
-  supportsVerifiedProviderData  Boolean  @default(false)
-  createdAt                     DateTime @default(now())
-  updatedAt                     DateTime @updatedAt
+  id                           String   @id // e.g. "github-copilot-vscode"
+  provider                     String
+  product                      String
+  surface                      String
+  displayName                  String?
+  supportsTokens               Boolean  @default(false)
+  supportsCosts                Boolean  @default(false)
+  supportsRunIds               Boolean  @default(false)
+  supportsRepoAttribution      Boolean  @default(false)
+  supportsToolActions          Boolean  @default(false)
+  supportsVerifiedProviderData Boolean  @default(false)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
 
   @@index([provider, product])
 }
 
 /// One normalized agent run (session) as reported by an adapter.
 model AgentRun {
-  id              String    @id @default(cuid())
-  userId          String
-  deviceId        String
-  adapter         String
-  provider        String
-  product         String
-  surface         String
-  runExternalId   String
-  startedAt       DateTime?
-  endedAt         DateTime?
-  repoIdentity    String?
-  trustLevel      String    // "verified" | "observed" | "inferred"
-  observedAt      DateTime  @default(now())
+  id            String    @id @default(cuid())
+  userId        String
+  deviceId      String
+  adapter       String
+  provider      String
+  product       String
+  surface       String
+  runExternalId String
+  startedAt     DateTime?
+  endedAt       DateTime?
+  repoIdentity  String?
+  trustLevel    String // "verified" | "observed" | "inferred"
+  observedAt    DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -180,24 +180,24 @@ model AgentRun {
 
 /// Daily aggregated model usage by full agent dimensions.
 model ModelUsageDaily {
-  id                String   @id @default(cuid())
-  userId            String
-  deviceId          String
-  date              DateTime @db.Date
-  provider          String
-  product           String
-  surface           String
-  modelId           String
-  repoIdentity      String?
-  trustLevel        String   @default("observed")
-  requestCount      Int      @default(0)
-  inputTokens       BigInt   @default(0)
-  outputTokens      BigInt   @default(0)
-  totalTokens       BigInt   @default(0)
-  cacheReadTokens   BigInt   @default(0)
-  cacheWriteTokens  BigInt   @default(0)
-  costMicros        BigInt   @default(0)
-  premiumRequests   Float    @default(0)
+  id               String   @id @default(cuid())
+  userId           String
+  deviceId         String
+  date             DateTime @db.Date
+  provider         String
+  product          String
+  surface          String
+  modelId          String
+  repoIdentity     String?
+  trustLevel       String   @default("observed")
+  requestCount     Int      @default(0)
+  inputTokens      BigInt   @default(0)
+  outputTokens     BigInt   @default(0)
+  totalTokens      BigInt   @default(0)
+  cacheReadTokens  BigInt   @default(0)
+  cacheWriteTokens BigInt   @default(0)
+  costMicros       BigInt   @default(0)
+  premiumRequests  Float    @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -209,17 +209,17 @@ model ModelUsageDaily {
 
 /// Daily aggregated action counts (tool calls, terminal commands, edits, …).
 model ActionUsageDaily {
-  id            String   @id @default(cuid())
-  userId        String
-  deviceId      String
-  date          DateTime @db.Date
-  provider      String
-  product       String
-  surface       String
-  repoIdentity  String?
-  actionType    String   // "tool_call" | "terminal_command" | "file_edit" | …
-  count         Int      @default(0)
-  filesTouched  Int      @default(0)
+  id           String   @id @default(cuid())
+  userId       String
+  deviceId     String
+  date         DateTime @db.Date
+  provider     String
+  product      String
+  surface      String
+  repoIdentity String?
+  actionType   String // "tool_call" | "terminal_command" | "file_edit" | …
+  count        Int      @default(0)
+  filesTouched Int      @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -280,4 +280,113 @@ model ModelStat {
 
   @@unique([userId, provider, product, modelId])
   @@index([modelId, totalTokens(sort: Desc)])
+}
+
+// =====================================================================
+// Admin console (Phase A.1)
+// Backed by separate auth surface — no relation to public User model.
+// =====================================================================
+
+enum AdminRole {
+  READ_ONLY
+  MODERATOR
+  ADMIN
+}
+
+/// Admin operator. Email is stored lowercased; uniqueness enforced at the DB
+/// layer plus app-level normalisation. Passwords hashed with bcrypt (cost >= 12).
+model AdminUser {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  role              AdminRole @default(READ_ONLY)
+  failedLoginCount  Int       @default(0)
+  lockedUntil       DateTime?
+  lastLoginAt       DateTime?
+  passwordChangedAt DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sessions      AdminSession[]
+  totpSecret    AdminTotpSecret?
+  recoveryCodes AdminRecoveryCode[]
+  actionLogs    AdminActionLog[]
+
+  @@index([role])
+}
+
+/// Active admin session. tokenHash is sha256 of an opaque session token; the
+/// raw token lives only in the __Host- cookie. Sessions are double-bounded
+/// (idle + absolute) so even an idle attacker cannot extend indefinitely.
+model AdminSession {
+  id                String    @id @default(cuid())
+  adminUserId       String
+  tokenHash         String    @unique
+  idleExpiresAt     DateTime
+  absoluteExpiresAt DateTime
+  ipHash            String?
+  userAgentHash     String?
+  createdAt         DateTime  @default(now())
+  revokedAt         DateTime?
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([idleExpiresAt])
+  @@index([absoluteExpiresAt])
+}
+
+/// 1-to-1 TOTP seed for an admin. encryptedSecret is produced by
+/// src/lib/crypto/tokenEncryption (AES-256-GCM, versioned key ring).
+/// confirmedAt is null until the operator verifies their first code.
+model AdminTotpSecret {
+  id              String    @id @default(cuid())
+  adminUserId     String    @unique
+  encryptedSecret String
+  confirmedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+}
+
+/// Single-use recovery codes (10 per admin by default). codeHash is bcrypt of
+/// the displayed code. usedAt being non-null marks the code as consumed.
+model AdminRecoveryCode {
+  id          String    @id @default(cuid())
+  adminUserId String
+  codeHash    String
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+}
+
+/// Append-only audit log of every admin mutation. The Postgres immutability
+/// trigger (BEFORE UPDATE OR DELETE -> RAISE) is added in Phase E so updates
+/// remain possible while fixtures stabilise. adminUserId uses SetNull so the
+/// log row survives even if the admin account is deleted — adminEmailHash
+/// captures the actor's identity at the time of the action.
+model AdminActionLog {
+  id             String   @id @default(cuid())
+  adminUserId    String?
+  adminEmailHash String
+  action         String
+  targetType     String?
+  targetId       String?
+  ipHash         String?
+  userAgentHash  String?
+  before         Json?
+  after          Json?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([adminUserId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([targetType, targetId])
+  @@index([createdAt(sort: Desc)])
 }
