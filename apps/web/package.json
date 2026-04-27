@@ -7,12 +7,15 @@
     "build": "next build",
     "start": "next start",
     "test": "tsx --test src/**/*.test.ts",
+    "test:integration": "tsx --env-file=.env --test src/**/*.itest.ts",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "db:test:setup": "tsx scripts/setupTestDb.ts",
+    "db:test:reset": "tsx scripts/setupTestDb.ts --reset",
     "postinstall": "prisma generate"
   },
   "dependencies": {
