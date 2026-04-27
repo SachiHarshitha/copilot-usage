@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { WorkspacePanel, DashboardPanel } from './views/panels';
 import { StatusBarManager } from './views/statusBar';
 import { getWorkspaceStorageRoot } from './core/discovery';
+import { CostEstimatorPanel, enableCostEstimator } from './features/costEstimator';
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('copilot-usage extension activated');
@@ -11,11 +12,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 	/** Refresh status bar + any open panels. */
 	const refreshAll = async () => {
-		await Promise.all([
+		const tasks: Promise<unknown>[] = [
 			statusBar.refresh(),
 			WorkspacePanel.refresh(),
 			DashboardPanel.refresh(),
-		]);
+		];
+		if (enableCostEstimator) {
+			tasks.push(CostEstimatorPanel.refresh());
+		}
+		await Promise.all(tasks);
 	};
 
 	// Watch the actual VS Code workspaceStorage directory for JSONL changes.
@@ -42,6 +47,14 @@ export function activate(context: vscode.ExtensionContext) {
 			refreshAll(),
 		),
 	);
+
+	if (enableCostEstimator) {
+		context.subscriptions.push(
+			vscode.commands.registerCommand('copilot-usage.costEstimator', () =>
+				CostEstimatorPanel.createOrShow(context.extensionUri, context),
+			),
+		);
+	}
 }
 
 export function deactivate() {}
