@@ -38,6 +38,12 @@ Desktop.ini
 .env.local
 .env.*.local
 
+# Secrets / keys
+*.pem
+*.key
+*.p12
+*.pfx
+
 # DuckDB local data
 *.duckdb
 *.duckdb.wal
@@ -56,7 +62,7 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-badges/
+/badges/
 !apps/web/src/lib/badges/
 !apps/web/src/lib/badges/**
 .github/skills/
