@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import { findCurrentWorkspace, discoverWorkspaces } from '../core/discovery';
 import { parseAllFiles, flattenEvents, computeKpis, computeModelStats, computeDailyStats, computeWorkspaceStats } from '../core/aggregator';
+import { enableCostEstimator } from '../features/costEstimator/flags';
 
 export class WorkspacePanel {
   public static currentPanel: WorkspacePanel | undefined;
@@ -26,6 +27,9 @@ export class WorkspacePanel {
           await this.loadData();
         }
         if (msg.command === 'openDashboard') { await DashboardPanel.createOrShow(this.extensionUri); }
+        if (msg.command === 'openCostEstimator' && enableCostEstimator) {
+          await vscode.commands.executeCommand('copilot-usage.costEstimator');
+        }
         if (msg.command === 'openGitHub') { vscode.env.openExternal(vscode.Uri.parse('https://github.com/SachiHarshitha/copilot-usage')); }
       },
       null,
@@ -129,6 +133,9 @@ export class DashboardPanel {
           await this.loadData();
         }
         if (msg.command === 'openWorkspace') { await WorkspacePanel.createOrShow(this.extensionUri); }
+        if (msg.command === 'openCostEstimator' && enableCostEstimator) {
+          await vscode.commands.executeCommand('copilot-usage.costEstimator');
+        }
         if (msg.command === 'openGitHub') { vscode.env.openExternal(vscode.Uri.parse('https://github.com/SachiHarshitha/copilot-usage')); }
       },
       null,
@@ -312,6 +319,7 @@ ${commonStyles()}
   <div class="header-actions">
     <button class="btn btn-star" onclick="starGitHub()" title="Star on GitHub">⭐</button>
     <button class="btn btn-secondary" onclick="openWorkspace()" title="Open Workspace View">📂</button>
+    ${enableCostEstimator ? `<button class="btn btn-secondary" onclick="openCostEstimator()" title="Open Cost Estimator (Preview)">💵</button>` : ''}
     <button class="btn" onclick="refresh()" title="Refresh data">↻</button>
     ${dateRangeSelect(dateRange)}
     ${autoRefreshSelect(autoRefreshSeconds)}
@@ -351,6 +359,7 @@ ${commonStyles()}
 const vscode = acquireVsCodeApi();
 function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openWorkspace() { vscode.postMessage({ command: 'openWorkspace' }); }
+function openCostEstimator() { vscode.postMessage({ command: 'openCostEstimator' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 ${dateRangeScript()}
 ${autoRefreshScript()}
@@ -560,6 +569,7 @@ ${commonStyles()}
   <div class="header-actions">
     <button class="btn btn-star" onclick="starGitHub()" title="Star on GitHub">⭐</button>
     <button class="btn btn-secondary" onclick="openDashboard()" title="Open Global Dashboard">🌐</button>
+    ${enableCostEstimator ? `<button class="btn btn-secondary" onclick="openCostEstimator()" title="Open Cost Estimator (Preview)">💵</button>` : ''}
     <button class="btn" onclick="refresh()" title="Refresh data">↻</button>
     ${dateRangeSelect(dateRange)}
     ${autoRefreshSelect(autoRefreshSeconds)}
@@ -593,6 +603,7 @@ ${commonStyles()}
 const vscode = acquireVsCodeApi();
 function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openDashboard() { vscode.postMessage({ command: 'openDashboard' }); }
+function openCostEstimator() { vscode.postMessage({ command: 'openCostEstimator' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 ${dateRangeScript()}
 ${autoRefreshScript()}
@@ -600,3 +611,11 @@ ${chartsScript(dailyLabels, dailyPrompt, dailyOutput, modelLabels, modelData)}
 </script>
 </body></html>`;
 }
+
+// === Shared exports for feature folders (e.g. costEstimator) ===
+export const commonStylesShared = commonStyles;
+export const loadingPageShared = loadingPage;
+export const escShared = esc;
+export const fmtShared = fmt;
+export const headerIconShared = headerIcon;
+
