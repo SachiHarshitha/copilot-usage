@@ -1,0 +1,253 @@
+{
+  "readmeTemplates": [
+    {
+      "key": "streak",
+      "file": "badges/readme/streak-template.svg",
+      "label": "STREAK",
+      "value": "18 DAYS"
+    },
+    {
+      "key": "lifetime",
+      "file": "badges/readme/lifetime-template.svg",
+      "label": "LIFETIME",
+      "value": "12.4M TOKENS"
+    },
+    {
+      "key": "rank",
+      "file": "badges/readme/rank-template.svg",
+      "label": "RANK",
+      "value": "DIAMOND"
+    },
+    {
+      "key": "weekly",
+      "file": "badges/readme/weekly-template.svg",
+      "label": "THIS WEEK",
+      "value": "420K TOKENS"
+    },
+    {
+      "key": "repo",
+      "file": "badges/readme/repo-template.svg",
+      "label": "TOP REPO",
+      "value": "promptstreak-web",
+      "notes": "User-profile badge showing the user's top public repo. Use repoReadmeBadges for badges embedded inside a repository README."
+    }
+  ],
+  "rankBadges": [
+    {
+      "key": "bronze",
+      "title": "Bronze",
+      "threshold30d": "100k / 30d",
+      "file": "badges/ranks/bronze.svg"
+    },
+    {
+      "key": "silver",
+      "title": "Silver",
+      "threshold30d": "300k / 30d",
+      "file": "badges/ranks/silver.svg"
+    },
+    {
+      "key": "gold",
+      "title": "Gold",
+      "threshold30d": "750k / 30d",
+      "file": "badges/ranks/gold.svg"
+    },
+    {
+      "key": "platinum",
+      "title": "Platinum",
+      "threshold30d": "1.5M / 30d",
+      "file": "badges/ranks/platinum.svg"
+    },
+    {
+      "key": "diamond",
+      "title": "Diamond",
+      "threshold30d": "3M / 30d",
+      "file": "badges/ranks/diamond.svg"
+    },
+    {
+      "key": "master",
+      "title": "Master",
+      "threshold30d": "6M / 30d",
+      "file": "badges/ranks/master.svg"
+    },
+    {
+      "key": "grandmaster",
+      "title": "Grandmaster",
+      "threshold30d": "12M+ / 30d",
+      "file": "badges/ranks/grandmaster.svg"
+    }
+  ],
+  "lifetimeAchievements": [
+    {
+      "key": "100k",
+      "title": "Spark",
+      "threshold": "100k lifetime",
+      "file": "badges/achievements/lifetime/100k-spark.svg"
+    },
+    {
+      "key": "500k",
+      "title": "Warmed Up",
+      "threshold": "500k lifetime",
+      "file": "badges/achievements/lifetime/500k-warmed-up.svg"
+    },
+    {
+      "key": "1m",
+      "title": "Million Club",
+      "threshold": "1M lifetime",
+      "file": "badges/achievements/lifetime/1m-million-club.svg"
+    },
+    {
+      "key": "5m",
+      "title": "Forge Master",
+      "threshold": "5M lifetime",
+      "file": "badges/achievements/lifetime/5m-forge-master.svg"
+    },
+    {
+      "key": "10m",
+      "title": "AI Workhorse",
+      "threshold": "10M lifetime",
+      "file": "badges/achievements/lifetime/10m-ai-workhorse.svg"
+    },
+    {
+      "key": "25m",
+      "title": "Titan",
+      "threshold": "25M lifetime",
+      "file": "badges/achievements/lifetime/25m-titan.svg"
+    },
+    {
+      "key": "50m",
+      "title": "Legend",
+      "threshold": "50M lifetime",
+      "file": "badges/achievements/lifetime/50m-legend.svg"
+    },
+    {
+      "key": "100m",
+      "title": "Mythic",
+      "threshold": "100M lifetime",
+      "file": "badges/achievements/lifetime/100m-mythic.svg"
+    }
+  ],
+  "streakAchievements": [
+    {
+      "key": "3d",
+      "title": "Ignition",
+      "threshold": "3-day streak",
+      "file": "badges/achievements/streak/3d-ignition.svg"
+    },
+    {
+      "key": "7d",
+      "title": "On Fire",
+      "threshold": "7-day streak",
+      "file": "badges/achievements/streak/7d-on-fire.svg"
+    },
+    {
+      "key": "14d",
+      "title": "Locked In",
+      "threshold": "14-day streak",
+      "file": "badges/achievements/streak/14d-locked-in.svg"
+    },
+    {
+      "key": "30d",
+      "title": "Unbroken",
+      "threshold": "30-day streak",
+      "file": "badges/achievements/streak/30d-unbroken.svg"
+    },
+    {
+      "key": "60d",
+      "title": "Relentless",
+      "threshold": "60-day streak",
+      "file": "badges/achievements/streak/60d-relentless.svg"
+    },
+    {
+      "key": "100d",
+      "title": "Centurion",
+      "threshold": "100-day streak",
+      "file": "badges/achievements/streak/100d-centurion.svg"
+    },
+    {
+      "key": "180d",
+      "title": "Machine",
+      "threshold": "180-day streak",
+      "file": "badges/achievements/streak/180d-machine.svg"
+    },
+    {
+      "key": "365d",
+      "title": "Immortal",
+      "threshold": "365-day streak",
+      "file": "badges/achievements/streak/365d-immortal.svg"
+    }
+  ],
+  "repoReadmeBadges": [
+    {
+      "key": "leaderboard",
+      "file": "badges/repo-readme/leaderboard-template.svg",
+      "label": "REPO RANK",
+      "value": "#12 ON PROMPTSTREAK",
+      "icon": "\ud83c\udfc6",
+      "accent1": "#f59e0b",
+      "accent2": "#fde68a",
+      "purpose": "Show public leaderboard placement for a repo.",
+      "route": "/api/badges/repo/:owner/:repo/leaderboard.svg",
+      "exampleMarkdown": "[![PromptStreak Rank](https://promptstreak.dev/api/badges/repo/owner/repo/leaderboard.svg)](https://promptstreak.dev/r/owner/repo)"
+    },
+    {
+      "key": "tokens-lifetime",
+      "file": "badges/repo-readme/tokens-lifetime-template.svg",
+      "label": "LIFETIME TOKENS",
+      "value": "12.4M TOKENS",
+      "icon": "\u26a1",
+      "accent1": "#4f46e5",
+      "accent2": "#c7d2fe",
+      "purpose": "Show total tracked token usage for the repo.",
+      "route": "/api/badges/repo/:owner/:repo/tokens.svg",
+      "exampleMarkdown": "[![PromptStreak Tokens](https://promptstreak.dev/api/badges/repo/owner/repo/tokens.svg)](https://promptstreak.dev/r/owner/repo)"
+    },
+    {
+      "key": "tokens-30d",
+      "file": "badges/repo-readme/tokens-30d-template.svg",
+      "label": "LAST 30 DAYS",
+      "value": "480K TOKENS",
+      "icon": "\ud83d\udcc8",
+      "accent1": "#0ea5e9",
+      "accent2": "#bae6fd",
+      "purpose": "Show recent repo activity based on a rolling 30-day window.",
+      "route": "/api/badges/repo/:owner/:repo/tokens-30d.svg",
+      "exampleMarkdown": "[![PromptStreak 30d](https://promptstreak.dev/api/badges/repo/owner/repo/tokens-30d.svg)](https://promptstreak.dev/r/owner/repo)"
+    },
+    {
+      "key": "models",
+      "file": "badges/repo-readme/models-template.svg",
+      "label": "MODELS TRACKED",
+      "value": "GPT-5 \u00b7 CLAUDE \u00b7 O4",
+      "icon": "\ud83e\udd16",
+      "accent1": "#8b5cf6",
+      "accent2": "#ddd6fe",
+      "purpose": "Show the top models used in the repo in a compact README-safe format.",
+      "route": "/api/badges/repo/:owner/:repo/models.svg",
+      "exampleMarkdown": "[![PromptStreak Models](https://promptstreak.dev/api/badges/repo/owner/repo/models.svg)](https://promptstreak.dev/r/owner/repo)"
+    },
+    {
+      "key": "primary-model",
+      "file": "badges/repo-readme/primary-model-template.svg",
+      "label": "PRIMARY MODEL",
+      "value": "GPT-5",
+      "icon": "\ud83e\udde0",
+      "accent1": "#10b981",
+      "accent2": "#a7f3d0",
+      "purpose": "Show the dominant model used in the repo by token share.",
+      "route": "/api/badges/repo/:owner/:repo/primary-model.svg",
+      "exampleMarkdown": "[![PromptStreak Primary Model](https://promptstreak.dev/api/badges/repo/owner/repo/primary-model.svg)](https://promptstreak.dev/r/owner/repo)"
+    },
+    {
+      "key": "summary",
+      "file": "badges/repo-readme/summary-template.svg",
+      "label": "PUBLIC REPO",
+      "value": "#12 \u00b7 12.4M \u00b7 GPT-5 +2",
+      "icon": "\u2728",
+      "accent1": "#ec4899",
+      "accent2": "#fbcfe8",
+      "purpose": "Compact all-in-one README badge for leaderboard, tokens, and models.",
+      "route": "/api/badges/repo/:owner/:repo/summary.svg",
+      "exampleMarkdown": "[![PromptStreak Summary](https://promptstreak.dev/api/badges/repo/owner/repo/summary.svg)](https://promptstreak.dev/r/owner/repo)"
+    }
+  ]
+}

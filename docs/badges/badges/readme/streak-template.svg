@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="96" viewBox="0 0 420 96" role="img" aria-label="PromptStreak badge">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#0f172a"/>
+    <stop offset="100%" stop-color="#111827"/>
+  </linearGradient>
+  <linearGradient id="glow" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#f97316"/>
+    <stop offset="100%" stop-color="#ffe0b2"/>
+  </linearGradient>
+  <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur stdDeviation="12" result="blur"/>
+    <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .35 0"/>
+  </filter>
+</defs>
+<rect x="2" y="2" rx="26" ry="26" width="416" height="92" fill="url(#bg)" stroke="rgba(255,255,255,.08)"/>
+<rect x="10" y="10" rx="20" ry="20" width="96" height="76" fill="#0b1220" stroke="rgba(255,255,255,.06)"/>
+<rect x="10" y="10" rx="20" ry="20" width="96" height="76" fill="url(#glow)" opacity=".16"/>
+<circle cx="58" cy="48" r="22" fill="#f97316" opacity=".15" filter="url(#soft)"/>
+<text x="58" y="56" text-anchor="middle" font-size="28" font-family="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, sans-serif">🔥</text>
+<text x="126" y="39" font-size="15" font-weight="700" fill="#dbeafe" opacity=".9" letter-spacing="1.2" font-family="Inter, Arial, sans-serif">STREAK</text>
+<text x="126" y="68" font-size="28" font-weight="800" fill="#ffffff" font-family="Inter, Arial, sans-serif">18 DAYS</text>
+<text x="404" y="78" text-anchor="end" font-size="10" fill="rgba(255,255,255,.26)" letter-spacing=".8" font-family="Inter, Arial, sans-serif">promptstreak.dev</text>
+<rect x="126" y="76" width="278" height="4" rx="2" fill="rgba(255,255,255,.06)"/>
+<rect x="126" y="76" width="105" height="4" rx="2" fill="url(#glow)" opacity=".9"/>
+</svg>

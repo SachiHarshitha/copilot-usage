@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="170" viewBox="0 0 320 170" role="img" aria-label="PromptStreak badge">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#0b1020"/>
+    <stop offset="100%" stop-color="#121826"/>
+  </linearGradient>
+  <linearGradient id="shine" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#f1f5f9"/>
+    <stop offset="100%" stop-color="#9aa5b1"/>
+  </linearGradient>
+  <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#9aa5b1"/>
+    <stop offset="100%" stop-color="#f1f5f9"/>
+  </linearGradient>
+</defs>
+<rect x="2" y="2" rx="24" ry="24" width="316" height="166" fill="url(#bg)" stroke="rgba(255,255,255,.09)"/>
+<path d="M160 24 224 58 224 114 160 146 96 114 96 58Z" fill="url(#shine)" opacity=".9"/>
+<path d="M160 40 208 65 208 107 160 132 112 107 112 65Z" fill="#111827" opacity=".88"/>
+<path d="M160 52 196 70 196 102 160 120 124 102 124 70Z" fill="#9aa5b1" opacity=".23"/>
+<text x="160" y="95" text-anchor="middle" font-size="22" font-weight="800" fill="#ffffff" font-family="Inter, Arial, sans-serif">SI</text>
+<text x="160" y="35" text-anchor="middle" font-size="13" font-weight="700" fill="rgba(255,255,255,.72)" letter-spacing="1.4" font-family="Inter, Arial, sans-serif">PROMPTSTREAK</text>
+<text x="160" y="152" text-anchor="middle" font-size="28" font-weight="800" fill="#fff" font-family="Inter, Arial, sans-serif">SILVER</text>
+<text x="160" y="118" text-anchor="middle" font-size="12" font-weight="700" fill="#cbd5e1" font-family="Inter, Arial, sans-serif">CONSISTENT</text>
+<rect x="44" y="128" width="232" height="3" rx="2" fill="rgba(255,255,255,.08)"/>
+<rect x="44" y="128" width="145" height="3" rx="2" fill="url(#bar)"/>
+<text x="160" y="168" text-anchor="middle" font-size="10" fill="rgba(255,255,255,.24)" letter-spacing=".8" font-family="Inter, Arial, sans-serif">promptstreak.dev</text>
+</svg>

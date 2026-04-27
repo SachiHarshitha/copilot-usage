@@ -1,6 +1,6 @@
 # promptstreak.dev Web App — Implementation Plan
 
-> **Status (April 2026):** Phases 0–2 complete. Phase 3 (profile page UI, `/r/` route) in progress. Phase 4 (badge/card SVG) next. See [Section 10](#10-step-by-step-delivery-plan) for current status.
+> **Status (April 2026):** Phases 0–2 complete. Phase 3 is in progress with user/repo/IDE leaderboards live. Repo badge routes are live and stable. See [Section 10](#10-step-by-step-delivery-plan) for current status.
 
 ---
 
@@ -35,12 +35,13 @@ GitHub Copilot is the first supported adapter. The architecture is agent-agnosti
 | Upload API (v1) | ✅ Done | `POST /api/upload` — accepts `SnapshotPayload` from Copilot extension/CLI |
 | Upload API (v2) | ✅ Done | Accepts `AgentSnapshot` envelope; v1 payloads auto-translated |
 | Device linking | ✅ Done | Split-token device auth; `POST /api/connect`; CSRF-protected |
-| Leaderboard | ✅ Done | `/leaderboard` — ranked by tokens or premium requests; 7d/30d/all-time |
+| Leaderboard | ✅ Done | User (`/leaderboard`), Repo (`/leaderboard/repos`), and IDE (`/leaderboard/ides`) ranking pages are live |
 | Settings | ✅ Done | Profile visibility, repo visibility, device management, account deletion |
 | Streak tracking | ✅ Done | Current + best streaks (≥10K tokens/day threshold) |
 | Public profile page | 🚧 In progress | `/u/[username]` — API route done; page component pending |
 | Repo/project stats | 🚧 In progress | `/r/[username]/[repo]` pending |
-| Badge/card endpoints | 📋 Next | `/badge/[username].svg` and `/card/[username].svg` — SVG generation pending |
+| Badge endpoints | ✅ Partial | `/api/badges/:user/*` and `/api/badges/repo/:owner/:repo/*` are live (including repo rank badge); BigInt percentile issue fixed |
+| Card endpoints | 📋 Next | `/card/[username].svg` and richer card variants remain pending |
 | Repo identity control | ✅ Done (server) | Per-workspace: GitHub link / alias / redacted. Extension UI pending |
 
 ### v1.5 — Agent-Agnostic Foundation (infrastructure complete)
@@ -283,11 +284,14 @@ model ModelStat    { // @@unique([userId, modelId]);   totalTokens, requestCount
 | `GET /api/profile/[username]` | ✅ | `UserStat` + public `RepoStat[]` — only if `profilePublic = true` |
 | `GET /api/leaderboard` | ✅ | All-time: `UserStat` indexed scan. Date-filtered: `UsageDaily WHERE date >= ?` with `(date, userId)` index. |
 | `GET /api/leaderboard/repos` | ✅ | Repo-level leaderboard from public `RepoStat` rows |
+| `GET /api/leaderboard/ides` | ✅ | IDE/surface leaderboard aggregated from `ModelUsageDaily.surface` |
 | `GET /api/repo/[username]/[...repo]` | 📋 | Pending — individual repo stat page |
 
 ### Badges/Cards
 | Endpoint | Status | Purpose |
 |----------|--------|---------|
+| `GET /api/badges/[user]/[type].svg` | ✅ | User badge variants (streak/lifetime/rank/weekly/repo/rank cards/achievements). |
+| `GET /api/badges/repo/[owner]/[repo]/[type].svg` | ✅ | Repo badges (leaderboard rank, tokens, models, summary). |
 | `GET /badge/[username].svg` | 📋 Next | Shields.io-style SVG. `?stat=tokens\|requests\|premium\|top-model\|top-product`. `Cache-Control: public, max-age=3600`. |
 | `GET /card/[username].svg` | 📋 Next | Wider stat card SVG. `Cache-Control: public, max-age=3600`. |
 
@@ -453,6 +457,16 @@ Current Copilot adapter trust level: `"observed"`. The leaderboard footer states
 - Paginated, 25 per page
 - Public only; no auth required
 
+### `/leaderboard/repos` — Repo Leaderboard
+- Table: rank, repo, repo rank badge, total tokens, 30d tokens, premium requests, requests, contributors
+- Sort toggle: by tokens / 30d tokens / premium / requests
+- Public repos only (`RepoStat.isPublic = true` + profile public)
+
+### `/leaderboard/ides` — IDE Ranking
+- Table: rank, IDE/surface, total tokens, premium requests, requests, public users
+- Sort toggle: by tokens / premium / requests
+- Aggregated from `ModelUsageDaily.surface`
+
 ### `/u/[username]` — User Profile
 - Header: GitHub avatar, username, "joined" date, last synced
 - KPI row: total tokens, premium requests, workspaces, sessions
@@ -489,6 +503,8 @@ apps/web/
 │   ├── app/
 │   │   ├── page.tsx                        # Landing ✅
 │   │   ├── leaderboard/page.tsx            # Leaderboard ✅
+│   │   ├── leaderboard/repos/page.tsx       # Repo leaderboard ✅
+│   │   ├── leaderboard/ides/page.tsx        # IDE ranking ✅
 │   │   ├── settings/page.tsx               # Settings ✅
 │   │   ├── connect/page.tsx                # Device linking ✅
 │   │   ├── u/[username]/page.tsx           # Profile 🚧
@@ -501,6 +517,9 @@ apps/web/
 │   │   │   ├── connect/route.ts            # ✅
 │   │   │   ├── leaderboard/route.ts        # ✅
 │   │   │   ├── leaderboard/repos/route.ts  # ✅
+│   │   │   ├── leaderboard/ides/route.ts   # ✅
+│   │   │   ├── badges/[user]/[type]/route.ts # ✅
+│   │   │   ├── badges/repo/[owner]/[repo]/[type]/route.ts # ✅
 │   │   │   ├── profile/[username]/route.ts # ✅
 │   │   │   ├── settings/profile/route.ts   # ✅
 │   │   │   ├── settings/repos/route.ts     # ✅
@@ -518,7 +537,10 @@ apps/web/
 │       ├── upload-translate.ts             # V1→V2 translation (detectPayloadVersion, translateV1ToV2)
 │       ├── streak.ts                       # Streak computation (current + best)
 │       ├── connect-policy.ts               # Device code validation, CSRF origin check
-│       └── profile-policy.ts               # canViewProfile
+│       ├── profile-policy.ts               # canViewProfile
+│       ├── ide-leaderboard.ts              # IDE ranking sort/page helpers
+│       ├── ide-leaderboard-data.ts         # IDE ranking aggregation query
+│       └── badges/data.ts                  # public badge data + repo percentile calc
 ├── prisma/
 │   ├── schema.prisma                       # Full v1+v2 schema
 │   ├── seed.ts
@@ -567,6 +589,7 @@ packages/shared-schema/
 ### Phase 3 — Public Profile + Leaderboard 🚧 IN PROGRESS
 - ✅ Leaderboard page + `/api/leaderboard` (all-time + 7d/30d, tokens + premium sort)
 - ✅ `/api/leaderboard/repos` repo-level leaderboard
+- ✅ `/api/leaderboard/ides` IDE ranking + `/leaderboard/ides` page
 - ✅ Settings: profile visibility, repo visibility, device management
 - ✅ `/api/profile/[username]` API route
 - 🚧 `/u/[username]` profile page component (directory exists, page pending)
@@ -574,6 +597,8 @@ packages/shared-schema/
 - 📋 Repo identity settings table (workspace → display mode mapping)
 
 ### Phase 4 — Badges / Cards 📋 NEXT
+- ✅ `/api/badges/repo/:owner/:repo/leaderboard.svg` and related repo badge variants
+- ✅ BigInt-safe percentile math in badge data path (prevents 500 badge failures)
 - `GET /badge/[username].svg` — Shields.io-style; `?stat=tokens|requests|premium|top-model|top-product|top-provider`
 - `GET /card/[username].svg` — wider stat card with 3–4 KPIs
 - Both: `Cache-Control: public, max-age=3600, stale-while-revalidate=86400`
