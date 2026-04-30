@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client';
 import { prisma as defaultPrisma } from '@/lib/db';
 import { adminAuthErrorToResponse, requireAdmin } from '@/lib/admin/requireAdmin';
 import { withAuditedAction } from '@/lib/admin/auth/audit';
-import { readJson } from '@/lib/admin/userManagement';
+import { readJson, type AdminActor } from '@/lib/admin/userManagement';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -195,14 +195,43 @@ export async function resolveAnomalyHandler(
   if (typeof body.resolution !== 'string' || body.resolution.trim().length === 0) {
     return NextResponse.json({ error: 'resolution_required' }, { status: 400 });
   }
-  const resolution = body.resolution.trim().slice(0, 500);
 
+  const result = await resolveAnomalyCore(prisma, admin, params.id, body.resolution);
+  if (result.error === 'not_found') {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true, ...(result.noop ? { noop: true } : {}) });
+}
+
+export type ResolveAnomalyResult =
+  | { ok: true; noop?: boolean; error?: undefined }
+  | { ok?: false; noop?: undefined; error: 'not_found' };
+
+/**
+ * Mark an open anomaly resolved. Idempotent — when the row is already
+ * resolved, returns `{ ok:true, noop:true }` without emitting another audit
+ * row. Shared between the REST handler and the admin server action so both
+ * surfaces stay in lock-step.
+ *
+ * The caller is responsible for authentication + role gating
+ * (`MODERATOR` minimum) and for trimming the resolution string above the
+ * 500-char cap. Returns `{ error:'not_found' }` for an unknown id rather
+ * than throwing, since both call sites want to surface that as a normal HTTP
+ * 404 response.
+ */
+export async function resolveAnomalyCore(
+  prisma: PrismaClient,
+  admin: AdminActor,
+  anomalyId: string,
+  resolutionRaw: string,
+): Promise<ResolveAnomalyResult> {
+  const resolution = resolutionRaw.trim().slice(0, 500);
   const row = await prisma.verificationAnomaly.findUnique({
-    where: { id: params.id },
+    where: { id: anomalyId },
     select: { id: true, resolvedAt: true, code: true, severity: true, userId: true },
   });
-  if (!row) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  if (row.resolvedAt) return NextResponse.json({ ok: true, noop: true });
+  if (!row) return { error: 'not_found' };
+  if (row.resolvedAt) return { ok: true, noop: true };
 
   const resolvedAt = new Date();
   await withAuditedAction(prisma, {
@@ -222,5 +251,5 @@ export async function resolveAnomalyHandler(
     },
   });
 
-  return NextResponse.json({ ok: true });
+  return { ok: true };
 }
