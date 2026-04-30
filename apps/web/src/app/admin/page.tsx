@@ -41,6 +41,12 @@ export default async function AdminHome() {
           </a>{' '}
           — search, suspend, restore, soft-delete, revoke devices.
         </li>
+        <li>
+          <a href="/admin/action-log" style={{ color: '#74b9ff' }}>
+            Action log
+          </a>{' '}
+          — read-only audit trail of every admin mutation.
+        </li>
       </ul>
       <form action="/api/admin/auth/logout" method="post">
         <button

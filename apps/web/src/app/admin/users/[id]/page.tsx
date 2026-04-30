@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import { ADMIN_SESSION_COOKIE_NAME } from '@/lib/admin/sessionCookie';
 import { getActiveAdmin } from '@/lib/admin/auth/loginActions';
 import { UserActionButtons } from '../UserActionButtons';
+import { ActionLogPanel } from '../../components/ActionLogPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,6 +97,8 @@ export default async function AdminUserDetailPage({
           revokedAt: d.revokedAt?.toISOString() ?? null,
         }))}
       />
+
+      <ActionLogPanel targetType="User" targetId={user.id} />
     </section>
   );
 }
