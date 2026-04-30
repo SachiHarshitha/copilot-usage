@@ -15,6 +15,18 @@ import {
 import { buildOtpauthUri, generateTotpSecret, verifyTotp } from '../totp';
 import { ADMIN_TOTP_ISSUER } from '../provisioning';
 import { logAdminAction, withAuditedAction } from './audit';
+import type { MailService } from '../../mail/mailService';
+
+/** Optional dependencies for login flows. Mail is omitted in tests that
+ * don't care about side-effect notifications; production wires the
+ * SmtpMailService here. */
+export interface LoginDeps {
+  mail?: MailService;
+}
+
+/** How far back we look for a prior login from the same IP fingerprint
+ * before treating an IP as "new" for the new-IP notification. */
+export const NEW_IP_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * After this many consecutive failed login attempts the admin is locked.
@@ -76,6 +88,7 @@ export type LoginResult =
 export async function loginWithPassword(
   prisma: PrismaClient,
   input: LoginInput,
+  deps: LoginDeps = {},
 ): Promise<LoginResult> {
   const email = input.email.trim().toLowerCase();
   const admin = email.includes('@')
@@ -118,7 +131,7 @@ export async function loginWithPassword(
 
   const passwordOk = await verifyPassword(input.password, admin.passwordHash);
   if (!passwordOk) {
-    await registerFailedAttempt(prisma, admin);
+    await registerFailedAttempt(prisma, admin, deps.mail);
     await safeLog(prisma, {
       adminUserId: admin.id,
       adminEmail: admin.email,
@@ -155,6 +168,12 @@ export async function loginWithPassword(
     status: 'SUCCEEDED',
     metadata: { requires2fa, sessionId: session.id },
   });
+
+  if (deps.mail) {
+    await sendNewIpNotificationIfUnknown(prisma, deps.mail, admin, input.ipHash).catch(() => {
+      // Don't fail the login if the notification can't be queued.
+    });
+  }
 
   return { ok: true, token, sessionId: session.id, requires2fa };
 }
@@ -477,16 +496,76 @@ class AuthError extends Error {
 
 export { AuthError };
 
-async function registerFailedAttempt(prisma: PrismaClient, admin: AdminUser): Promise<void> {
+async function registerFailedAttempt(
+  prisma: PrismaClient,
+  admin: AdminUser,
+  mail?: MailService,
+): Promise<void> {
   // If a previous lockout has expired, treat this as a fresh streak.
   const startsFresh = admin.lockedUntil && admin.lockedUntil.getTime() <= Date.now();
   const next = startsFresh ? 1 : admin.failedLoginCount + 1;
   const shouldLock = next >= FAILED_LOGIN_LOCKOUT_THRESHOLD;
+  const unlocksAt = shouldLock ? new Date(Date.now() + FAILED_LOGIN_LOCKOUT_MS) : admin.lockedUntil;
   await prisma.adminUser.update({
     where: { id: admin.id },
     data: {
       failedLoginCount: shouldLock ? 0 : next,
-      lockedUntil: shouldLock ? new Date(Date.now() + FAILED_LOGIN_LOCKOUT_MS) : admin.lockedUntil,
+      lockedUntil: unlocksAt,
+    },
+  });
+  if (shouldLock && mail && unlocksAt) {
+    await mail
+      .send({
+        to: [admin.email],
+        templateId: 'admin-lockout',
+        variables: {
+          who: admin.email,
+          unlocksAt: unlocksAt.toISOString(),
+          duration: `${Math.round(FAILED_LOGIN_LOCKOUT_MS / 60_000)} minutes`,
+        },
+      })
+      .catch(() => {
+        // Mail is best-effort; the lockout itself already happened.
+      });
+  }
+}
+
+/**
+ * Send `admin-login-from-new-ip` if there's no prior SUCCEEDED LOGIN_PASSWORD
+ * row for this admin from the same `ipHash` within the lookback window.
+ * Naturally caps at one notification per (admin, ipHash) per 30 days because
+ * the *current* successful login row already exists by the time we run.
+ */
+async function sendNewIpNotificationIfUnknown(
+  prisma: PrismaClient,
+  mail: MailService,
+  admin: AdminUser,
+  ipHash: string | null,
+): Promise<void> {
+  if (!ipHash) return;
+  const since = new Date(Date.now() - NEW_IP_LOOKBACK_MS);
+  const prior = await prisma.adminActionLog.findFirst({
+    where: {
+      adminUserId: admin.id,
+      action: 'LOGIN_PASSWORD',
+      ipHash,
+      createdAt: { gte: since },
+      metadata: { path: ['status'], equals: 'SUCCEEDED' },
+    },
+    orderBy: { createdAt: 'desc' },
+    // The current SUCCEEDED row was written immediately above, so it sits at
+    // the top of the ordering. Skipping past it lets us check whether *any*
+    // earlier successful login from this IP exists in the lookback window.
+    skip: 1,
+  });
+  if (prior) return;
+  await mail.send({
+    to: [admin.email],
+    templateId: 'admin-login-from-new-ip',
+    variables: {
+      who: admin.email,
+      loginAt: new Date().toISOString(),
+      ipHashShort: ipHash.slice(0, 12),
     },
   });
 }
