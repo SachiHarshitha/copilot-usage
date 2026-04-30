@@ -31,8 +31,8 @@ export default async function AdminHome() {
         Signed in as <strong>{admin.email}</strong> ({admin.role.toLowerCase()}).
       </p>
       <p style={{ color: '#9aa0aa' }}>
-        This is the admin dashboard placeholder. Operational tools will appear here
-        as later phases land.
+        Operator console. All mutations are gated by role and recorded in the
+        immutable action log.
       </p>
       <ul style={{ paddingLeft: 20 }}>
         <li>
@@ -40,6 +40,30 @@ export default async function AdminHome() {
             Users
           </a>{' '}
           — search, suspend, restore, soft-delete, revoke devices.
+        </li>
+        <li>
+          <a href="/admin/anomalies" style={{ color: '#74b9ff' }}>
+            Anomalies
+          </a>{' '}
+          — verification anomaly queue; resolve open items.
+        </li>
+        <li>
+          <a href="/admin/verification" style={{ color: '#74b9ff' }}>
+            Verification
+          </a>{' '}
+          — per-user GitHub-billing verification state.
+        </li>
+        <li>
+          <a href="/admin/upload-audits" style={{ color: '#74b9ff' }}>
+            Upload audits
+          </a>{' '}
+          — search the upload-audit log by user, token, signature status, time.
+        </li>
+        <li>
+          <a href="/admin/metrics" style={{ color: '#74b9ff' }}>
+            Metrics
+          </a>{' '}
+          — uploads/hour, signature health, anomaly counts, active users.
         </li>
         <li>
           <a href="/admin/action-log" style={{ color: '#74b9ff' }}>
