@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { withTestDb } from '../test/withTestDb';
-import { listUsersHandler } from './userManagement';
+import { listUsersHandler, userDetailHandler } from './userManagement';
 import {
   buildAdminRequest,
   seedAdminSession,
@@ -126,5 +126,100 @@ test('limit is capped at 100', async () => {
     const body = await readJson(res);
     assert.equal(body.entries.length, 3);
     assert.equal(body.nextCursor, null);
+  });
+});
+
+interface DetailBody {
+  id: string;
+  username: string;
+  deviceCount: number;
+  deviceCountAll: number;
+  recentUploads30d: number;
+  totalTokens: string;
+  verificationStatus: string;
+  recentAnomalies30d: number;
+}
+
+test('GET /api/admin/users/[id] returns 401 without a session', async () => {
+  await withTestDb(async ({ prisma }) => {
+    const u = await prisma.user.create({
+      data: { githubId: 5000, username: 'detail-anon' },
+    });
+    const req = buildAdminRequest(
+      `https://admin.example.com/api/admin/users/${u.id}`,
+      null,
+    );
+    const res = await userDetailHandler(req, { params: { id: u.id } }, { prisma });
+    assert.equal(res.status, 401);
+  });
+});
+
+test('GET /api/admin/users/[id] returns 404 for unknown id', async () => {
+  await withTestDb(async ({ prisma }) => {
+    const session = await seedAdminSession(prisma);
+    const req = buildAdminRequest(
+      'https://admin.example.com/api/admin/users/does-not-exist',
+      session,
+    );
+    const res = await userDetailHandler(
+      req,
+      { params: { id: 'does-not-exist' } },
+      { prisma },
+    );
+    assert.equal(res.status, 404);
+  });
+});
+
+test('GET /api/admin/users/[id] returns derived counts for a real user', async () => {
+  await withTestDb(async ({ prisma }) => {
+    const session = await seedAdminSession(prisma);
+    const u = await prisma.user.create({
+      data: { githubId: 5100, username: 'detail-real' },
+    });
+    // Two devices, one revoked.
+    await prisma.device.create({
+      data: {
+        userId: u.id,
+        tokenId: 't-1',
+        secretHash: 'h1',
+      },
+    });
+    await prisma.device.create({
+      data: {
+        userId: u.id,
+        tokenId: 't-2',
+        secretHash: 'h2',
+        revokedAt: new Date(),
+      },
+    });
+    // Three uploads: two recent, one ancient.
+    const now = new Date();
+    const ancient = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    await prisma.uploadLog.createMany({
+      data: [
+        { userId: u.id, deviceId: 't-1', ipHash: 'h', payloadBytes: 10, bucketCount: 1, accepted: true, uploadedAt: now },
+        { userId: u.id, deviceId: 't-1', ipHash: 'h', payloadBytes: 10, bucketCount: 1, accepted: true, uploadedAt: now },
+        { userId: u.id, deviceId: 't-1', ipHash: 'h', payloadBytes: 10, bucketCount: 1, accepted: true, uploadedAt: ancient },
+      ],
+    });
+
+    const res = await userDetailHandler(
+      buildAdminRequest(
+        `https://admin.example.com/api/admin/users/${u.id}`,
+        session,
+      ),
+      { params: { id: u.id } },
+      { prisma },
+    );
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as DetailBody;
+    assert.equal(body.id, u.id);
+    assert.equal(body.username, 'detail-real');
+    assert.equal(body.deviceCount, 1);
+    assert.equal(body.deviceCountAll, 2);
+    assert.equal(body.recentUploads30d, 2);
+    assert.equal(body.totalTokens, '0');
+    assert.equal(body.verificationStatus, 'unknown');
+    assert.equal(body.recentAnomalies30d, 0);
   });
 });

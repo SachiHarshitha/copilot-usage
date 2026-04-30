@@ -98,3 +98,101 @@ export async function listUsersHandler(
   };
   return NextResponse.json(body);
 }
+
+export interface UserDetailResponse {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  profilePublic: boolean;
+  createdAt: string;
+  githubId: number;
+  totalTokens: string;
+  /** Active (non-revoked) device count. */
+  deviceCount: number;
+  /** Total device count including revoked, for forensic context. */
+  deviceCountAll: number;
+  /** Number of UploadLog entries in the last 30 days. */
+  recentUploads30d: number;
+  /**
+   * Verification surface placeholder. The VerificationAnomaly model does not
+   * yet exist in the schema; this field exists so the response shape is
+   * stable when verification ops land.
+   */
+  verificationStatus: 'unknown';
+  /** Anomaly count placeholder, see verificationStatus comment. */
+  recentAnomalies30d: 0;
+}
+
+interface UserDetailParams {
+  id: string;
+}
+
+/**
+ * Implementation of `GET /api/admin/users/[id]`. Returns a single user with
+ * derived counts (devices, recent uploads). Returns 404 when the id does not
+ * resolve. Returns no GitHub tokens, no encrypted secrets, no device secrets.
+ */
+export async function userDetailHandler(
+  req: NextRequest,
+  ctx: { params: UserDetailParams | Promise<UserDetailParams> },
+  deps: HandlerDeps = {},
+): Promise<NextResponse> {
+  const prisma = deps.prisma ?? defaultPrisma;
+
+  try {
+    await requireAdmin(req, { prisma });
+  } catch (err) {
+    const res = adminAuthErrorToResponse(err);
+    if (res) return res;
+    throw err;
+  }
+
+  const params = await Promise.resolve(ctx.params);
+  const id = params.id;
+  if (!id || typeof id !== 'string') {
+    return NextResponse.json({ error: 'invalid_id' }, { status: 400 });
+  }
+
+  const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const [user, deviceCount, deviceCountAll, recentUploads30d] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+        profilePublic: true,
+        createdAt: true,
+        githubId: true,
+        userStat: { select: { totalTokens: true } },
+      },
+    }),
+    prisma.device.count({ where: { userId: id, revokedAt: null } }),
+    prisma.device.count({ where: { userId: id } }),
+    prisma.uploadLog.count({ where: { userId: id, uploadedAt: { gte: since30d } } }),
+  ]);
+
+  if (!user) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+
+  const body: UserDetailResponse = {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    profilePublic: user.profilePublic,
+    createdAt: user.createdAt.toISOString(),
+    githubId: user.githubId,
+    totalTokens: (user.userStat?.totalTokens ?? 0n).toString(),
+    deviceCount,
+    deviceCountAll,
+    recentUploads30d,
+    verificationStatus: 'unknown',
+    recentAnomalies30d: 0,
+  };
+  return NextResponse.json(body);
+}
