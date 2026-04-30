@@ -323,10 +323,11 @@ model AdminUser {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  sessions      AdminSession[]
-  totpSecret    AdminTotpSecret?
-  recoveryCodes AdminRecoveryCode[]
-  actionLogs    AdminActionLog[]
+  sessions       AdminSession[]
+  totpSecret     AdminTotpSecret?
+  recoveryCodes  AdminRecoveryCode[]
+  actionLogs     AdminActionLog[]
+  badgeOverrides AdminBadgeOverride[]
 
   @@index([role])
 }
@@ -408,6 +409,30 @@ model AdminActionLog {
   @@index([action, createdAt(sort: Desc)])
   @@index([targetType, targetId])
   @@index([createdAt(sort: Desc)])
+}
+
+/// Manual override that forces `UserVerification.publicBadgeEligible` to a
+/// chosen value regardless of the computed eligibility. Inserted by Phase C.4
+/// admin actions; consulted by `resolveBadgeEligibility` (and, once it lands,
+/// by Verification Task 4.1's `recomputeBadgeEligibility`). Append-only:
+/// each new override row supersedes the previous one rather than mutating it,
+/// which keeps a complete history alongside the immutable AdminActionLog.
+/// `expiresAt` is null for an indefinite override, otherwise the override is
+/// ignored once `now() > expiresAt`. createdById uses SetNull so the row
+/// survives even if the admin account is later deleted.
+model AdminBadgeOverride {
+  id          String    @id @default(cuid())
+  userId      String
+  eligible    Boolean
+  reason      String
+  expiresAt   DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  createdBy AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([expiresAt])
 }
 
 /// One row per outbound mail send attempt. The recipient address is stored

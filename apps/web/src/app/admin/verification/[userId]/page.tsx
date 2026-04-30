@@ -5,6 +5,8 @@ import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { ADMIN_SESSION_COOKIE_NAME } from '@/lib/admin/sessionCookie';
 import { getActiveAdmin } from '@/lib/admin/auth/loginActions';
+import { findActiveBadgeOverride } from '@/lib/admin/badgeOverrides';
+import { BadgeOverrideButton } from '../BadgeOverrideButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +22,7 @@ export default async function AdminVerificationDetailPage({
 
   const { userId } = await params;
 
-  const [row, user, openAnomalies] = await Promise.all([
+  const [row, user, openAnomalies, activeOverride, recentOverrides] = await Promise.all([
     prisma.userVerification.findUnique({ where: { userId } }),
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, username: true } }),
     prisma.verificationAnomaly.findMany({
@@ -29,9 +31,25 @@ export default async function AdminVerificationDetailPage({
       take: 10,
       select: { id: true, code: true, severity: true, summary: true, detectedAt: true },
     }),
+    findActiveBadgeOverride(prisma, userId),
+    prisma.adminBadgeOverride.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 5,
+      select: {
+        id: true,
+        eligible: true,
+        reason: true,
+        expiresAt: true,
+        createdAt: true,
+        createdBy: { select: { email: true } },
+      },
+    }),
   ]);
 
   if (!row) notFound();
+
+  const canOverride = admin.role === 'ADMIN' || admin.role === 'SUPER_ADMIN';
 
   return (
     <section>
@@ -105,10 +123,88 @@ export default async function AdminVerificationDetailPage({
         )}
       </div>
 
+      <div style={{ marginTop: 24 }}>
+        <h3 style={{ fontSize: 14, color: '#9aa0aa', marginBottom: 8 }}>
+          Manual badge override
+        </h3>
+        {activeOverride ? (
+          <div
+            style={{
+              border: '1px solid #2a2f3a',
+              borderRadius: 6,
+              padding: 12,
+              marginBottom: 8,
+              background: '#0f1218',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <strong style={{ color: activeOverride.eligible ? '#55efc4' : '#fdcb6e' }}>
+                  Active: forces eligible = {activeOverride.eligible ? 'true' : 'false'}
+                </strong>
+                <div style={{ fontSize: 12, color: '#9aa0aa', marginTop: 4 }}>
+                  set {activeOverride.createdAt.slice(0, 19).replace('T', ' ')} UTC
+                  {activeOverride.expiresAt
+                    ? ` · expires ${activeOverride.expiresAt.slice(0, 19).replace('T', ' ')} UTC`
+                    : ' · indefinite'}
+                </div>
+                <div style={{ fontSize: 13, marginTop: 6 }}>{activeOverride.reason}</div>
+              </div>
+              <BadgeOverrideButton
+                userId={userId}
+                currentEligible={row.publicBadgeEligible}
+                canOverride={canOverride}
+              />
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+            <span style={{ color: '#9aa0aa', fontSize: 13 }}>
+              No active override. Computed eligibility ({row.publicBadgeEligible ? 'true' : 'false'})
+              applies.
+            </span>
+            <BadgeOverrideButton
+              userId={userId}
+              currentEligible={row.publicBadgeEligible}
+              canOverride={canOverride}
+            />
+          </div>
+        )}
+
+        {recentOverrides.length > 0 && (
+          <details style={{ marginTop: 8 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 12, color: '#9aa0aa' }}>
+              History ({recentOverrides.length} most recent)
+            </summary>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0' }}>
+              {recentOverrides.map((o) => (
+                <li
+                  key={o.id}
+                  style={{ borderBottom: '1px solid #1a1f2a', padding: '6px 0', fontSize: 12 }}
+                >
+                  <span style={{ color: '#9aa0aa', fontFamily: 'monospace' }}>
+                    {o.createdAt.toISOString().slice(0, 19).replace('T', ' ')}
+                  </span>{' '}
+                  <strong style={{ color: o.eligible ? '#55efc4' : '#fdcb6e' }}>
+                    {o.eligible ? 'true' : 'false'}
+                  </strong>{' '}
+                  {o.expiresAt
+                    ? `until ${o.expiresAt.toISOString().slice(0, 19).replace('T', ' ')}`
+                    : 'indefinite'}{' '}
+                  by {o.createdBy?.email ?? '(deleted admin)'} — {o.reason}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </div>
+
       <p style={{ marginTop: 24, fontSize: 12, color: '#9aa0aa' }}>
         Refresh and disconnect actions are deferred until the GitHub-billing
-        verification worker (Verification Task 3.6) lands. This page is
-        currently read-only.
+        verification worker (Verification Task 3.6) lands. Once Task 4.1
+        (`recomputeBadgeEligibility`) is in, it will consult the active
+        override via `resolveBadgeEligibility` so this panel is the
+        authoritative way to grant or revoke the badge by hand.
       </p>
     </section>
   );
