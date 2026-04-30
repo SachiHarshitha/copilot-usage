@@ -437,3 +437,131 @@ enum MailLogStatus {
   SENT
   FAILED
 }
+
+// ============================================================================
+// Verification surface (per docs/promptstreak-verification-concrete-spec.md §8)
+// ============================================================================
+
+/// One row per user describing the current state of GitHub-billing
+/// verification and the most recently computed mismatch numbers. Updated by
+/// the verification refresh job; read by Phase C admin views.
+model UserVerification {
+  id                      String             @id @default(cuid())
+  userId                  String             @unique
+
+  githubBillingConnected  Boolean            @default(false)
+  githubBillingStatus     VerificationStatus @default(NOT_CONNECTED)
+
+  verifiedAt              DateTime?
+  lastCheckedAt           DateTime?
+  lastHealthyAt           DateTime?
+
+  currentPeriodKey        String?
+  localPremiumRequests    BigInt?
+  verifiedPremiumRequests BigInt?
+  differenceAbsolute      BigInt?
+  differencePercent       Decimal?           @db.Decimal(8, 4)
+
+  mismatchScore           Int                @default(0)
+  trustScore              Int                @default(0)
+
+  publicBadgeEligible     Boolean            @default(false)
+
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  @@index([githubBillingStatus, lastCheckedAt])
+}
+
+enum VerificationStatus {
+  NOT_CONNECTED
+  CONNECTED
+  HEALTHY
+  MINOR_MISMATCH
+  WARNING
+  MISMATCH
+  UNSUPPORTED
+  EXPIRED
+  ERROR
+}
+
+/// One row per upload-attempt seen by /api/upload. Records signature outcome
+/// and journal chain head so admins can search for replay attempts, signature
+/// failures, and chain rewrites without touching the (much hotter) usage
+/// tables. Used by Phase D (upload audit search).
+model UploadAudit {
+  id                String                @id @default(cuid())
+  userId            String
+  deviceId          String?
+  tokenId           String?
+
+  receivedAt        DateTime              @default(now())
+  clientTimestamp   DateTime?
+  clientVersion     String?
+
+  payloadHash       String?
+  signatureStatus   UploadSignatureStatus
+  chainHead         String?
+  previousChainHead String?
+
+  accepted          Boolean
+  rejectionCode     String?
+
+  ipHash            String?
+  userAgentHash     String?
+
+  @@index([userId, receivedAt])
+  @@index([tokenId, receivedAt])
+  @@index([signatureStatus, receivedAt])
+}
+
+enum UploadSignatureStatus {
+  VALID
+  MISSING
+  INVALID
+  STALE_TIMESTAMP
+  REPLAYED_NONCE
+  BODY_HASH_MISMATCH
+  DEVICE_REVOKED
+}
+
+/// One row per detected anomaly. Open anomalies (resolvedAt = null) form the
+/// queue surfaced to admins in Phase C. `detailsJson` is opaque to the schema;
+/// callers must never put raw PII into it (use hashes).
+model VerificationAnomaly {
+  id          String                  @id @default(cuid())
+  userId      String
+
+  code        VerificationAnomalyCode
+  severity    VerificationSeverity
+  summary     String
+  detailsJson Json?
+
+  detectedAt  DateTime                @default(now())
+  resolvedAt  DateTime?
+  resolution  String?
+
+  @@index([userId, detectedAt])
+  @@index([code, detectedAt])
+  @@index([resolvedAt, severity])
+}
+
+enum VerificationAnomalyCode {
+  PREMIUM_MISMATCH_MINOR
+  PREMIUM_MISMATCH_WARNING
+  PREMIUM_MISMATCH_LARGE
+  IMPOSSIBLE_DAILY_SPIKE
+  IMPOSSIBLE_THROUGHPUT
+  REPLAY_ATTEMPT
+  INVALID_SIGNATURE
+  JOURNAL_CHAIN_REWRITE
+  HISTORIC_REWRITE
+  DEVICE_FINGERPRINT_COLLISION
+}
+
+enum VerificationSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
