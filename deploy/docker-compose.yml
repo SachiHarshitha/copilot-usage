@@ -70,10 +70,47 @@ services:
     networks:
       - internal
 
+  # Automated, encrypted Postgres backups. See docs/ops/backups.md for the full
+  # rotation policy and recovery procedure. The image is built from
+  # deploy/postgres-backup.Dockerfile, which extends the upstream
+  # prodrigestivill/postgres-backup-local image with `age` for at-rest
+  # encryption using an offline-escrowed recovery key.
+  postgres-backup:
+    build:
+      context: .
+      dockerfile: postgres-backup.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-promptstreak}
+      POSTGRES_USER: ${POSTGRES_USER:-promptstreak}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Daily at 02:30 UTC. Same cron format as the upstream image.
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+      # Recipients file is mounted read-only below. The hook script
+      # (deploy/postgres-backup-encrypt.sh) reads it and encrypts every dump
+      # in place. Unset/empty disables encryption (dev only).
+      AGE_RECIPIENTS_FILE: /run/secrets/age_recipients
+      HEALTHCHECK_PORT: 8080
+    volumes:
+      - pgbackups:/backups
+      # The recipients file holds one or more age public keys (one per line),
+      # e.g. `age1abc...`. Plaintext, not secret — but pinning via a bind mount
+      # makes accidental edits visible in code review.
+      - ./age-recipients.txt:/run/secrets/age_recipients:ro
+    networks:
+      - internal
+
 volumes:
   pgdata:
   caddy_data:
   caddy_config:
+  pgbackups:
 
 networks:
   internal:

@@ -1,0 +1,10 @@
+# Replace with the operator's age public key(s), one per line.
+# Generate with: age-keygen -o ~/.config/age/promptstreak-backup.key
+# (Print the public key with: age-keygen -y ~/.config/age/promptstreak-backup.key)
+#
+# The matching PRIVATE key is stored offline per docs/ops/key-escrow.md.
+# It is NEVER committed to this repo and NEVER stored on the VPS.
+#
+# This file ships with a placeholder so `docker compose config` validates.
+# Production deploys MUST overwrite it before the first backup runs.
+age1placeholderplaceholderplaceholderplaceholderplaceholderplaceholderp
