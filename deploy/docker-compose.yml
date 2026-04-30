@@ -1,0 +1,80 @@
+# PromptStreak production stack.
+#
+# Brings up:
+#   - postgres : the application database.
+#   - web      : the Next.js app (apps/web), reachable only via the caddy proxy.
+#   - caddy    : public TLS termination + a loopback-only admin vhost.
+#
+# Usage on the VPS:
+#   cp deploy/.env.example .env       # edit secrets
+#   docker compose -f deploy/docker-compose.yml --env-file .env up -d
+#
+# Operators reach the admin surface from their laptop with an SSH tunnel:
+#   ssh -L 8443:127.0.0.1:8081 user@vps
+# then open https://localhost:8443/admin (accept the local cert).
+#
+# See docs/admin-ops-runbook.md for the full procedure.
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-promptstreak}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-promptstreak}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # No published ports - postgres is reached over the internal compose network only.
+    networks:
+      - internal
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-promptstreak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-promptstreak}
+      ADMIN_INTERNAL_PROXY_SECRET: ${ADMIN_INTERNAL_PROXY_SECRET:?set ADMIN_INTERNAL_PROXY_SECRET}
+      ADMIN_FINGERPRINT_SALT: ${ADMIN_FINGERPRINT_SALT:?set ADMIN_FINGERPRINT_SALT}
+      ADMIN_TOTP_KEYS: ${ADMIN_TOTP_KEYS:?set ADMIN_TOTP_KEYS}
+      ADMIN_TOTP_ACTIVE_KEY: ${ADMIN_TOTP_ACTIVE_KEY:?set ADMIN_TOTP_ACTIVE_KEY}
+      GITHUB_TOKEN_ENCRYPTION_KEYS: ${GITHUB_TOKEN_ENCRYPTION_KEYS:?set GITHUB_TOKEN_ENCRYPTION_KEYS}
+      GITHUB_TOKEN_ENCRYPTION_ACTIVE_KEY: ${GITHUB_TOKEN_ENCRYPTION_ACTIVE_KEY:?set GITHUB_TOKEN_ENCRYPTION_ACTIVE_KEY}
+      NODE_ENV: production
+    # No published ports - reached only by caddy on the internal compose network.
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+      # Admin vhost bound to LOOPBACK ONLY on the host. Reachable from the VPS
+      # itself (or via SSH tunnel from a laptop), never from the public internet.
+      - "127.0.0.1:8081:8081"
+    environment:
+      ADMIN_INTERNAL_PROXY_SECRET: ${ADMIN_INTERNAL_PROXY_SECRET}
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?set PUBLIC_HOSTNAME}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - internal
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:
+    driver: bridge

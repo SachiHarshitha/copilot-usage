@@ -1,0 +1,46 @@
+# Caddy configuration for PromptStreak.
+#
+# Two virtual hosts:
+#   1. Public app - {$PUBLIC_HOSTNAME} on 80/443 with automatic Let's Encrypt.
+#      Strips any incoming X-Internal-* headers so an attacker cannot fake the
+#      admin trusted-origin headers from the public internet.
+#
+#   2. Loopback admin vhost - listens on :8081, reachable only from the host
+#      (the docker-compose port mapping is 127.0.0.1:8081). Injects the
+#      X-Internal-Source and X-Internal-Proxy-Secret headers that the Next.js
+#      middleware (apps/web/src/middleware.ts) verifies in constant time. A
+#      self-signed cert is fine here - operators reach this through an SSH
+#      tunnel and trust the local cert manually.
+
+{$PUBLIC_HOSTNAME} {
+	encode zstd gzip
+
+	# Defense in depth: scrub any inbound headers an attacker might use to
+	# masquerade as the loopback proxy. Caddy applies these to the request
+	# before it is forwarded upstream.
+	request_header -X-Internal-Source
+	request_header -X-Internal-Proxy-Secret
+
+	# The /admin and /api/admin surfaces are NOT served on the public host.
+	# The Next.js middleware will return 404 because the trusted-origin
+	# headers are absent, but we also block at the proxy for clarity.
+	@admin path /admin* /api/admin*
+	respond @admin 404
+
+	reverse_proxy web:3000
+}
+
+:8081 {
+	tls internal
+
+	# Inject the trusted-origin headers expected by the Next.js admin
+	# middleware. The secret is read from the env var at startup.
+	request_header X-Internal-Source admin-loopback
+	request_header X-Internal-Proxy-Secret {$ADMIN_INTERNAL_PROXY_SECRET}
+
+	# Only proxy admin paths through this vhost. Everything else is 404.
+	@admin path /admin* /api/admin*
+	reverse_proxy @admin web:3000
+
+	respond 404
+}
