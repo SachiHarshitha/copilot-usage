@@ -318,16 +318,19 @@ model AdminUser {
 /// Active admin session. tokenHash is sha256 of an opaque session token; the
 /// raw token lives only in the __Host- cookie. Sessions are double-bounded
 /// (idle + absolute) so even an idle attacker cannot extend indefinitely.
+/// twoFactorCompletedAt is null on a freshly issued (pre-2FA) session and
+/// set once the operator has verified a TOTP/recovery code.
 model AdminSession {
-  id                String    @id @default(cuid())
-  adminUserId       String
-  tokenHash         String    @unique
-  idleExpiresAt     DateTime
-  absoluteExpiresAt DateTime
-  ipHash            String?
-  userAgentHash     String?
-  createdAt         DateTime  @default(now())
-  revokedAt         DateTime?
+  id                    String    @id @default(cuid())
+  adminUserId           String
+  tokenHash             String    @unique
+  twoFactorCompletedAt  DateTime?
+  idleExpiresAt         DateTime
+  absoluteExpiresAt     DateTime
+  ipHash                String?
+  userAgentHash         String?
+  createdAt             DateTime  @default(now())
+  revokedAt             DateTime?
 
   adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
 
