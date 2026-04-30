@@ -91,6 +91,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid or revoked token.' }, { status: 401 });
   }
 
+  // Reject uploads from suspended or soft-deleted accounts. Admin actions
+  // (suspend / soft-delete) take effect on the next upload because we check
+  // the user's lifecycle state on every request.
+  if (device.user.status !== 'ACTIVE' || device.user.deletedAt !== null) {
+    return NextResponse.json({ error: 'Account suspended.' }, { status: 401 });
+  }
+
   const secretValid = await bcrypt.compare(secret, device.secretHash);
   if (!secretValid) {
     return NextResponse.json({ error: 'Invalid token.' }, { status: 401 });

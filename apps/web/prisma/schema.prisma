@@ -8,14 +8,19 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  githubId      Int      @unique
-  username      String   @unique
+  id            String     @id @default(cuid())
+  githubId      Int        @unique
+  username      String     @unique
   displayName   String?
   avatarUrl     String?
-  profilePublic Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  profilePublic Boolean    @default(false)
+  status        UserStatus @default(ACTIVE)
+  /// Soft-delete tombstone. Set when an admin runs DELETE /api/admin/users/[id].
+  /// Username/displayName/avatar are anonymized at the same time so the row
+  /// can survive for forensics without leaking PII.
+  deletedAt     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   devices    Device[]
   usageDaily UsageDaily[]
@@ -31,6 +36,17 @@ model User {
   productStats     ProductStat[]
   providerStats    ProviderStat[]
   modelStats       ModelStat[]
+
+  @@index([status])
+}
+
+/// Lifecycle state of an end user. SUSPENDED accounts cannot upload and are
+/// hidden from leaderboards. Soft-deleted users have status=ACTIVE but a
+/// non-null deletedAt — combine `status='ACTIVE' AND deletedAt IS NULL` for
+/// "active and present" filters.
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
 }
 
 model Device {
