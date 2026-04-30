@@ -16,6 +16,11 @@ venv/
 env/
 ENV/
 
+# Node / JS
+node_modules/
+.next/
+*.tsbuildinfo
+
 # IDE
 .vscode/
 .idea/
@@ -27,6 +32,11 @@ ENV/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
 
 # DuckDB local data
 *.duckdb
@@ -45,3 +55,11 @@ htmlcov/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+badges/
+!apps/web/src/lib/badges/
+!apps/web/src/lib/badges/**
+.github/skills/
+.github/agents/
+
+.github/copilot-instructions.md
