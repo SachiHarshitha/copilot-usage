@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "test": "tsx --test src/**/*.test.ts",
-    "test:integration": "tsx --env-file=.env --test src/**/*.itest.ts",
+    "test:integration": "tsx --env-file-if-exists=.env --test src/**/*.itest.ts",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
