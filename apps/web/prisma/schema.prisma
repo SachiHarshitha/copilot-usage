@@ -409,3 +409,31 @@ model AdminActionLog {
   @@index([targetType, targetId])
   @@index([createdAt(sort: Desc)])
 }
+
+/// One row per outbound mail send attempt. The recipient address is stored
+/// hashed only — never plaintext — so the table can be retained for audit
+/// without becoming a long-term store of user email addresses.
+model MailLog {
+  id                String        @id @default(cuid())
+  /// sha256 of the lowercased recipient (matches `hashEmail`).
+  recipientHash     String
+  templateId        String
+  /// SMTP / provider message id, when delivery returned one. Null on failure.
+  providerMessageId String?
+  status            MailLogStatus @default(SENT)
+  /// Brief failure reason; never includes the recipient address or template
+  /// variables.
+  errorReason       String?
+  /// Number of attempts made (1 = first try succeeded; 2 = one retry).
+  attempts          Int           @default(1)
+  createdAt         DateTime      @default(now())
+
+  @@index([recipientHash, createdAt(sort: Desc)])
+  @@index([templateId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+}
+
+enum MailLogStatus {
+  SENT
+  FAILED
+}
