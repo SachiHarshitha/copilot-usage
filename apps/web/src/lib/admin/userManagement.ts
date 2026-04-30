@@ -421,3 +421,139 @@ export async function deleteUserHandler(
 
   return NextResponse.json({ ok: true });
 }
+
+// ---------------------------------------------------------------------------
+// Core actions (callable from server actions / non-HTTP contexts)
+// ---------------------------------------------------------------------------
+
+export interface AdminActor {
+  id: string;
+  email: string;
+  role: 'READ_ONLY' | 'MODERATOR' | 'ADMIN' | 'SUPER_ADMIN';
+}
+
+export interface CoreActionResult {
+  ok: true;
+  noop?: boolean;
+}
+
+/**
+ * Suspend a user. Same audit + idempotency semantics as the HTTP handler but
+ * without the request/response plumbing — for use from Server Actions.
+ *
+ * Throws on missing user or soft-deleted user so the caller can render an
+ * error UI; callers should not pass IDs they have not first looked up.
+ */
+export async function suspendUserCore(
+  prisma: PrismaClient,
+  admin: AdminActor,
+  targetId: string,
+  mail: MailService = defaultMailService,
+): Promise<CoreActionResult> {
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, status: true, deletedAt: true, username: true },
+  });
+  if (!target) throw new Error('user_not_found');
+  if (target.deletedAt) throw new Error('user_deleted');
+  if (target.status === 'SUSPENDED') return { ok: true, noop: true };
+
+  await withAuditedAction(prisma, {
+    adminUserId: admin.id,
+    adminEmail: admin.email,
+    action: 'USER_SUSPEND',
+    targetType: 'User',
+    targetId: target.id,
+    before: { status: target.status },
+    after: { status: 'SUSPENDED' },
+    run: async () => {
+      await prisma.user.update({
+        where: { id: target.id },
+        data: { status: 'SUSPENDED' },
+      });
+      await mail.send({
+        to: [],
+        templateId: 'account-suspended',
+        variables: { username: target.username },
+      });
+    },
+  });
+
+  return { ok: true };
+}
+
+export async function restoreUserCore(
+  prisma: PrismaClient,
+  admin: AdminActor,
+  targetId: string,
+): Promise<CoreActionResult> {
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, status: true, deletedAt: true },
+  });
+  if (!target) throw new Error('user_not_found');
+  if (target.deletedAt) throw new Error('user_deleted');
+  if (target.status === 'ACTIVE') return { ok: true, noop: true };
+
+  await withAuditedAction(prisma, {
+    adminUserId: admin.id,
+    adminEmail: admin.email,
+    action: 'USER_RESTORE',
+    targetType: 'User',
+    targetId: target.id,
+    before: { status: target.status },
+    after: { status: 'ACTIVE' },
+    run: async () => {
+      await prisma.user.update({
+        where: { id: target.id },
+        data: { status: 'ACTIVE' },
+      });
+    },
+  });
+
+  return { ok: true };
+}
+
+export async function softDeleteUserCore(
+  prisma: PrismaClient,
+  admin: AdminActor,
+  targetId: string,
+): Promise<CoreActionResult> {
+  const target = await prisma.user.findUnique({
+    where: { id: targetId },
+    select: { id: true, username: true, deletedAt: true },
+  });
+  if (!target) throw new Error('user_not_found');
+  if (target.deletedAt) return { ok: true, noop: true };
+
+  const tombstoneUsername = `deleted-${target.id}`;
+  await withAuditedAction(prisma, {
+    adminUserId: admin.id,
+    adminEmail: admin.email,
+    action: 'USER_SOFT_DELETE',
+    targetType: 'User',
+    targetId: target.id,
+    before: { username: target.username },
+    after: { username: tombstoneUsername },
+    run: async () => {
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: target.id },
+          data: {
+            deletedAt: new Date(),
+            username: tombstoneUsername,
+            displayName: null,
+            avatarUrl: null,
+            profilePublic: false,
+          },
+        }),
+        prisma.device.updateMany({
+          where: { userId: target.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      ]);
+    },
+  });
+
+  return { ok: true };
+}

@@ -176,3 +176,63 @@ export async function revokeDeviceHandler(
 
   return NextResponse.json({ ok: true });
 }
+
+// ---------------------------------------------------------------------------
+// Core action (Server Action callable, no NextRequest plumbing)
+// ---------------------------------------------------------------------------
+
+import type { AdminActor, CoreActionResult } from './userManagement';
+
+export async function revokeDeviceCore(
+  prisma: PrismaClient,
+  admin: AdminActor,
+  deviceId: string,
+  mail: MailService = defaultMailService,
+): Promise<CoreActionResult> {
+  const device = await prisma.device.findUnique({
+    where: { id: deviceId },
+    select: {
+      id: true,
+      userId: true,
+      tokenId: true,
+      secretHash: true,
+      revokedAt: true,
+      user: { select: { id: true, username: true } },
+    },
+  });
+  if (!device) throw new Error('device_not_found');
+  if (device.revokedAt) return { ok: true, noop: true };
+
+  const secretHashLastFour = device.secretHash.slice(-4);
+
+  await withAuditedAction(prisma, {
+    adminUserId: admin.id,
+    adminEmail: admin.email,
+    action: 'DEVICE_REVOKE',
+    targetType: 'Device',
+    targetId: device.id,
+    before: { revokedAt: null },
+    after: { revokedAt: 'now' },
+    metadata: {
+      tokenId: device.tokenId,
+      userId: device.userId,
+      secretHashLastFour,
+    },
+    run: async () => {
+      await prisma.device.update({
+        where: { id: device.id },
+        data: { revokedAt: new Date() },
+      });
+      await mail.send({
+        to: [],
+        templateId: 'device-revoked',
+        variables: {
+          username: device.user.username,
+          tokenId: device.tokenId,
+        },
+      });
+    },
+  });
+
+  return { ok: true };
+}

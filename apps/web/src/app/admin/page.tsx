@@ -34,6 +34,14 @@ export default async function AdminHome() {
         This is the admin dashboard placeholder. Operational tools will appear here
         as later phases land.
       </p>
+      <ul style={{ paddingLeft: 20 }}>
+        <li>
+          <a href="/admin/users" style={{ color: '#74b9ff' }}>
+            Users
+          </a>{' '}
+          — search, suspend, restore, soft-delete, revoke devices.
+        </li>
+      </ul>
       <form action="/api/admin/auth/logout" method="post">
         <button
           type="submit"
