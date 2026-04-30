@@ -44,7 +44,7 @@ test('suspendUserCore + restoreUserCore round-trip with audit rows', async () =>
     assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: u.id } })).status, 'ACTIVE');
 
     const audit = await prisma.adminActionLog.findMany({
-      where: { targetId: u.id },
+      where: { targetId: u.id, metadata: { path: ['status'], equals: 'SUCCEEDED' } },
       orderBy: { createdAt: 'asc' },
     });
     const actions = audit.map((a) => a.action);

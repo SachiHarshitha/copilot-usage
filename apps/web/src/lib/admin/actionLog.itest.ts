@@ -43,7 +43,7 @@ test('action log: returns rows newest-first for any authenticated admin (READ_ON
     const session = await seedAdminSession(prisma, { role: 'READ_ONLY' });
     // seedAdminSession itself writes enrollment audit rows; clear them to
     // make this test's assertions about ordering deterministic.
-    await prisma.adminActionLog.deleteMany({});
+    await prisma.$executeRawUnsafe('TRUNCATE TABLE "AdminActionLog" RESTART IDENTITY CASCADE');
     await seedRows(prisma, session.adminId);
 
     const res = await listActionLogHandler(buildAdminRequest(BASE, session), { prisma });
@@ -75,7 +75,7 @@ test('action log: filters by action, targetType, targetId compose', async () => 
 test('action log: from / to date filters work', async () => {
   await withTestDb(async ({ prisma }) => {
     const session = await seedAdminSession(prisma);
-    await prisma.adminActionLog.deleteMany({});
+    await prisma.$executeRawUnsafe('TRUNCATE TABLE "AdminActionLog" RESTART IDENTITY CASCADE');
     await seedRows(prisma, session.adminId);
 
     const res = await listActionLogHandler(
@@ -105,7 +105,7 @@ test('action log: invalid date param → 400', async () => {
 test('action log: cursor pagination walks every row exactly once', async () => {
   await withTestDb(async ({ prisma }) => {
     const session = await seedAdminSession(prisma);
-    await prisma.adminActionLog.deleteMany({});
+    await prisma.$executeRawUnsafe('TRUNCATE TABLE "AdminActionLog" RESTART IDENTITY CASCADE');
     await seedRows(prisma, session.adminId);
 
     const seen = new Set<string>();

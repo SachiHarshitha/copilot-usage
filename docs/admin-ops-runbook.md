@@ -47,6 +47,12 @@ On the VPS:
 docker compose -f deploy/docker-compose.yml --env-file .env exec web \
   pnpm --filter @promptstreak/web prisma db push --skip-generate
 
+# 1b. Apply the AdminActionLog append-only trigger. Idempotent — re-run any
+#     time `prisma db push` rebuilds the table. Required: AdminActionLog rows
+#     are tamper-resistant only after this trigger is in place.
+docker compose -f deploy/docker-compose.yml --env-file .env exec web \
+  pnpm --filter @promptstreak/web exec tsx scripts/applyAuditLogImmutability.ts
+
 # 2. Create the first admin (interactive). The CLI prompts for password
 #    and prints the TOTP otpauth URL once.
 docker compose -f deploy/docker-compose.yml --env-file .env exec web \
@@ -81,6 +87,29 @@ password, complete the TOTP step.
   row to `AdminActionLog` with status `ATTEMPTED`/`SUCCEEDED`/`FAILED` and a
   reason in the metadata JSON. Email/IP/UA are sha256-salted; correlate by
   hash, never by raw value.
+
+### Audit log immutability
+
+`AdminActionLog` is append-only at the DB layer via a `BEFORE UPDATE OR DELETE`
+trigger (see [apps/web/sql/admin-action-log-immutable.sql](../apps/web/sql/admin-action-log-immutable.sql)).
+Every mutating admin action writes **two** rows: one `ATTEMPTED` and one
+follow-up `SUCCEEDED` or `FAILED` row linked via `metadata.attemptId`.
+
+To (re-)apply the trigger against any environment:
+
+```bash
+# Production / staging — uses DATABASE_URL
+pnpm --filter @promptstreak/web exec tsx scripts/applyAuditLogImmutability.ts
+
+# Local test database — uses DATABASE_URL_TEST
+pnpm --filter @promptstreak/web exec tsx scripts/applyAuditLogImmutability.ts --test
+```
+
+The script is idempotent. It re-runs automatically as part of
+`pnpm db:test:reset`. The only permitted UPDATE is the FK cascade that nulls
+`adminUserId` when an `AdminUser` is deleted; every other column must remain
+unchanged. Any other UPDATE or any DELETE raises
+`42501 insufficient_privilege`.
 
 ## Lockout recovery
 

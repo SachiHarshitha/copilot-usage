@@ -75,46 +75,47 @@ export interface WithAuditedActionInput<T> extends Omit<LogAdminActionInput, 'st
  *
  *   1. Write `ATTEMPTED` row (failure here aborts the action — no silent loss).
  *   2. Run the handler.
- *   3. Update the row to `SUCCEEDED` (with optional `after` snapshot) or
- *      `FAILED` (with the error message), then re-throw.
+ *   3. Append a SECOND row with `SUCCEEDED` (and any `after` snapshot) or
+ *      `FAILED` (with the error message), then re-throw on failure.
+ *
+ * The log is append-only at the DB layer (admin-action-log-immutable.sql),
+ * so we never UPDATE the first row — we always insert a follow-up row that
+ * references the same target. Each completed action therefore writes two
+ * rows, with `metadata.attemptId` linking them together.
  */
 export async function withAuditedAction<T>(
   prisma: PrismaClient,
   input: WithAuditedActionInput<T>,
 ): Promise<T> {
   const { run, ...logInput } = input;
-  const { id } = await logAdminAction(prisma, { ...logInput, status: 'ATTEMPTED' });
+  const { id: attemptId } = await logAdminAction(prisma, { ...logInput, status: 'ATTEMPTED' });
 
   try {
-    const result = await run(id);
-    await prisma.adminActionLog.update({
-      where: { id },
-      data: {
-        metadata: {
-          ...(input.metadata ?? {}),
-          status: 'SUCCEEDED',
-        } as Prisma.InputJsonValue,
+    const result = await run(attemptId);
+    await logAdminAction(prisma, {
+      ...logInput,
+      status: 'SUCCEEDED',
+      metadata: {
+        ...(input.metadata ?? {}),
+        attemptId,
       },
     });
     return result;
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    await prisma.adminActionLog
-      .update({
-        where: { id },
-        data: {
-          metadata: {
-            ...(input.metadata ?? {}),
-            status: 'FAILED',
-            reason,
-          } as Prisma.InputJsonValue,
-        },
-      })
-      .catch(() => {
-        // We swallow only the *secondary* update failure so the original
-        // error reaches the caller — losing the FAILED marker is bad but
-        // hiding the root cause would be worse.
-      });
+    await logAdminAction(prisma, {
+      ...logInput,
+      status: 'FAILED',
+      metadata: {
+        ...(input.metadata ?? {}),
+        attemptId,
+        reason,
+      },
+    }).catch(() => {
+      // Swallow only the *secondary* insert failure so the original error
+      // reaches the caller — losing the FAILED marker is bad but hiding the
+      // root cause would be worse.
+    });
     throw err;
   }
 }

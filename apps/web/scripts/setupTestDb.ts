@@ -13,6 +13,8 @@ import path from 'node:path';
 
 import { PrismaClient } from '@prisma/client';
 
+import { applyAuditLogImmutability } from './applyAuditLogImmutability';
+
 function loadDotEnv(): void {
   const envPath = path.resolve(__dirname, '..', '.env');
   let raw: string;
@@ -109,6 +111,11 @@ async function main(): Promise<void> {
   await ensureDatabase(reset);
   pushSchema();
   console.log('[db:test] schema pushed');
+  const testUrl = process.env.DATABASE_URL_TEST;
+  if (testUrl) {
+    await applyAuditLogImmutability(testUrl);
+    console.log('[db:test] audit-log immutability trigger applied');
+  }
 }
 
 main().catch((err) => {

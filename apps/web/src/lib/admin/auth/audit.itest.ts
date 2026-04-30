@@ -58,9 +58,15 @@ test('withAuditedAction marks SUCCEEDED on resolved handlers', async () => {
       run: async () => 42,
     });
     assert.equal(result, 42);
-    const rows = await prisma.adminActionLog.findMany({ where: { action: 'TEST_OK' } });
-    assert.equal(rows.length, 1);
-    assert.equal((rows[0].metadata as { status: string }).status, 'SUCCEEDED');
+    const rows = await prisma.adminActionLog.findMany({
+      where: { action: 'TEST_OK' },
+      orderBy: { createdAt: 'asc' },
+    });
+    // Append-only: ATTEMPTED row + SUCCEEDED row.
+    assert.equal(rows.length, 2);
+    assert.equal((rows[0].metadata as { status: string }).status, 'ATTEMPTED');
+    assert.equal((rows[1].metadata as { status: string }).status, 'SUCCEEDED');
+    assert.equal((rows[1].metadata as { attemptId: string }).attemptId, rows[0].id);
   });
 });
 
@@ -80,9 +86,14 @@ test('withAuditedAction marks FAILED and re-throws on rejected handlers', async 
       }),
       /boom/,
     );
-    const rows = await prisma.adminActionLog.findMany({ where: { action: 'TEST_FAIL' } });
-    assert.equal(rows.length, 1);
-    const meta = rows[0].metadata as { status: string; reason: string };
+    const rows = await prisma.adminActionLog.findMany({
+      where: { action: 'TEST_FAIL' },
+      orderBy: { createdAt: 'asc' },
+    });
+    // Append-only: ATTEMPTED row + FAILED row.
+    assert.equal(rows.length, 2);
+    assert.equal((rows[0].metadata as { status: string }).status, 'ATTEMPTED');
+    const meta = rows[1].metadata as { status: string; reason: string };
     assert.equal(meta.status, 'FAILED');
     assert.equal(meta.reason, 'boom');
   });

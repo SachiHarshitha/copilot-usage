@@ -145,7 +145,11 @@ test('revoke device: success sets revokedAt, audits last-four of secretHash, mai
     assert.notEqual(after.revokedAt, null);
 
     const audit = await prisma.adminActionLog.findMany({
-      where: { action: 'DEVICE_REVOKE', targetId: d.id },
+      where: {
+        action: 'DEVICE_REVOKE',
+        targetId: d.id,
+        metadata: { path: ['status'], equals: 'SUCCEEDED' },
+      },
     });
     assert.equal(audit.length, 1);
     const meta = audit[0].metadata as {

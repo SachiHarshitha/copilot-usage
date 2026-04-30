@@ -75,7 +75,7 @@ test('suspend sets status, writes audit row, sends mail call', async () => {
     const after = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
     assert.equal(after.status, 'SUSPENDED');
     const audit = await prisma.adminActionLog.findMany({
-      where: { action: 'USER_SUSPEND', targetId: u.id },
+      where: { action: 'USER_SUSPEND', targetId: u.id, metadata: { path: ['status'], equals: 'SUCCEEDED' } },
     });
     assert.equal(audit.length, 1);
     assert.equal((audit[0].metadata as { status: string }).status, 'SUCCEEDED');
