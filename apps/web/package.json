@@ -16,6 +16,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:test:setup": "tsx scripts/setupTestDb.ts",
     "db:test:reset": "tsx scripts/setupTestDb.ts --reset",
+    "admin:create": "tsx --env-file-if-exists=.env scripts/createAdmin.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
