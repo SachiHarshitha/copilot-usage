@@ -86,6 +86,21 @@ export async function validateSession(
   return { session: slid, adminUser: session.adminUser };
 }
 
+/**
+ * Promote a session from "password verified" to "fully authenticated" by
+ * stamping `twoFactorCompletedAt`. Idempotent — repeated calls keep the
+ * earliest stamp so audit trails are unambiguous.
+ */
+export async function markTwoFactorCompleted(
+  prisma: PrismaClient,
+  sessionId: string,
+): Promise<void> {
+  await prisma.adminSession.updateMany({
+    where: { id: sessionId, twoFactorCompletedAt: null },
+    data: { twoFactorCompletedAt: new Date() },
+  });
+}
+
 /** Mark a single session as revoked. Subsequent validateSession calls fail. */
 export async function revokeSession(prisma: PrismaClient, sessionId: string): Promise<void> {
   await prisma.adminSession.updateMany({
