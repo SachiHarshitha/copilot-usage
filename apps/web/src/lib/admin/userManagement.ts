@@ -216,6 +216,8 @@ async function readJson<T = unknown>(req: NextRequest): Promise<T | null> {
   }
 }
 
+export { readJson };
+
 /**
  * Standard mutation envelope. We require `{ confirm: true }` so a misclick or
  * stray request never destroys account state.
