@@ -18,11 +18,16 @@ export type AdminMailTemplateId =
   | 'account-suspended'
   | 'device-revoked';
 
+/** All known template ids. Phase G expands this union as templates ship. */
+export type MailTemplateId = AdminMailTemplateId;
+
 export interface SendMailInput {
   /** Recipient email. The User model has no email today; some templates may
    * accept an empty array (no-op send) so callers can stay uniform. */
   to: string[];
-  templateId: AdminMailTemplateId;
+  /** Typed for autocomplete; widened to `string` so runtime template
+   * registration can grow without churning every call site. */
+  templateId: MailTemplateId | (string & {});
   /** Template-specific variables. Kept loosely typed because templates are
    * defined by Phase G; this field is opaque to the no-op backend. */
   variables: Record<string, string | number | null>;
