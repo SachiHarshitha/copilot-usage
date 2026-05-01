@@ -3,6 +3,12 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+interface PrivacySettings {
+  profilePublic: boolean;
+  leaderboardOptIn: boolean;
+  badgesEnabled: boolean;
+}
+
 interface UserSettings {
   displayName: string;
   profilePublic: boolean;
@@ -13,14 +19,26 @@ interface UserSettings {
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    fetch('/api/settings/profile')
-      .then((r) => (r.ok ? r.json() : null))
-      .then(setSettings)
+    Promise.all([
+      fetch('/api/settings/profile').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/settings/privacy').then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([profileResp, privacyResp]) => {
+        setSettings(profileResp);
+        if (privacyResp) {
+          setPrivacy({
+            profilePublic: !!privacyResp.profilePublic,
+            leaderboardOptIn: !!privacyResp.leaderboardOptIn,
+            badgesEnabled: !!privacyResp.badgesEnabled,
+          });
+        }
+      })
       .catch(() => setSettings(null))
       .finally(() => setLoading(false));
   }, []);
@@ -40,16 +58,28 @@ export default function SettingsPage() {
     );
   }
 
-  async function toggleProfile() {
+  async function togglePrivacyField(field: keyof PrivacySettings) {
+    if (!privacy) return;
+    const next = !privacy[field];
     setSaving(true);
-    const res = await fetch('/api/settings/profile', {
+    const res = await fetch('/api/settings/privacy', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profilePublic: !settings!.profilePublic }),
+      body: JSON.stringify({ [field]: next }),
     });
     if (res.ok) {
-      setSettings((s) => s && { ...s, profilePublic: !s.profilePublic });
-      setMessage('Profile visibility updated.');
+      const data = (await res.json()) as PrivacySettings & { ok: boolean };
+      setPrivacy({
+        profilePublic: !!data.profilePublic,
+        leaderboardOptIn: !!data.leaderboardOptIn,
+        badgesEnabled: !!data.badgesEnabled,
+      });
+      // Keep the legacy `settings.profilePublic` view in sync for now (the
+      // server mirrors it during the Phase 2 → 2.1 bridge window).
+      if (field === 'profilePublic') {
+        setSettings((s) => s && { ...s, profilePublic: next });
+      }
+      setMessage('Privacy settings updated.');
     }
     setSaving(false);
   }
@@ -122,16 +152,37 @@ export default function SettingsPage() {
 
       {/* Privacy */}
       <Section title="Privacy">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm">Profile is {settings.profilePublic ? 'public' : 'private'}</span>
-          <button
-            onClick={toggleProfile}
-            disabled={saving}
-            className="text-sm bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded disabled:opacity-50"
-          >
-            {settings.profilePublic ? 'Make Private' : 'Make Public'}
-          </button>
-        </div>
+        <p className="text-xs text-[#8b949e] mb-4">
+          Each control is independent. Turning a setting off immediately removes the related public surface.
+          Withdrawing consent is recorded just like granting it.
+        </p>
+        {privacy ? (
+          <div className="space-y-3">
+            <PrivacyRow
+              label="Public profile"
+              hint="Allow anyone to view your profile page at /u/your-username."
+              enabled={privacy.profilePublic}
+              disabled={saving}
+              onToggle={() => togglePrivacyField('profilePublic')}
+            />
+            <PrivacyRow
+              label="Show on public leaderboards"
+              hint="Include your username and aggregated stats on global leaderboards. Requires public profile."
+              enabled={privacy.leaderboardOptIn}
+              disabled={saving || !privacy.profilePublic}
+              onToggle={() => togglePrivacyField('leaderboardOptIn')}
+            />
+            <PrivacyRow
+              label="Show public badges"
+              hint="Render SVG badges (streak, lifetime, rank) at public badge URLs. Requires public profile."
+              enabled={privacy.badgesEnabled}
+              disabled={saving || !privacy.profilePublic}
+              onToggle={() => togglePrivacyField('badgesEnabled')}
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-[#8b949e]">Privacy settings unavailable.</p>
+        )}
       </Section>
 
       {/* Repos */}
@@ -264,6 +315,42 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="mb-8">
       <h2 className="text-lg font-semibold text-white mb-4 pb-2 border-b border-[#30363d]">{title}</h2>
       {children}
+    </div>
+  );
+}
+
+function PrivacyRow({
+  label,
+  hint,
+  enabled,
+  disabled,
+  onToggle,
+}: {
+  label: string;
+  hint: string;
+  enabled: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 bg-[#0d1117] border border-[#30363d] rounded p-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-white">{label}</p>
+        <p className="text-xs text-[#8b949e] mt-0.5">{hint}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={disabled}
+        aria-pressed={enabled}
+        className={`shrink-0 text-xs px-3 py-1.5 rounded border ${
+          enabled
+            ? 'bg-green-900/30 text-green-400 border-green-700'
+            : 'bg-[#21262d] text-[#8b949e] border-[#30363d]'
+        } disabled:opacity-50`}
+      >
+        {enabled ? 'On' : 'Off'}
+      </button>
     </div>
   );
 }
