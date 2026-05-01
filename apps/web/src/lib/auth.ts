@@ -25,11 +25,22 @@ function normalizeUsername(value: unknown): string {
 }
 
 // GitHub OAuth (production + dev if configured)
+//
+// Phase 1d — minimal scope:
+//   `read:user` only. We deliberately DROP the next-auth default `user:email`
+//   and never request any `repo` / `read:org` / `workflow` scope. The product
+//   never needs the user's verified email at sign-in time — `User.email`
+//   stays nullable and is only populated through an explicit user action
+//   (e.g. the future "subscribe to deletion-confirmation mail" flow), at
+//   which point we will request the email via a separate, narrowly-scoped
+//   call. This keeps the consent screen honest: "see your public profile"
+//   instead of "see your email and repositories".
 if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   providers.push(
     GitHubProvider({
       clientId: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      authorization: { params: { scope: 'read:user' } },
     })
   );
 }
