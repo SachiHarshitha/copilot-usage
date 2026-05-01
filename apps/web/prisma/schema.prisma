@@ -37,6 +37,16 @@ model User {
   providerStats    ProviderStat[]
   modelStats       ModelStat[]
 
+  // Phase 1a — privacy/identity foundation. Additive; legacy `githubId` and
+  // `profilePublic` columns remain as bridge until Phase 1c bake completes.
+  identity               UserIdentity?
+  privacySettings        PrivacySettings?
+  consentEvents          ConsentEvent[]
+  deletionJobs           AccountDeletionJob[]
+  dataExportRequests     DataExportRequest[]
+  abuseReportsFiled      AbuseReport[]            @relation("AbuseReportsByReporter")
+  repoVisibilitySettings RepoVisibilitySettings[]
+
   @@index([status])
 }
 
@@ -338,16 +348,16 @@ model AdminUser {
 /// twoFactorCompletedAt is null on a freshly issued (pre-2FA) session and
 /// set once the operator has verified a TOTP/recovery code.
 model AdminSession {
-  id                    String    @id @default(cuid())
-  adminUserId           String
-  tokenHash             String    @unique
-  twoFactorCompletedAt  DateTime?
-  idleExpiresAt         DateTime
-  absoluteExpiresAt     DateTime
-  ipHash                String?
-  userAgentHash         String?
-  createdAt             DateTime  @default(now())
-  revokedAt             DateTime?
+  id                   String    @id @default(cuid())
+  adminUserId          String
+  tokenHash            String    @unique
+  twoFactorCompletedAt DateTime?
+  idleExpiresAt        DateTime
+  absoluteExpiresAt    DateTime
+  ipHash               String?
+  userAgentHash        String?
+  createdAt            DateTime  @default(now())
+  revokedAt            DateTime?
 
   adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
 
@@ -471,29 +481,29 @@ enum MailLogStatus {
 /// verification and the most recently computed mismatch numbers. Updated by
 /// the verification refresh job; read by Phase C admin views.
 model UserVerification {
-  id                      String             @id @default(cuid())
-  userId                  String             @unique
+  id     String @id @default(cuid())
+  userId String @unique
 
-  githubBillingConnected  Boolean            @default(false)
-  githubBillingStatus     VerificationStatus @default(NOT_CONNECTED)
+  githubBillingConnected Boolean            @default(false)
+  githubBillingStatus    VerificationStatus @default(NOT_CONNECTED)
 
-  verifiedAt              DateTime?
-  lastCheckedAt           DateTime?
-  lastHealthyAt           DateTime?
+  verifiedAt    DateTime?
+  lastCheckedAt DateTime?
+  lastHealthyAt DateTime?
 
   currentPeriodKey        String?
   localPremiumRequests    BigInt?
   verifiedPremiumRequests BigInt?
   differenceAbsolute      BigInt?
-  differencePercent       Decimal?           @db.Decimal(8, 4)
+  differencePercent       Decimal? @db.Decimal(8, 4)
 
-  mismatchScore           Int                @default(0)
-  trustScore              Int                @default(0)
+  mismatchScore Int @default(0)
+  trustScore    Int @default(0)
 
-  publicBadgeEligible     Boolean            @default(false)
+  publicBadgeEligible Boolean @default(false)
 
-  createdAt               DateTime           @default(now())
-  updatedAt               DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([githubBillingStatus, lastCheckedAt])
 }
@@ -515,25 +525,25 @@ enum VerificationStatus {
 /// failures, and chain rewrites without touching the (much hotter) usage
 /// tables. Used by Phase D (upload audit search).
 model UploadAudit {
-  id                String                @id @default(cuid())
-  userId            String
-  deviceId          String?
-  tokenId           String?
+  id       String  @id @default(cuid())
+  userId   String
+  deviceId String?
+  tokenId  String?
 
-  receivedAt        DateTime              @default(now())
-  clientTimestamp   DateTime?
-  clientVersion     String?
+  receivedAt      DateTime  @default(now())
+  clientTimestamp DateTime?
+  clientVersion   String?
 
   payloadHash       String?
   signatureStatus   UploadSignatureStatus
   chainHead         String?
   previousChainHead String?
 
-  accepted          Boolean
-  rejectionCode     String?
+  accepted      Boolean
+  rejectionCode String?
 
-  ipHash            String?
-  userAgentHash     String?
+  ipHash        String?
+  userAgentHash String?
 
   @@index([userId, receivedAt])
   @@index([tokenId, receivedAt])
@@ -554,17 +564,17 @@ enum UploadSignatureStatus {
 /// queue surfaced to admins in Phase C. `detailsJson` is opaque to the schema;
 /// callers must never put raw PII into it (use hashes).
 model VerificationAnomaly {
-  id          String                  @id @default(cuid())
-  userId      String
+  id     String @id @default(cuid())
+  userId String
 
   code        VerificationAnomalyCode
   severity    VerificationSeverity
   summary     String
   detailsJson Json?
 
-  detectedAt  DateTime                @default(now())
-  resolvedAt  DateTime?
-  resolution  String?
+  detectedAt DateTime  @default(now())
+  resolvedAt DateTime?
+  resolution String?
 
   @@index([userId, detectedAt])
   @@index([code, detectedAt])
@@ -589,4 +599,228 @@ enum VerificationSeverity {
   MEDIUM
   HIGH
   CRITICAL
+}
+
+// ============================================================================
+// Phase 1a — Identity & privacy schema foundation
+// (per docs/gdpr/promptstreak-complete-gdpr-mvp-implementation-prompt.md)
+//
+// All defaults privacy-first. Existing `User.githubId` and `User.profilePublic`
+// remain as bridge columns until Phase 1c bake completes.
+// ============================================================================
+
+/// Encrypted identity row — one per User. Holds the AES-GCM ciphertext of the
+/// GitHub user ID (and optional email) plus a deterministic HMAC used for
+/// lookup. The HMAC pepper is held in env, never in DB. See
+/// `apps/web/src/lib/crypto/identityCrypto.ts` (Phase 1b).
+model UserIdentity {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  /// HMAC-SHA256(pepper, normalized GitHub numeric ID). base64url, 43 chars.
+  /// Unique + indexed so dual-read auth (Phase 1c) can resolve a session
+  /// without ever decrypting a row.
+  githubIdHmac       String   @unique
+  /// AES-GCM ciphertext of the GitHub numeric ID. Format defined by
+  /// identityCrypto.encrypt(): version || iv || ciphertext+tag (base64).
+  githubIdCiphertext String
+  /// Optional. HMAC-SHA256(pepper, normalized lowercased email).
+  emailHmac          String?  @unique
+  /// Optional. AES-GCM ciphertext of the email address.
+  emailCiphertext    String?
+  /// Active key version for both ciphertexts (key rotation lives in
+  /// identityCrypto, this column lets the row be re-encrypted lazily).
+  keyVersion         Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([keyVersion])
+}
+
+/// Per-user privacy toggles. ALL defaults are FALSE — users must opt-in to
+/// every public surface. Mirrors and supersedes the legacy
+/// `User.profilePublic` column during the bridge period.
+model PrivacySettings {
+  userId           String    @id
+  profilePublic    Boolean   @default(false)
+  leaderboardOptIn Boolean   @default(false)
+  badgesEnabled    Boolean   @default(false)
+  /// True if the user has accepted the current privacy policy version.
+  policyVersion    String?
+  policyAcceptedAt DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Append-only consent log (GDPR Art. 7 §1 — controllers must demonstrate
+/// consent). Every flip of a privacy toggle, every per-repo opt-in, every
+/// account-deletion request, and every admin override writes one row here.
+/// Rows are NEVER deleted; soft-delete cascades intentionally do not apply.
+model ConsentEvent {
+  id        String             @id @default(cuid())
+  userId    String
+  kind      ConsentEventKind
+  granted   Boolean
+  source    ConsentEventSource
+  /// Optional pointer for kinds that scope to a sub-resource, e.g. the repo
+  /// identity for REPO_PUBLIC. Free text — interpreted per `kind`.
+  subjectId String?
+  /// Pre-hashed IP captured at consent time (pepper from env). Never raw.
+  ipHash    String?
+  userAgent String?
+  createdAt DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([kind, createdAt(sort: Desc)])
+}
+
+enum ConsentEventKind {
+  PROFILE_PUBLIC
+  LEADERBOARD_OPT_IN
+  BADGES_ENABLED
+  REPO_PUBLIC
+  WORKSPACE_PUBLIC
+  POLICY_ACCEPTED
+  ACCOUNT_DELETION_REQUESTED
+  ACCOUNT_DELETION_CONFIRMED
+  ACCOUNT_DELETION_CANCELLED
+  DATA_EXPORT_REQUESTED
+}
+
+enum ConsentEventSource {
+  USER_SETTING
+  SIGNUP_DEFAULT
+  ADMIN_OVERRIDE
+  SYSTEM
+}
+
+/// Two-step account deletion (GDPR Art. 17). User requests deletion → email
+/// confirm link → grace window → executor anonymizes the User row. One ACTIVE
+/// (status in PENDING|CONFIRMED) job per user at a time.
+model AccountDeletionJob {
+  id               String                   @id @default(cuid())
+  userId           String
+  status           AccountDeletionJobStatus @default(PENDING)
+  /// Optional free-text reason supplied by the user.
+  reason           String?
+  /// SHA-256 hash of the single-use confirmation token mailed to the user.
+  /// Plaintext token is never stored.
+  confirmTokenHash String                   @unique
+  requestedAt      DateTime                 @default(now())
+  confirmedAt      DateTime?
+  /// When the executor actually anonymized the user.
+  executedAt       DateTime?
+  /// When this job is no longer eligible to be confirmed.
+  expiresAt        DateTime
+  cancelledAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+}
+
+enum AccountDeletionJobStatus {
+  PENDING
+  CONFIRMED
+  EXECUTED
+  EXPIRED
+  CANCELLED
+}
+
+/// DSAR — Data Subject Access Request. User clicks "Download my data",
+/// async job builds a JSON archive, user gets a one-time download link.
+model DataExportRequest {
+  id                String                  @id @default(cuid())
+  userId            String
+  status            DataExportRequestStatus @default(PENDING)
+  requestedAt       DateTime                @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  /// SHA-256 hash of the one-time download token. Never stored plaintext.
+  downloadTokenHash String?                 @unique
+  downloadExpiresAt DateTime?
+  downloadedAt      DateTime?
+  /// Compressed archive size, set when completed.
+  sizeBytes         Int?
+  errorReason       String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, requestedAt(sort: Desc)])
+  @@index([status, requestedAt])
+}
+
+enum DataExportRequestStatus {
+  PENDING
+  IN_PROGRESS
+  READY
+  DOWNLOADED
+  EXPIRED
+  FAILED
+}
+
+/// Public-surface abuse / takedown reports (Phase 6.1). Reporter MAY be
+/// anonymous (reporterUserId null + reporterEmail set) or signed-in.
+model AbuseReport {
+  id                String                 @id @default(cuid())
+  reporterUserId    String?
+  /// Optional contact email for anonymous reporters. Plaintext for now —
+  /// Phase 6.1 will decide if this also goes through identityCrypto.
+  reporterEmail     String?
+  reporterIpHash    String?
+  subjectKind       AbuseReportSubjectKind
+  /// Username or repo slug being reported.
+  subjectIdentifier String
+  /// Categorization, e.g. "impersonation", "spam", "doxxing".
+  reason            String
+  description       String
+  status            AbuseReportStatus      @default(NEW)
+  resolvedById      String?
+  resolutionNotes   String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  reporter User? @relation("AbuseReportsByReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([subjectKind, subjectIdentifier])
+}
+
+enum AbuseReportSubjectKind {
+  USER
+  REPO
+  BADGE
+}
+
+enum AbuseReportStatus {
+  NEW
+  TRIAGED
+  ACTIONED
+  DISMISSED
+}
+
+/// Per-(user, repo) public-visibility opt-in. Decoupled from RepoStat.isPublic
+/// so it survives stat resets / re-aggregations and gives us a single source
+/// of truth for "did the user explicitly opt this repo into public surfaces?".
+/// Phase 2.1 cuts the public read paths over to JOIN here instead of reading
+/// RepoStat.isPublic directly.
+model RepoVisibilitySettings {
+  id           String   @id @default(cuid())
+  userId       String
+  /// Same value as RepoStat.repoIdentity for the same repo.
+  repoIdentity String
+  isPublic     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, repoIdentity])
+  @@index([isPublic, repoIdentity])
 }
