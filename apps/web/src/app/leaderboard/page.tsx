@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db';
 import Link from 'next/link';
+import Image from 'next/image';
+import { getAllowedAvatarUrl } from '@/lib/profile-menu';
 
 interface SearchParams {
   sort?: string;
@@ -158,30 +160,33 @@ export default async function LeaderboardPage({
                 </td>
               </tr>
             )}
-            {entries.map((e, i) => (
-              <tr key={e.userId} className="border-b border-[#21262d] hover:bg-[#161b22]">
-                <td className="py-3 px-2 text-[#8b949e]">{(page - 1) * PAGE_SIZE + i + 1}</td>
-                <td className="py-3 px-2">
-                  <Link href={`/u/${e.username}`} className="flex items-center gap-2 no-underline">
-                    {e.avatarUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={e.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
-                    )}
-                    <span className="text-white font-medium">{e.username}</span>
-                  </Link>
-                </td>
-                <td className="py-3 px-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/api/badges/${e.username}/rank.svg`} alt={`${e.username} rank`} className="h-7 w-auto" />
-                </td>
-                <td className="py-3 px-2 text-right font-mono">{Number(e.totalTokens).toLocaleString()}</td>
-                <td className="py-3 px-2 text-right font-mono">🔥 {e.currentStreakDays}</td>
-                <td className="py-3 px-2 text-right font-mono">{e.premiumRequests.toFixed(1)}</td>
-                <td className="py-3 px-2 text-right font-mono">{e.totalRequests.toLocaleString()}</td>
-                <td className="py-3 px-2 text-right text-[#8b949e]">{e.topModel || '–'}</td>
-                <td className="py-3 px-2 text-right">{e.workspaceCount}</td>
-              </tr>
-            ))}
+            {entries.map((e, i) => {
+              const safeAvatarUrl = getAllowedAvatarUrl(e.avatarUrl);
+
+              return (
+                <tr key={e.userId} className="border-b border-[#21262d] hover:bg-[#161b22]">
+                  <td className="py-3 px-2 text-[#8b949e]">{(page - 1) * PAGE_SIZE + i + 1}</td>
+                  <td className="py-3 px-2">
+                    <Link href={`/u/${e.username}`} className="flex items-center gap-2 no-underline">
+                      {safeAvatarUrl && (
+                        <Image src={safeAvatarUrl} alt="" width={24} height={24} className="w-6 h-6 rounded-full" />
+                      )}
+                      <span className="text-white font-medium">{e.username}</span>
+                    </Link>
+                  </td>
+                  <td className="py-3 px-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/api/badges/${e.username}/rank.svg`} alt={`${e.username} rank`} className="h-7 w-auto" />
+                  </td>
+                  <td className="py-3 px-2 text-right font-mono">{Number(e.totalTokens).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right font-mono">🔥 {e.currentStreakDays}</td>
+                  <td className="py-3 px-2 text-right font-mono">{e.premiumRequests.toFixed(1)}</td>
+                  <td className="py-3 px-2 text-right font-mono">{e.totalRequests.toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-[#8b949e]">{e.topModel || '–'}</td>
+                  <td className="py-3 px-2 text-right">{e.workspaceCount}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -5,7 +5,7 @@ import { timingSafeEqual } from 'node:crypto';
  * Admin surface guard. Runs on every /admin/** and /api/admin/** request and:
  *
  *  1. Verifies the request arrived through the trusted reverse proxy
- *     (loopback Caddy vhost) by checking a shared secret + marker header.
+ *     by checking a shared secret + marker header injected by that proxy.
  *     Anything else gets a flat 404 — we don't want to advertise that the
  *     admin surface exists.
  *  2. Adds defensive response headers so the browser never caches admin
@@ -16,7 +16,8 @@ import { timingSafeEqual } from 'node:crypto';
  * outermost ring — purely network/transport guard.
  *
  * Bypass for local development: set `ADMIN_NETWORK_GUARD=disabled`. The bypass
- * must be opt-in so a misconfigured production deploy fails closed.
+ * must be opt-in so a misconfigured production deploy fails closed. In
+ * production, disabling the guard is treated as a hard configuration error.
  */
 
 const ADMIN_PATH_PATTERN = /^\/(?:admin|api\/admin)(?:\/|$)/;
@@ -52,7 +53,13 @@ export function middleware(req: NextRequest): NextResponse {
     return NextResponse.next();
   }
 
-  if (process.env.ADMIN_NETWORK_GUARD !== NETWORK_GUARD_DISABLED) {
+  const networkGuardDisabled = process.env.ADMIN_NETWORK_GUARD === NETWORK_GUARD_DISABLED;
+
+  if (networkGuardDisabled) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('ADMIN_NETWORK_GUARD cannot be disabled in production');
+    }
+  } else {
     const expectedSecret = process.env.ADMIN_INTERNAL_PROXY_SECRET;
     if (!expectedSecret) {
       // Fail closed if the operator forgot to provision the secret.

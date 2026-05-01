@@ -1,8 +1,9 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { getProfileAvatarInitial } from '@/lib/profile-menu';
+import { getAllowedAvatarUrl, getProfileAvatarInitial } from '@/lib/profile-menu';
 
 interface ProfileMenuProps {
   username: string;
@@ -12,6 +13,7 @@ interface ProfileMenuProps {
 export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const safeAvatarUrl = getAllowedAvatarUrl(avatarUrl);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -47,9 +49,8 @@ export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
         className="group inline-flex items-center rounded-full border border-[#30363d] bg-[#161b22] pl-1 pr-1 py-1 text-sm shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors hover:border-[#4f5b6b]"
       >
         <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#30363d] text-xs font-semibold text-white">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt={`@${username} avatar`} className="h-full w-full object-cover" />
+          {safeAvatarUrl ? (
+            <Image src={safeAvatarUrl} alt={`@${username} avatar`} width={32} height={32} className="h-full w-full object-cover" />
           ) : (
             getProfileAvatarInitial(username)
           )}

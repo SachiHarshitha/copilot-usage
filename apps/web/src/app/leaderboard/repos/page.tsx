@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { getRepoLeaderboardEntries } from '@/lib/repo-leaderboard-data';
 import {
   REPO_LEADERBOARD_PAGE_SIZE,
@@ -7,6 +8,7 @@ import {
   normalizeRepoLeaderboardSort,
   type RepoLeaderboardSort,
 } from '@/lib/repo-leaderboard';
+import { getAllowedAvatarUrl } from '@/lib/profile-menu';
 
 interface SearchParams {
   sort?: string;
@@ -79,15 +81,15 @@ export default async function RepoLeaderboardPage({
               const [owner, repo] = entry.repoSlug.split('/');
               const repoHref = entry.topUsername ? `/r/${entry.topUsername}/${entry.repoSlug}` : null;
               const rankBadgeUrl = `/api/badges/repo/${owner}/${repo}/leaderboard.svg`;
+              const safeAvatarUrl = getAllowedAvatarUrl(entry.topAvatarUrl);
 
               return (
                 <tr key={`${entry.rank}-${entry.repoSlug}`} className="border-b border-[#21262d] hover:bg-[#161b22]">
                   <td className="py-3 px-2 text-[#8b949e]">{entry.rank}</td>
                   <td className="py-3 px-2">
                     <div className="flex items-center gap-2">
-                      {entry.topAvatarUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={entry.topAvatarUrl} alt="" className="w-6 h-6 rounded-full" />
+                      {safeAvatarUrl && (
+                        <Image src={safeAvatarUrl} alt="" width={24} height={24} className="w-6 h-6 rounded-full" />
                       )}
                       {repoHref ? (
                         <Link href={repoHref} className="text-white font-medium no-underline hover:underline">

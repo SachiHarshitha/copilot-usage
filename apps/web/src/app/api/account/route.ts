@@ -16,5 +16,25 @@ export async function DELETE() {
     where: { id: sessionUser.userId },
   });
 
-  return NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true });
+
+  // Clear NextAuth/Auth.js session cookies so deleted accounts are signed out immediately.
+  response.cookies.set('next-auth.session-token', '', { path: '/', maxAge: 0, httpOnly: true, sameSite: 'lax' });
+  response.cookies.set('__Secure-next-auth.session-token', '', {
+    path: '/',
+    maxAge: 0,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: true,
+  });
+  response.cookies.set('authjs.session-token', '', { path: '/', maxAge: 0, httpOnly: true, sameSite: 'lax' });
+  response.cookies.set('__Secure-authjs.session-token', '', {
+    path: '/',
+    maxAge: 0,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: true,
+  });
+
+  return response;
 }

@@ -1,9 +1,11 @@
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { computeRank, computeUnlockedLifetime, computeUnlockedStreak } from '@/lib/badge-stats';
 import { getSessionUser } from '@/lib/auth';
 import { canViewProfile } from '@/lib/profile-policy';
+import { getAllowedAvatarUrl } from '@/lib/profile-menu';
 
 export default async function ProfilePage({
   params,
@@ -59,14 +61,14 @@ export default async function ProfilePage({
   ];
 
   const cardUrl = `/card/${username}.svg`;
+  const safeAvatarUrl = getAllowedAvatarUrl(user.avatarUrl);
 
   return (
     <div>
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
-        {user.avatarUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={user.avatarUrl} alt="" className="w-16 h-16 rounded-full" />
+        {safeAvatarUrl && (
+          <Image src={safeAvatarUrl} alt="" width={64} height={64} className="w-16 h-16 rounded-full" />
         )}
         <div>
           <h1 className="text-2xl font-bold text-white">{user.displayName || user.username}</h1>

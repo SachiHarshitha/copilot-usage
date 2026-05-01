@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+
 import { prisma } from './db';
 import { IDE_LEADERBOARD_PAGE_SIZE, type IdeLeaderboardSort } from './ide-leaderboard';
 
@@ -18,16 +20,21 @@ interface IdeLeaderboardRow {
   user_count: number;
 }
 
-function orderByClause(sort: IdeLeaderboardSort): string {
+function assertUnreachable(value: never): never {
+  throw new Error(`Unhandled ide leaderboard sort value: ${String(value)}`);
+}
+
+function orderByClause(sort: IdeLeaderboardSort): Prisma.Sql {
   switch (sort) {
     case 'premium':
-      return 'premium_requests DESC, total_tokens DESC';
+      return Prisma.raw('premium_requests DESC, total_tokens DESC');
     case 'requests':
-      return 'total_requests DESC, total_tokens DESC';
+      return Prisma.raw('total_requests DESC, total_tokens DESC');
     case 'tokens':
-    default:
-      return 'total_tokens DESC, total_requests DESC';
+      return Prisma.raw('total_tokens DESC, total_requests DESC');
   }
+
+  return assertUnreachable(sort);
 }
 
 export async function getIdeLeaderboardEntries(options: {
@@ -37,8 +44,8 @@ export async function getIdeLeaderboardEntries(options: {
   const offset = (options.page - 1) * IDE_LEADERBOARD_PAGE_SIZE;
   const orderBy = orderByClause(options.sort);
 
-  const rows = await prisma.$queryRawUnsafe<IdeLeaderboardRow[]>(
-    `
+  const rows = await prisma.$queryRaw<IdeLeaderboardRow[]>(
+    Prisma.sql`
       SELECT
         mud.surface,
         SUM(mud."totalTokens")::bigint AS total_tokens,
@@ -50,11 +57,9 @@ export async function getIdeLeaderboardEntries(options: {
       WHERE u."profilePublic" = true
       GROUP BY mud.surface
       ORDER BY ${orderBy}
-      LIMIT $1
-      OFFSET $2
-    `,
-    IDE_LEADERBOARD_PAGE_SIZE,
-    offset
+      LIMIT ${IDE_LEADERBOARD_PAGE_SIZE}
+      OFFSET ${offset}
+    `
   );
 
   return rows.map((row, index) => ({

@@ -3,6 +3,29 @@ import assert from 'node:assert/strict';
 
 import { adminAuthRateLimiter } from './rateLimit';
 
+const mutableEnv = process.env as Record<string, string | undefined>;
+const originalAdminFingerprintSalt = process.env.ADMIN_FINGERPRINT_SALT;
+const originalIpHashSalt = process.env.IP_HASH_SALT;
+
+test.beforeEach(() => {
+  mutableEnv.ADMIN_FINGERPRINT_SALT = 'test-fingerprint-salt';
+  delete mutableEnv.IP_HASH_SALT;
+});
+
+test.after(() => {
+  if (originalAdminFingerprintSalt === undefined) {
+    delete mutableEnv.ADMIN_FINGERPRINT_SALT;
+  } else {
+    mutableEnv.ADMIN_FINGERPRINT_SALT = originalAdminFingerprintSalt;
+  }
+
+  if (originalIpHashSalt === undefined) {
+    delete mutableEnv.IP_HASH_SALT;
+  } else {
+    mutableEnv.IP_HASH_SALT = originalIpHashSalt;
+  }
+});
+
 // We pull the loginHandler late so the prisma import inside it isn't evaluated
 // for tests we don't run end-to-end here; we just verify the rate-limiting
 // behaviour at the HTTP layer.

@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+
 import { prisma } from './db';
 import { REPO_LEADERBOARD_PAGE_SIZE, type RepoLeaderboardSort } from './repo-leaderboard';
 
@@ -24,18 +26,23 @@ interface RepoLeaderboardRow {
   top_avatar_url: string | null;
 }
 
-function orderByClause(sort: RepoLeaderboardSort): string {
+function assertUnreachable(value: never): never {
+  throw new Error(`Unhandled repo leaderboard sort value: ${String(value)}`);
+}
+
+function orderByClause(sort: RepoLeaderboardSort): Prisma.Sql {
   switch (sort) {
     case 'premium':
-      return 'premium_reqs DESC, total_tokens DESC';
+      return Prisma.raw('premium_reqs DESC, total_tokens DESC');
     case 'requests':
-      return 'total_requests DESC, total_tokens DESC';
+      return Prisma.raw('total_requests DESC, total_tokens DESC');
     case 'tokens30d':
-      return 'tokens_30d DESC, total_tokens DESC';
+      return Prisma.raw('tokens_30d DESC, total_tokens DESC');
     case 'tokens':
-    default:
-      return 'total_tokens DESC, tokens_30d DESC';
+      return Prisma.raw('total_tokens DESC, tokens_30d DESC');
   }
+
+  return assertUnreachable(sort);
 }
 
 export async function getRepoLeaderboardEntries(options: {
@@ -45,8 +52,8 @@ export async function getRepoLeaderboardEntries(options: {
   const offset = (options.page - 1) * REPO_LEADERBOARD_PAGE_SIZE;
   const orderBy = orderByClause(options.sort);
 
-  const rows = await prisma.$queryRawUnsafe<RepoLeaderboardRow[]>(
-    `
+  const rows = await prisma.$queryRaw<RepoLeaderboardRow[]>(
+    Prisma.sql`
       WITH public_repo_stats AS (
         SELECT
           rs."githubRepo" AS repo_slug,
@@ -98,11 +105,9 @@ export async function getRepoLeaderboardEntries(options: {
         ON tc.repo_slug = rt.repo_slug
        AND tc.contributor_rank = 1
       ORDER BY ${orderBy}
-      LIMIT $1
-      OFFSET $2
-    `,
-    REPO_LEADERBOARD_PAGE_SIZE,
-    offset
+      LIMIT ${REPO_LEADERBOARD_PAGE_SIZE}
+      OFFSET ${offset}
+    `
   );
 
   return rows.map((row, index) => ({

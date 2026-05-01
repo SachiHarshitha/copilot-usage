@@ -34,11 +34,11 @@ function sha256(input: string): string {
 }
 
 function getSalt(): string {
-  return (
-    process.env.ADMIN_FINGERPRINT_SALT ||
-    process.env.IP_HASH_SALT ||
-    'admin-fingerprint-default-salt'
-  );
+  const salt = process.env.ADMIN_FINGERPRINT_SALT || process.env.IP_HASH_SALT;
+  if (!salt || !salt.trim()) {
+    throw new Error('ADMIN_FINGERPRINT_SALT or IP_HASH_SALT is required');
+  }
+  return salt;
 }
 
 /**

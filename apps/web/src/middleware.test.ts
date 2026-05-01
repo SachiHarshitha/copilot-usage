@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 import { NextRequest } from 'next/server';
 
 const SECRET = 'test-proxy-secret-abcdefghij';
+const mutableEnv = process.env as Record<string, string | undefined>;
+
+function setNodeEnv(value: string | undefined): void {
+  if (value === undefined) {
+    delete mutableEnv.NODE_ENV;
+    return;
+  }
+
+  mutableEnv.NODE_ENV = value;
+}
 
 function buildReq(
   pathname: string,
@@ -23,6 +33,7 @@ async function loadMiddleware() {
 test('middleware passes through non-admin paths untouched', async () => {
   process.env.ADMIN_INTERNAL_PROXY_SECRET = SECRET;
   delete process.env.ADMIN_NETWORK_GUARD;
+  setNodeEnv(undefined);
   const middleware = await loadMiddleware();
   const res = middleware(buildReq('/api/public/data'));
   assert.equal(res.status, 200);
@@ -33,6 +44,7 @@ test('middleware passes through non-admin paths untouched', async () => {
 test('middleware returns 404 on /admin without trusted-origin headers', async () => {
   process.env.ADMIN_INTERNAL_PROXY_SECRET = SECRET;
   delete process.env.ADMIN_NETWORK_GUARD;
+  setNodeEnv(undefined);
   const middleware = await loadMiddleware();
   const res = middleware(buildReq('/admin/dashboard'));
   assert.equal(res.status, 404);
@@ -41,6 +53,7 @@ test('middleware returns 404 on /admin without trusted-origin headers', async ()
 test('middleware returns 404 when the proxy secret is wrong', async () => {
   process.env.ADMIN_INTERNAL_PROXY_SECRET = SECRET;
   delete process.env.ADMIN_NETWORK_GUARD;
+  setNodeEnv(undefined);
   const middleware = await loadMiddleware();
   const res = middleware(
     buildReq('/admin/dashboard', {
@@ -54,6 +67,7 @@ test('middleware returns 404 when the proxy secret is wrong', async () => {
 test('middleware allows requests with matching trusted-origin headers and adds hardening', async () => {
   process.env.ADMIN_INTERNAL_PROXY_SECRET = SECRET;
   delete process.env.ADMIN_NETWORK_GUARD;
+  setNodeEnv(undefined);
   const middleware = await loadMiddleware();
   const res = middleware(
     buildReq('/admin/dashboard', {
@@ -71,6 +85,7 @@ test('middleware allows requests with matching trusted-origin headers and adds h
 test('middleware returns 404 when the proxy secret env var is missing', async () => {
   delete process.env.ADMIN_INTERNAL_PROXY_SECRET;
   delete process.env.ADMIN_NETWORK_GUARD;
+  setNodeEnv(undefined);
   const middleware = await loadMiddleware();
   const res = middleware(
     buildReq('/admin/dashboard', {
@@ -81,18 +96,32 @@ test('middleware returns 404 when the proxy secret env var is missing', async ()
   assert.equal(res.status, 404);
 });
 
-test('ADMIN_NETWORK_GUARD=disabled bypasses the trusted-origin check', async () => {
+test('ADMIN_NETWORK_GUARD=disabled bypasses the trusted-origin check outside production', async () => {
   delete process.env.ADMIN_INTERNAL_PROXY_SECRET;
   process.env.ADMIN_NETWORK_GUARD = 'disabled';
+  setNodeEnv('development');
   const middleware = await loadMiddleware();
   const res = middleware(buildReq('/admin/dashboard'));
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('Cache-Control'), 'no-store');
 });
 
+test('ADMIN_NETWORK_GUARD=disabled throws in production', async () => {
+  delete process.env.ADMIN_INTERNAL_PROXY_SECRET;
+  process.env.ADMIN_NETWORK_GUARD = 'disabled';
+  setNodeEnv('production');
+  const middleware = await loadMiddleware();
+
+  assert.throws(
+    () => middleware(buildReq('/admin/dashboard')),
+    /ADMIN_NETWORK_GUARD cannot be disabled in production/
+  );
+});
+
 test('safeEqual constant-time path resists length-mismatch oracle (404, no throw)', async () => {
   process.env.ADMIN_INTERNAL_PROXY_SECRET = SECRET;
   delete process.env.ADMIN_NETWORK_GUARD;
+  setNodeEnv(undefined);
   const middleware = await loadMiddleware();
   // Wildly different length should not throw.
   const res = middleware(

@@ -8,6 +8,7 @@ import {
 import { checkRateLimit } from '@/lib/ratelimit';
 import bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
+import { isIP } from 'node:net';
 import { computeStreaks } from '@/lib/streak';
 import { aggregateCanonical, writeCanonical } from '@/lib/agent-ingest';
 import { detectPayloadVersion, translateV1ToV2 } from '@/lib/upload-translate';
@@ -23,14 +24,9 @@ interface RejectedUploadLogInput {
 }
 
 function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim();
-    if (first) return first;
-  }
-
-  const realIp = request.headers.get('x-real-ip');
-  if (realIp) return realIp;
+  // Trust only the reverse-proxy-normalized IP header.
+  const realIp = (request.headers.get('x-real-ip') || '').trim();
+  if (realIp && isIP(realIp)) return realIp;
 
   return 'unknown';
 }

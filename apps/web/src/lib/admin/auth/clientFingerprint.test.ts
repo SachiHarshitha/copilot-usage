@@ -8,6 +8,29 @@ import {
   hashUserAgent,
 } from './clientFingerprint';
 
+const mutableEnv = process.env as Record<string, string | undefined>;
+const originalAdminFingerprintSalt = process.env.ADMIN_FINGERPRINT_SALT;
+const originalIpHashSalt = process.env.IP_HASH_SALT;
+
+test.beforeEach(() => {
+  mutableEnv.ADMIN_FINGERPRINT_SALT = 'test-fingerprint-salt';
+  delete mutableEnv.IP_HASH_SALT;
+});
+
+test.after(() => {
+  if (originalAdminFingerprintSalt === undefined) {
+    delete mutableEnv.ADMIN_FINGERPRINT_SALT;
+  } else {
+    mutableEnv.ADMIN_FINGERPRINT_SALT = originalAdminFingerprintSalt;
+  }
+
+  if (originalIpHashSalt === undefined) {
+    delete mutableEnv.IP_HASH_SALT;
+  } else {
+    mutableEnv.IP_HASH_SALT = originalIpHashSalt;
+  }
+});
+
 test('hashIp returns null for empty input', () => {
   assert.equal(hashIp(null), null);
   assert.equal(hashIp(undefined), null);
@@ -33,6 +56,16 @@ test('hashUserAgent and hashEmail produce 64-hex digests', () => {
 
 test('hashEmail normalizes case and whitespace', () => {
   assert.equal(hashEmail('ADMIN@example.com'), hashEmail('  admin@example.com '));
+});
+
+test('hashIp throws when no fingerprint salt is configured', () => {
+  delete mutableEnv.ADMIN_FINGERPRINT_SALT;
+  delete mutableEnv.IP_HASH_SALT;
+
+  assert.throws(
+    () => hashIp('203.0.113.5'),
+    /ADMIN_FINGERPRINT_SALT or IP_HASH_SALT is required/
+  );
 });
 
 test('getClientIpFromHeaders prefers x-forwarded-for first hop', () => {

@@ -58,8 +58,11 @@ export async function PATCH(request: NextRequest) {
   if (typeof body.profilePublic === 'boolean') {
     update.profilePublic = body.profilePublic;
   }
-  if (typeof body.displayName === 'string' && body.displayName.length <= 100) {
-    update.displayName = body.displayName;
+  if (typeof body.displayName === 'string') {
+    const normalizedDisplayName = body.displayName.trim();
+    if (normalizedDisplayName.length > 0 && normalizedDisplayName.length <= 100) {
+      update.displayName = normalizedDisplayName;
+    }
   }
 
   if (Object.keys(update).length === 0) {
