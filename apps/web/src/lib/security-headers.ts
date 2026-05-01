@@ -5,9 +5,9 @@ function buildContentSecurityPolicy(isProduction: boolean): string {
     "form-action 'self'",
     "frame-ancestors 'none'",
     "object-src 'none'",
-    // Phase 1 hardening: keep dev ergonomics, remove unsafe-eval in production.
+    // Phase 2 hardening: production removes both unsafe-eval and unsafe-inline.
     isProduction
-      ? "script-src 'self' 'unsafe-inline'"
+      ? "script-src 'self'"
       : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",

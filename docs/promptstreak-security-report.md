@@ -5,11 +5,11 @@
 |---|---|
 | Critical | 0 |
 | High | 0 |
-| Medium | 1 |
-| Low | 1 |
+| Medium | 0 |
+| Low | 0 |
 | Info | 4 |
 
-Resolved findings tracked in this report: **6**
+Resolved findings tracked in this report: **8**
 
 ---
 
@@ -26,23 +26,20 @@ Resolved findings tracked in this report: **6**
 
 ### Findings
 
-#### [LOW][CONDITIONAL] Proxy trust drift can bypass upload IP rate limit
+#### [LOW][RESOLVED] Proxy trust drift can bypass upload IP rate limit
 
 - **Location:** apps/web/src/app/api/upload/route.ts
-- **Description:** `getClientIp()` now trusts only `X-Real-IP` and validates format (`isIP`). This removes direct reliance on `X-Forwarded-For`, but still assumes the app is reachable only via a trusted proxy that overwrites `X-Real-IP`.
-- **Impact:** Under the VPS deployment assumptions above, this remains low risk. If the app becomes directly reachable or proxy header sanitation drifts, an attacker could still rotate `X-Real-IP` values to reduce IP-based rate-limit effectiveness. In that drift scenario, severity escalates to **HIGH**.
+- **Description:** Upload requests now fail closed in production unless they include a valid proxy-injected secret header (`x-upload-proxy-secret`) that matches `UPLOAD_INTERNAL_PROXY_SECRET`. Client IP still uses validated `X-Real-IP` only.
+- **Impact:** Direct-to-app header spoofing no longer bypasses upload trust checks in production. Requests that do not traverse the trusted proxy boundary are rejected.
 - **Proof of concept:**
   ```
   POST /api/upload
   Authorization: Bearer <valid-token>
   X-Real-IP: 10.0.0.1
+  X-Upload-Proxy-Secret: wrong-or-missing
   ```
-  Repeat with incrementing fake IPs — bypass requires unsanitized headers to reach the app process.
-- **Recommendation:** Keep the current network controls and add explicit runtime guarantees:
-  - Deny direct access to the app process from non-proxy sources.
-  - Ensure Nginx overwrites `X-Real-IP` and strips user-provided variants.
-  - Prefer a single trusted header from proxy-to-app (for example `X-Real-IP`) and ignore user-supplied alternatives.
-  - Treat this as a deployment control verification item in release checklists.
+  In production, request is rejected unless the trusted proxy injects a matching secret header.
+- **Recommendation:** Keep Nginx header injection and secret management as mandatory production controls, and rotate `UPLOAD_INTERNAL_PROXY_SECRET` using the same process used for other internal proxy secrets.
 
 ---
 
@@ -65,20 +62,12 @@ Resolved findings tracked in this report: **6**
 
 ---
 
-#### [MEDIUM] CSP `script-src` still includes `'unsafe-inline'`
+#### [MEDIUM][RESOLVED] CSP `script-src` still includes `'unsafe-inline'`
 
 - **Location:** apps/web/src/lib/security-headers.ts
-- **Description:** CSP hardening is now **partially implemented**. Production no longer includes `'unsafe-eval'`, but `'unsafe-inline'` is still present in `script-src`. This is materially better than before, but still weaker than nonce-based CSP.
-- **Impact:** Removing `'unsafe-eval'` reduces script-injection blast radius. Remaining `'unsafe-inline'` still limits CSP effectiveness against XSS in user-influenced surfaces.
-- **Recommendation (phased):**
-  - **Phase 1 (completed):** Remove `'unsafe-eval'` in production only; keep development CSP relaxed for tooling compatibility.
-  - **Phase 2:** Evaluate nonce-based CSP across public pages, badge routes, auth flows, admin pages, and any third-party scripts.
-  - **Phase 3:** Consider route-profiled CSP policies:
-    - Public pages: stricter
-    - Admin pages: strictest
-    - SVG badge routes: no script allowances
-    - Development: relaxed CSP only in development
-  Note: Next.js nonce CSP can force dynamic rendering and may reduce static optimization/ISR/cache benefits; evaluate performance impact before full rollout.
+- **Description:** Production CSP `script-src` now excludes both `'unsafe-eval'` and `'unsafe-inline'`, and allows scripts only from `'self'`.
+- **Impact:** Script-injection blast radius is reduced materially versus prior policy; inline script execution is blocked under production policy.
+- **Recommendation:** Keep development CSP relaxed for tooling ergonomics, and evaluate nonce-based CSP only if future framework/runtime behavior requires inline script allowances.
 
 ---
 
@@ -206,13 +195,17 @@ Resolved findings tracked in this report: **6**
   - apps/web/src/lib/repo-leaderboard-data.ts
   - apps/web/src/lib/ide-leaderboard-data.ts
 - Validation run: `pnpm --filter @promptstreak/web test`
-- Result: **179 passed, 0 failed**
+- Result: **184 passed, 0 failed**
 - Additional guard verification in tests:
   - `ADMIN_NETWORK_GUARD=disabled` bypasses only outside production
   - `ADMIN_NETWORK_GUARD=disabled` throws in production
-- CSP phase-1 verification in tests:
+- CSP hardening verification in tests:
   - production CSP excludes `'unsafe-eval'`
+  - production `script-src` excludes `'unsafe-inline'`
   - development CSP retains `'unsafe-eval'` for tooling compatibility
+- Upload proxy trust verification in tests:
+  - production requests fail closed without `UPLOAD_INTERNAL_PROXY_SECRET`
+  - production requests require matching `x-upload-proxy-secret`
 - Fingerprint hardening verification in tests:
   - `hashIp` throws when no fingerprint salt env is configured
 - Avatar origin restriction verification in tests:
@@ -222,13 +215,11 @@ Resolved findings tracked in this report: **6**
 
 ### Priority Remediation Order
 
-1. **MEDIUM** — Tighten CSP (remove `'unsafe-inline'`/`'unsafe-eval'`, adopt nonces)
-2. **LOW** — Harden and continuously verify proxy IP-header trust guarantees
-3. **INFO** — Add explicit startup validation for `NEXTAUTH_SECRET`
-4. **INFO** — Move admin auth rate limits to shared storage when scaling beyond single-instance VPS
+1. **INFO** — Add explicit startup validation for `NEXTAUTH_SECRET`
+2. **INFO** — Move admin auth rate limits to shared storage when scaling beyond single-instance VPS
 
 ---
 
 ### Deployment-Adjusted Conclusion
 
-Given the stated Cloudflare + VPS firewall + Nginx header-sanitization architecture, no **Critical** or **High** findings remain at this time. Open items are now limited to one **Medium** CSP hardening item and one **Low** conditional proxy-trust item. Residual risk is primarily configuration drift risk: if firewall/proxy trust guarantees weaken, the conditional IP-header finding should be reclassified back to **HIGH** immediately.
+Given the stated Cloudflare + VPS firewall + Nginx header-sanitization architecture, no **Critical**, **High**, **Medium**, or **Low** findings remain open at this time. Remaining work is now informational hardening and scale-readiness. Residual risk is still dominated by configuration drift, so proxy header and secret-injection controls should remain release-gated checks.

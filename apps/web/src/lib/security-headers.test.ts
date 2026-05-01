@@ -22,7 +22,8 @@ test('development CSP keeps unsafe-eval for tooling compatibility', () => {
 
 test('production CSP removes unsafe-eval', () => {
   assert.equal(CONTENT_SECURITY_POLICY_PRODUCTION.includes("'unsafe-eval'"), false);
-  assert.equal(CONTENT_SECURITY_POLICY_PRODUCTION.includes("script-src 'self' 'unsafe-inline'"), true);
+  assert.equal(CONTENT_SECURITY_POLICY_PRODUCTION.includes("script-src 'self' 'unsafe-inline'"), false);
+  assert.equal(CONTENT_SECURITY_POLICY_PRODUCTION.includes("script-src 'self'"), true);
 });
 
 test('base security headers are present in non-production mode', () => {

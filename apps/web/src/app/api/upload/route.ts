@@ -8,10 +8,10 @@ import {
 import { checkRateLimit } from '@/lib/ratelimit';
 import bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
-import { isIP } from 'node:net';
 import { computeStreaks } from '@/lib/streak';
 import { aggregateCanonical, writeCanonical } from '@/lib/agent-ingest';
 import { detectPayloadVersion, translateV1ToV2 } from '@/lib/upload-translate';
+import { getUploadClientIp, isTrustedUploadProxyRequest } from '@/lib/upload-security';
 
 interface RejectedUploadLogInput {
   userId: string;
@@ -21,14 +21,6 @@ interface RejectedUploadLogInput {
   bucketCount?: number;
   earliestDate?: Date | null;
   latestDate?: Date | null;
-}
-
-function getClientIp(request: NextRequest): string {
-  // Trust only the reverse-proxy-normalized IP header.
-  const realIp = (request.headers.get('x-real-ip') || '').trim();
-  if (realIp && isIP(realIp)) return realIp;
-
-  return 'unknown';
 }
 
 async function logRejectedUpload({
@@ -63,6 +55,10 @@ async function logRejectedUpload({
  * Authenticated upload endpoint. Validates payload, upserts UsageDaily + UserStat + RepoStat.
  */
 export async function POST(request: NextRequest) {
+  if (!isTrustedUploadProxyRequest(request.headers)) {
+    return NextResponse.json({ error: 'Upload request is not from a trusted proxy.' }, { status: 403 });
+  }
+
   // --- Authenticate via split device token ---
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -101,7 +97,7 @@ export async function POST(request: NextRequest) {
 
   const userId = device.userId;
   const deviceId = device.id;
-  const ipHash = createHash('sha256').update(getClientIp(request)).digest('hex');
+  const ipHash = createHash('sha256').update(getUploadClientIp(request.headers)).digest('hex');
 
   // --- Rate limit ---
   const rateCheck = await checkRateLimit({ deviceId, userId, ipHash });
