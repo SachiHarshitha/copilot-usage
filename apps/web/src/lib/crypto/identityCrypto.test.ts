@@ -61,7 +61,7 @@ test('loadIdentityKeyRingFromEnv: parses keys, active version, pepper', () => {
     IDENTITY_ENCRYPTION_KEYS: JSON.stringify({ '1': KEY_B64_1, '2': KEY_B64_2 }),
     IDENTITY_ENCRYPTION_ACTIVE_KEY: '2',
     IDENTITY_HMAC_PEPPER: PEPPER_B64,
-  } as NodeJS.ProcessEnv);
+  } as unknown as NodeJS.ProcessEnv);
   assert.equal(r.activeVersion, 2);
   assert.equal(r.keys.size, 2);
   assert.equal(r.pepper.length, 32);
@@ -74,7 +74,7 @@ test('loadIdentityKeyRingFromEnv: rejects non-integer version labels', () => {
         IDENTITY_ENCRYPTION_KEYS: JSON.stringify({ v1: KEY_B64_1 }),
         IDENTITY_ENCRYPTION_ACTIVE_KEY: 'v1',
         IDENTITY_HMAC_PEPPER: PEPPER_B64,
-      } as NodeJS.ProcessEnv),
+      } as unknown as NodeJS.ProcessEnv),
     /positive integer/i,
   );
 });
@@ -86,7 +86,7 @@ test('loadIdentityKeyRingFromEnv: rejects active version not in ring', () => {
         IDENTITY_ENCRYPTION_KEYS: JSON.stringify({ '1': KEY_B64_1 }),
         IDENTITY_ENCRYPTION_ACTIVE_KEY: '7',
         IDENTITY_HMAC_PEPPER: PEPPER_B64,
-      } as NodeJS.ProcessEnv),
+      } as unknown as NodeJS.ProcessEnv),
     /not present/i,
   );
 });
@@ -98,7 +98,7 @@ test('loadIdentityKeyRingFromEnv: rejects wrong pepper length', () => {
         IDENTITY_ENCRYPTION_KEYS: JSON.stringify({ '1': KEY_B64_1 }),
         IDENTITY_ENCRYPTION_ACTIVE_KEY: '1',
         IDENTITY_HMAC_PEPPER: Buffer.alloc(16).toString('base64'),
-      } as NodeJS.ProcessEnv),
+      } as unknown as NodeJS.ProcessEnv),
     /32 bytes/i,
   );
 });
@@ -110,7 +110,7 @@ test('loadIdentityKeyRingFromEnv: rejects wrong key length', () => {
         IDENTITY_ENCRYPTION_KEYS: JSON.stringify({ '1': Buffer.alloc(16).toString('base64') }),
         IDENTITY_ENCRYPTION_ACTIVE_KEY: '1',
         IDENTITY_HMAC_PEPPER: PEPPER_B64,
-      } as NodeJS.ProcessEnv),
+      } as unknown as NodeJS.ProcessEnv),
     /32 bytes/i,
   );
 });

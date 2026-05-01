@@ -8,6 +8,11 @@ import {
   shouldAutoCreateDevTestAccount,
   shouldEnableDevLogin,
 } from './auth-policy';
+import {
+  ensurePrivacySettings,
+  ensureUserIdentity,
+  findUserByGithubId,
+} from './identity/identitySync';
 
 const enableDevLogin = shouldEnableDevLogin(process.env);
 const devTestAccount = getDevTestAccountConfig(process.env);
@@ -102,7 +107,7 @@ export const authOptions: NextAuthOptions = {
         return false;
       }
 
-      await prisma.user.upsert({
+      const upserted = await prisma.user.upsert({
         where: { githubId: ghProfile.id },
         update: {
           username: ghProfile.login,
@@ -117,13 +122,28 @@ export const authOptions: NextAuthOptions = {
         },
       });
 
+      // Phase 1c: opportunistically create the encrypted identity row + a
+      // privacy-first PrivacySettings row. Both are no-ops on subsequent
+      // logins. Identity-row creation is gated on env; privacy-row creation
+      // is unconditional so the new schema gets populated even before keys
+      // are deployed.
+      try {
+        await ensureUserIdentity(prisma, upserted);
+        await ensurePrivacySettings(prisma, upserted.id);
+      } catch (err) {
+        // Sign-in must not break if the identity bridge fails. Surface to
+        // server logs but allow the user through (the legacy column still
+        // works for lookup).
+        console.error('[auth] identity bridge sync failed', { userId: upserted.id, err });
+      }
+
       return true;
     },
     async session({ session, token }) {
       if (token.sub) {
-        const dbUser = await prisma.user.findFirst({
-          where: { githubId: parseInt(token.sub, 10) },
-        });
+        // Dual-read: prefer the encrypted-identity HMAC lookup, fall back to
+        // the legacy githubId column for users not yet backfilled.
+        const dbUser = await findUserByGithubId(prisma, parseInt(token.sub, 10));
         if (dbUser) {
           const sessionWithUser = session as typeof session & {
             userId?: string;
