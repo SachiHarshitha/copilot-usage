@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+import { revalidateTag } from 'next/cache';
 
 import { prisma as defaultPrisma } from '@/lib/db';
 import { adminAuthErrorToResponse, requireAdmin } from '@/lib/admin/requireAdmin';
 import { withAuditedAction } from '@/lib/admin/auth/audit';
+import { tagsForUserChange } from '@/lib/cache/tags';
 import { mailService as defaultMailService, type MailService } from '@/lib/mail/mailService';
 
 const DEFAULT_LIMIT = 25;
@@ -29,6 +31,31 @@ export interface UserListResponse {
 interface HandlerDeps {
   prisma?: PrismaClient;
   mail?: MailService;
+  /**
+   * Override for tests. Default delegates to `next/cache#revalidateTag`,
+   * which throws outside a Next.js request context.
+   */
+  revalidate?: (tag: string) => void;
+}
+
+/**
+ * Phase 2.2: invalidate every cache tag that depends on a user's
+ * lifecycle/visibility state. Safe to call from suspend/restore/delete
+ * handlers; failures are swallowed so they cannot mask the underlying
+ * mutation. The next TTL refresh will catch up.
+ */
+function invalidateUserCacheTags(
+  userId: string,
+  username: string,
+  revalidate: (tag: string) => void,
+): void {
+  for (const tag of tagsForUserChange(userId, username)) {
+    try {
+      revalidate(tag);
+    } catch {
+      // best-effort; never let cache invalidation block the audited mutation.
+    }
+  }
 }
 
 /**
@@ -293,6 +320,8 @@ export async function suspendUserHandler(
     },
   });
 
+  invalidateUserCacheTags(target.id, target.username, deps.revalidate ?? revalidateTag);
+
   return NextResponse.json({ ok: true });
 }
 
@@ -323,7 +352,7 @@ export async function restoreUserHandler(
 
   const target = await prisma.user.findUnique({
     where: { id: params.id },
-    select: { id: true, status: true, deletedAt: true },
+    select: { id: true, status: true, deletedAt: true, username: true },
   });
   if (!target) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   if (target.deletedAt) {
@@ -348,6 +377,8 @@ export async function restoreUserHandler(
       });
     },
   });
+
+  invalidateUserCacheTags(target.id, target.username, deps.revalidate ?? revalidateTag);
 
   return NextResponse.json({ ok: true });
 }
@@ -420,6 +451,8 @@ export async function deleteUserHandler(
       ]);
     },
   });
+
+  invalidateUserCacheTags(target.id, target.username, deps.revalidate ?? revalidateTag);
 
   return NextResponse.json({ ok: true });
 }
