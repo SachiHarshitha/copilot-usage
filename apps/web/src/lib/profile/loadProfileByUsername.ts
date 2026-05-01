@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 
 import { prisma as defaultPrisma } from '@/lib/db';
-import { isUserPubliclyVisible } from '@/lib/policy/userLifecycle';
+import { isUserVisibleForFeature } from '@/lib/policy/userLifecycle';
 
 /**
  * Shape returned by GET /api/profile/[username] on success. Locked in by
@@ -57,6 +57,7 @@ export async function loadProfileByUsername(
     where: { username },
     include: {
       userStat: true,
+      privacySettings: true,
       repoStats: {
         where: { isPublic: true },
         orderBy: { totalTokens: 'desc' },
@@ -65,7 +66,7 @@ export async function loadProfileByUsername(
     },
   });
 
-  if (!user || !isUserPubliclyVisible(user)) {
+  if (!user || !isUserVisibleForFeature(user, 'profile')) {
     return null;
   }
 

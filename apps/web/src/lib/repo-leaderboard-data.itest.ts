@@ -26,6 +26,7 @@ test('getRepoLeaderboardEntries hides private repos and repos owned by hidden us
         profilePublic: true,
         status: 'ACTIVE',
         avatarUrl: 'https://avatars/owner',
+        privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
         repoStats: {
           create: [
             {
@@ -143,6 +144,7 @@ test('getRepoLeaderboardEntries entry shape is the documented contract', async (
         username: 'rl-shape',
         profilePublic: true,
         status: 'ACTIVE',
+        privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
         repoStats: {
           create: {
             repoIdentity: 'rl/shape',

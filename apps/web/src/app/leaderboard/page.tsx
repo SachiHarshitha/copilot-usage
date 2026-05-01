@@ -2,6 +2,10 @@ import { prisma } from '@/lib/db';
 import Link from 'next/link';
 import Image from 'next/image';
 import { getAllowedAvatarUrl } from '@/lib/profile-menu';
+import {
+  userVisibleForFeatureSql,
+  userVisibleForFeatureWhere,
+} from '@/lib/policy/userLifecycle';
 
 interface SearchParams {
   sort?: string;
@@ -37,7 +41,7 @@ export default async function LeaderboardPage({
     // All-time: read from UserStat (fast indexed)
     const stats = await prisma.userStat.findMany({
       where: {
-        user: { profilePublic: true },
+        user: userVisibleForFeatureWhere('leaderboard'),
       },
       include: { user: true },
       orderBy: sort === 'premium' ? { premiumRequests: 'desc' } : { totalTokens: 'desc' },
@@ -76,7 +80,7 @@ export default async function LeaderboardPage({
              SUM(ud."totalRequests")::int AS "totalRequests"
       FROM "UsageDaily" ud
       JOIN "User" u ON u.id = ud."userId"
-      WHERE u."profilePublic" = true
+      WHERE ${userVisibleForFeatureSql('u', 'leaderboard')}
         AND ud.date >= ${sinceDate}
       GROUP BY ud."userId"
       ORDER BY ${sort === 'premium' ? `"premiumRequests"` : `"totalTokens"`} DESC

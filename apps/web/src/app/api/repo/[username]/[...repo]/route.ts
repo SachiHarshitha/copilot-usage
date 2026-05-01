@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { isUserPubliclyVisible } from '@/lib/policy/userLifecycle';
+import { isUserVisibleForFeature } from '@/lib/policy/userLifecycle';
 
 /**
  * GET /api/repo/[username]/[...repo] — Public repo stats.
@@ -15,8 +15,11 @@ export async function GET(
   const { username, repo } = await params;
   const repoSlug = repo.join('/');
 
-  const user = await prisma.user.findUnique({ where: { username } });
-  if (!user || !isUserPubliclyVisible(user)) {
+  const user = await prisma.user.findUnique({
+    where: { username },
+    include: { privacySettings: true },
+  });
+  if (!user || !isUserVisibleForFeature(user, 'profile')) {
     return NextResponse.json({ error: 'User not found.' }, { status: 404 });
   }
 

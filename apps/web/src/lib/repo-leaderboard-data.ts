@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { prisma as defaultPrisma } from './db';
-import { userPubliclyVisibleSql } from './policy/userLifecycle';
+import { userVisibleForFeatureSql } from './policy/userLifecycle';
 import { REPO_LEADERBOARD_PAGE_SIZE, type RepoLeaderboardSort } from './repo-leaderboard';
 
 export interface RepoLeaderboardEntry {
@@ -70,7 +70,7 @@ export async function getRepoLeaderboardEntries(
         JOIN "User" u ON u.id = rs."userId"
         WHERE rs."isPublic" = true
           AND rs."githubRepo" IS NOT NULL
-          AND ${userPubliclyVisibleSql('u')}
+          AND ${userVisibleForFeatureSql('u', 'leaderboard')}
       ),
       repo_totals AS (
         SELECT

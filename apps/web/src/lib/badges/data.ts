@@ -7,9 +7,9 @@ import {
   userBadgesByUsernameTag,
 } from '@/lib/cache/tags';
 import {
-  isUserPubliclyVisible,
-  userPubliclyVisibleSql,
-  userPubliclyVisibleWhere,
+  isUserVisibleForFeature,
+  userVisibleForFeatureSql,
+  userVisibleForFeatureWhere,
 } from '@/lib/policy/userLifecycle';
 import type { PublicRepoBadgeSummary, PublicUserBadgeSummary } from './types';
 
@@ -46,6 +46,7 @@ const getPublicUserBadgeSummaryCached = unstable_cache(
       where: { username },
       include: {
         userStat: true,
+        privacySettings: true,
         repoStats: {
           where: { isPublic: true },
           orderBy: { totalTokens: 'desc' },
@@ -61,7 +62,7 @@ const getPublicUserBadgeSummaryCached = unstable_cache(
       },
     });
 
-    if (!user || !isUserPubliclyVisible(user) || !user.userStat) {
+    if (!user || !isUserVisibleForFeature(user, 'badges') || !user.userStat) {
       return null;
     }
 
@@ -88,7 +89,7 @@ const getPublicRepoBadgeSummaryCached = unstable_cache(
     const where = {
       isPublic: true,
       githubRepo: repoSlug,
-      user: userPubliclyVisibleWhere(),
+      user: userVisibleForFeatureWhere('badges'),
     };
 
     const aggregate = await prisma.repoStat.aggregate({
@@ -116,7 +117,7 @@ const getPublicRepoBadgeSummaryCached = unstable_cache(
         JOIN "User" u ON u.id = rs."userId"
         WHERE rs."isPublic" = true
           AND rs."githubRepo" IS NOT NULL
-          AND ${userPubliclyVisibleSql('u')}
+          AND ${userVisibleForFeatureSql('u', 'badges')}
         GROUP BY rs."githubRepo"
       ),
       ranked AS (

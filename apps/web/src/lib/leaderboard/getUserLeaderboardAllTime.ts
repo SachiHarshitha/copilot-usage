@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 
 import { prisma as defaultPrisma } from '@/lib/db';
-import { userPubliclyVisibleWhere } from '@/lib/policy/userLifecycle';
+import { userVisibleForFeatureWhere } from '@/lib/policy/userLifecycle';
 
 export const USER_LEADERBOARD_PAGE_SIZE = 25;
 
@@ -41,7 +41,7 @@ export async function getUserLeaderboardAllTime(
   const page = Math.max(1, options.page);
 
   const stats = await prisma.userStat.findMany({
-    where: { user: userPubliclyVisibleWhere() },
+    where: { user: userVisibleForFeatureWhere('leaderboard') },
     include: { user: { select: { username: true, avatarUrl: true } } },
     orderBy: sort === 'premium' ? { premiumRequests: 'desc' } : { totalTokens: 'desc' },
     take: USER_LEADERBOARD_PAGE_SIZE,

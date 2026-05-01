@@ -26,6 +26,7 @@ test('getUserLeaderboardAllTime returns only ACTIVE + non-deleted + profilePubli
         status: 'ACTIVE',
         avatarUrl: 'https://avatars/1',
         userStat: { create: { totalTokens: 1000n, premiumRequests: 10 } },
+        privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
       },
     });
     // Public user with smaller totals — must appear after the first.
@@ -36,6 +37,7 @@ test('getUserLeaderboardAllTime returns only ACTIVE + non-deleted + profilePubli
         profilePublic: true,
         status: 'ACTIVE',
         userStat: { create: { totalTokens: 500n, premiumRequests: 50 } },
+        privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
       },
     });
     // Private profile — MUST be hidden.
@@ -100,6 +102,7 @@ test('getUserLeaderboardAllTime entry shape is the documented contract', async (
             workspaceCount: 5,
           },
         },
+        privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
       },
     });
 
@@ -134,6 +137,7 @@ test('getUserLeaderboardAllTime sort=premium orders by premiumRequests desc', as
         profilePublic: true,
         status: 'ACTIVE',
         userStat: { create: { totalTokens: 100n, premiumRequests: 1 } },
+        privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
       },
     });
     await prisma.user.create({
@@ -143,6 +147,7 @@ test('getUserLeaderboardAllTime sort=premium orders by premiumRequests desc', as
         profilePublic: true,
         status: 'ACTIVE',
         userStat: { create: { totalTokens: 1n, premiumRequests: 99 } },
+        privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
       },
     });
 

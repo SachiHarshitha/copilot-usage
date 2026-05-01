@@ -127,9 +127,12 @@ export async function updatePrivacySettings(
   });
 
   // Bridge invariant (Phase 2 → 2.1):
-  // While public-surface readers still consult the legacy `User.profilePublic`
-  // column, mirror any profile-visibility change here so both columns agree.
-  // Phase 2.1 will switch readers over and this mirror can be removed.
+  // Public-surface readers now consult `PrivacySettings.profilePublic` via
+  // `userVisibleForFeatureWhere/Sql('profile')` (with a fallback to legacy
+  // `User.profilePublic` only when no PS row exists). The legacy column is
+  // still written by `/api/settings/profile` PATCH and read by admin paths,
+  // so we keep the mirror here to prevent divergence until that route is
+  // retired or migrated to delegate through this writer.
   if (typeof diff.profilePublic === 'boolean') {
     await prisma.user.update({
       where: { id: userId },

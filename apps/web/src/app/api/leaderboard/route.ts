@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import {
-  userPubliclyVisibleSql,
+  userVisibleForFeatureSql,
 } from '@/lib/policy/userLifecycle';
 import {
   USER_LEADERBOARD_PAGE_SIZE,
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
            SUM(ud."totalRequests")::int AS "totalRequests"
     FROM "UsageDaily" ud
     JOIN "User" u ON u.id = ud."userId"
-    WHERE ${userPubliclyVisibleSql('u')}
+    WHERE ${userVisibleForFeatureSql('u', 'leaderboard')}
       AND ud.date >= ${sinceDate}
     GROUP BY ud."userId"
     ORDER BY ${orderBy}
