@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 
 import { prisma } from './db';
+import { userPubliclyVisibleSql } from './policy/userLifecycle';
 import { IDE_LEADERBOARD_PAGE_SIZE, type IdeLeaderboardSort } from './ide-leaderboard';
 
 export interface IdeLeaderboardEntry {
@@ -54,7 +55,7 @@ export async function getIdeLeaderboardEntries(options: {
         COUNT(DISTINCT mud."userId")::int AS user_count
       FROM "ModelUsageDaily" mud
       JOIN "User" u ON u.id = mud."userId"
-      WHERE u."profilePublic" = true
+      WHERE ${userPubliclyVisibleSql('u')}
       GROUP BY mud.surface
       ORDER BY ${orderBy}
       LIMIT ${IDE_LEADERBOARD_PAGE_SIZE}

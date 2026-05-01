@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import {
   AgentSnapshotSchema,
   SnapshotPayloadSchema,
+  findForbiddenFields,
   type AgentSnapshot,
 } from '@copilot-usage/shared-schema';
 import { checkRateLimit } from '@/lib/ratelimit';
@@ -134,6 +135,29 @@ export async function POST(request: NextRequest) {
   }
 
   const payloadBytes = rawPayload.length;
+
+  // --- Forbidden-content denylist ---
+  // Reject payloads that contain raw user content (prompts, completions,
+  // code, terminal output, secrets, diffs, chat transcripts, etc.) at any
+  // depth. We log only field *names*, never values, so the audit trail
+  // never echoes private data. See acceptance criteria §1.
+  const forbidden = findForbiddenFields(body);
+  if (forbidden.length > 0) {
+    await logRejectedUpload({
+      userId,
+      deviceId,
+      ipHash,
+      payloadBytes,
+    });
+    return NextResponse.json(
+      {
+        error: 'Forbidden content fields rejected.',
+        reason: 'forbidden_field',
+        fields: forbidden,
+      },
+      { status: 400 }
+    );
+  }
 
   // Dispatch on payload contract version. Both legacy (v1) and canonical
   // (v2) snapshots are accepted during the migration window.

@@ -1,5 +1,16 @@
 import { unstable_cache } from 'next/cache';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import {
+  leaderboardTag,
+  repoSlugTag,
+  userBadgesByUsernameTag,
+} from '@/lib/cache/tags';
+import {
+  isUserPubliclyVisible,
+  userPubliclyVisibleSql,
+  userPubliclyVisibleWhere,
+} from '@/lib/policy/userLifecycle';
 import type { PublicRepoBadgeSummary, PublicUserBadgeSummary } from './types';
 
 export function computeRankPercentile(
@@ -50,7 +61,7 @@ const getPublicUserBadgeSummaryCached = unstable_cache(
       },
     });
 
-    if (!user || !user.profilePublic || !user.userStat) {
+    if (!user || !isUserPubliclyVisible(user) || !user.userStat) {
       return null;
     }
 
@@ -69,7 +80,7 @@ const getPublicUserBadgeSummaryCached = unstable_cache(
     };
   },
   ['public-user-badge-summary-v1'],
-  { revalidate: 300 }
+  { revalidate: 300, tags: ['public-user-badge-summary'] }
 );
 
 const getPublicRepoBadgeSummaryCached = unstable_cache(
@@ -77,7 +88,7 @@ const getPublicRepoBadgeSummaryCached = unstable_cache(
     const where = {
       isPublic: true,
       githubRepo: repoSlug,
-      user: { profilePublic: true },
+      user: userPubliclyVisibleWhere(),
     };
 
     const aggregate = await prisma.repoStat.aggregate({
@@ -97,14 +108,15 @@ const getPublicRepoBadgeSummaryCached = unstable_cache(
       return null;
     }
 
-    const rankRows = await prisma.$queryRaw<{ repo_rank: number | bigint; repo_count: number | bigint }[]>`
+    const rankRows = await prisma.$queryRaw<{ repo_rank: number | bigint; repo_count: number | bigint }[]>(
+      Prisma.sql`
       WITH repo_totals AS (
         SELECT rs."githubRepo" AS "githubRepo", SUM(rs."totalTokens")::bigint AS total_tokens
         FROM "RepoStat" rs
         JOIN "User" u ON u.id = rs."userId"
         WHERE rs."isPublic" = true
           AND rs."githubRepo" IS NOT NULL
-          AND u."profilePublic" = true
+          AND ${userPubliclyVisibleSql('u')}
         GROUP BY rs."githubRepo"
       ),
       ranked AS (
@@ -118,7 +130,8 @@ const getPublicRepoBadgeSummaryCached = unstable_cache(
       FROM ranked
       WHERE "githubRepo" = ${repoSlug}
       LIMIT 1
-    `;
+    `
+    );
 
     const rank = rankRows[0]?.repo_rank ?? null;
     const repoCount = rankRows[0]?.repo_count ?? null;
@@ -148,20 +161,31 @@ const getPublicRepoBadgeSummaryCached = unstable_cache(
       tokens30d: aggregate._sum.tokens30d || aggregate._sum.totalTokens || BigInt(0),
       requests: aggregate._sum.requests || 0,
       premiumRequests: aggregate._sum.premiumReqs || 0,
-      rank,
+      rank: rank === null ? null : Number(rank),
       percentile,
       models,
       primaryModel: primaryModelRow?.topModel || null,
     };
   },
   ['public-repo-badge-summary-v1'],
-  { revalidate: 300 }
+  { revalidate: 300, tags: ['public-repo-badge-summary'] }
 );
 
 export async function getPublicUserBadgeSummary(username: string): Promise<PublicUserBadgeSummary | null> {
-  return getPublicUserBadgeSummaryCached(username);
+  // Per-username tag lets `revalidateTag(userBadgesByUsernameTag(username))`
+  // surgically invalidate just this user's badge cache on privacy/lifecycle change.
+  return unstable_cache(
+    () => getPublicUserBadgeSummaryCached(username),
+    ['public-user-badge-summary-by-username-v1', username],
+    { revalidate: 300, tags: [userBadgesByUsernameTag(username), leaderboardTag()] }
+  )();
 }
 
 export async function getPublicRepoBadgeSummary(owner: string, repo: string): Promise<PublicRepoBadgeSummary | null> {
-  return getPublicRepoBadgeSummaryCached(`${owner}/${repo}`);
+  const slug = `${owner}/${repo}`;
+  return unstable_cache(
+    () => getPublicRepoBadgeSummaryCached(slug),
+    ['public-repo-badge-summary-by-slug-v1', slug],
+    { revalidate: 300, tags: [repoSlugTag(slug), leaderboardTag()] }
+  )();
 }

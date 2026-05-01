@@ -49,7 +49,7 @@ export default async function AdminVerificationDetailPage({
 
   if (!row) notFound();
 
-  const canOverride = admin.role === 'ADMIN' || admin.role === 'SUPER_ADMIN';
+  const canOverride = admin.role === 'ADMIN';
 
   return (
     <section>

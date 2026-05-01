@@ -221,8 +221,8 @@ export async function createBadgeOverrideHandler(
     reason: body.reason.trim().slice(0, REASON_MAX),
     expiresAt,
   });
-  if (result.error === 'not_found') {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 404 });
   }
   return NextResponse.json({ ok: true, override: result.override }, { status: 201 });
 }

@@ -3,7 +3,9 @@ import test from 'node:test';
 
 import {
   AgentSnapshotSchema,
+  FORBIDDEN_CONTENT_FIELDS,
   SnapshotPayloadSchema,
+  findForbiddenFields,
   type AgentSnapshot,
   type SnapshotPayload,
 } from '@copilot-usage/shared-schema';
@@ -125,4 +127,118 @@ test('v2 schemaVersion must be literal 2', () => {
     schemaVersion: 1,
   });
   assert.equal(parsed.success, false);
+});
+
+// --- Phase Q.3 strictness + denylist ---
+
+test('v1 strict schema rejects unknown top-level field', () => {
+  const parsed = SnapshotPayloadSchema.safeParse({
+    ...validV1Payload,
+    smuggled: 'extra',
+  });
+  assert.equal(parsed.success, false);
+});
+
+test('v1 strict schema rejects unknown nested field on a repo entry', () => {
+  const parsed = SnapshotPayloadSchema.safeParse({
+    ...validV1Payload,
+    repos: [
+      {
+        workspaceKey: '0123456789abcdef0123456789abcdef',
+        displayMode: 'github',
+        githubRepo: 'foo/bar',
+        aliasLabel: null,
+        requests: 1,
+        promptTokens: 1,
+        outputTokens: 1,
+        premiumRequests: 0,
+        topModel: 'm',
+        sourceCode: 'console.log("leak")',
+      },
+    ],
+  });
+  assert.equal(parsed.success, false);
+});
+
+test('v1 strict schema rejects unknown nested field on a daily bucket', () => {
+  const parsed = SnapshotPayloadSchema.safeParse({
+    ...validV1Payload,
+    dailyBuckets: [
+      {
+        ...validV1Payload.dailyBuckets[0],
+        prompts: ['leak'],
+      },
+    ],
+  });
+  assert.equal(parsed.success, false);
+});
+
+test('findForbiddenFields returns empty for clean v1 payload', () => {
+  assert.deepEqual(findForbiddenFields(validV1Payload), []);
+});
+
+test('findForbiddenFields detects top-level forbidden field', () => {
+  const result = findForbiddenFields({ prompt: 'hello world' });
+  assert.deepEqual(result, ['prompt']);
+});
+
+test('findForbiddenFields is case-insensitive', () => {
+  const result = findForbiddenFields({ Prompt: 'x', SECRET: 'y' });
+  assert.equal(result.length, 2);
+  assert.ok(result.includes('Prompt'));
+  assert.ok(result.includes('SECRET'));
+});
+
+test('findForbiddenFields detects forbidden field nested in arrays', () => {
+  const result = findForbiddenFields({
+    repos: [
+      { ok: 1 },
+      { ok: 2, terminalOutput: 'cat /etc/passwd' },
+    ],
+  });
+  assert.deepEqual(result, ['repos[1].terminalOutput']);
+});
+
+test('findForbiddenFields detects forbidden field deeply nested', () => {
+  const result = findForbiddenFields({
+    a: { b: { c: { diff: 'patch' } } },
+  });
+  assert.deepEqual(result, ['a.b.c.diff']);
+});
+
+test('findForbiddenFields does not flag legitimate look-alike fields', () => {
+  // promptTokens / messageId / requestCount must NOT be flagged because we
+  // require an exact (case-insensitive) field-name match, not substring.
+  const result = findForbiddenFields({
+    promptTokens: 100,
+    messageId: 'abc',
+    requestCount: 5,
+    tokenizer: 'gpt',
+  });
+  assert.deepEqual(result, []);
+});
+
+test('findForbiddenFields is cycle-safe', () => {
+  const a: Record<string, unknown> = { x: 1 };
+  a.self = a;
+  // Should not throw or hang.
+  assert.deepEqual(findForbiddenFields(a), []);
+});
+
+test('FORBIDDEN_CONTENT_FIELDS includes the core content names from the spec', () => {
+  for (const name of [
+    'prompt',
+    'completion',
+    'code',
+    'terminal',
+    'chat',
+    'message',
+    'secret',
+    'env',
+    'diff',
+    'patch',
+    'transcript',
+  ]) {
+    assert.ok(FORBIDDEN_CONTENT_FIELDS.has(name), `missing ${name}`);
+  }
 });

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { timingSafeEqual } from 'node:crypto';
 
 /**
  * Admin surface guard. Runs on every /admin/** and /api/admin/** request and:
@@ -40,12 +39,24 @@ function applyHardeningHeaders(res: NextResponse): NextResponse {
   return res;
 }
 
-/** Constant-time compare; returns false on length mismatch instead of throwing. */
+/**
+ * Constant-time compare; returns false on length mismatch instead of throwing.
+ *
+ * Implemented without `node:crypto` because Next.js middleware runs on the
+ * Edge runtime, which does not expose Node built-ins. We encode both inputs
+ * as UTF-8 bytes and XOR-accumulate over a fixed-length loop so the timing
+ * does not leak which byte mismatched.
+ */
 function safeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a, 'utf8');
-  const bb = Buffer.from(b, 'utf8');
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
   if (ab.length !== bb.length) return false;
-  return timingSafeEqual(ab, bb);
+  let diff = 0;
+  for (let i = 0; i < ab.length; i += 1) {
+    diff |= ab[i] ^ bb[i];
+  }
+  return diff === 0;
 }
 
 export function middleware(req: NextRequest): NextResponse {

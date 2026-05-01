@@ -10,7 +10,6 @@ const ROLE_RANK: Record<AdminRole, number> = {
   READ_ONLY: 0,
   MODERATOR: 1,
   ADMIN: 2,
-  SUPER_ADMIN: 3,
 };
 
 export class AdminAuthRequiredError extends Error {

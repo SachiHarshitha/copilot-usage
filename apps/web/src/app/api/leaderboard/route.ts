@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import {
+  userPubliclyVisibleSql,
+  userPubliclyVisibleWhere,
+} from '@/lib/policy/userLifecycle';
 
 const PAGE_SIZE = 25;
 
@@ -14,7 +19,7 @@ export async function GET(request: NextRequest) {
   if (!since) {
     // All-time from UserStat
     const stats = await prisma.userStat.findMany({
-      where: { user: { profilePublic: true } },
+      where: { user: userPubliclyVisibleWhere() },
       include: { user: { select: { username: true, avatarUrl: true } } },
       orderBy: sort === 'premium' ? { premiumRequests: 'desc' } : { totalTokens: 'desc' },
       take: PAGE_SIZE,
@@ -44,22 +49,26 @@ export async function GET(request: NextRequest) {
   const sinceDate = new Date();
   sinceDate.setDate(sinceDate.getDate() - days);
 
+  const orderBy =
+    sort === 'premium'
+      ? Prisma.raw('"premiumRequests" DESC')
+      : Prisma.raw('"totalTokens" DESC');
   const rows = await prisma.$queryRaw<
     { userId: string; totalTokens: bigint; premiumRequests: number; totalRequests: number }[]
-  >`
+  >(Prisma.sql`
     SELECT ud."userId",
            SUM(ud."totalTokens")::bigint AS "totalTokens",
            SUM(ud."premiumRequests")::float AS "premiumRequests",
            SUM(ud."totalRequests")::int AS "totalRequests"
     FROM "UsageDaily" ud
     JOIN "User" u ON u.id = ud."userId"
-    WHERE u."profilePublic" = true
+    WHERE ${userPubliclyVisibleSql('u')}
       AND ud.date >= ${sinceDate}
     GROUP BY ud."userId"
-    ORDER BY ${sort === 'premium' ? `"premiumRequests"` : `"totalTokens"`} DESC
+    ORDER BY ${orderBy}
     LIMIT ${PAGE_SIZE}
     OFFSET ${(page - 1) * PAGE_SIZE}
-  `;
+  `);
 
   const userIds = rows.map((r) => r.userId);
   const users = await prisma.user.findMany({

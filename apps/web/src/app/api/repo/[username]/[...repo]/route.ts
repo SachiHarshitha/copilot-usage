@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { isUserPubliclyVisible } from '@/lib/policy/userLifecycle';
 
 /**
  * GET /api/repo/[username]/[...repo] — Public repo stats.
+ *
+ * Lifecycle gating: deleted/suspended users are hidden regardless of
+ * `profilePublic`. See `lib/policy/userLifecycle.ts`.
  */
 export async function GET(
   _request: Request,
@@ -12,7 +16,7 @@ export async function GET(
   const repoSlug = repo.join('/');
 
   const user = await prisma.user.findUnique({ where: { username } });
-  if (!user || !user.profilePublic) {
+  if (!user || !isUserPubliclyVisible(user)) {
     return NextResponse.json({ error: 'User not found.' }, { status: 404 });
   }
 

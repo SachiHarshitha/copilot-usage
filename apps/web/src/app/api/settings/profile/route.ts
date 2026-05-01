@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
+import { tagsForUserChange } from '@/lib/cache/tags';
 
 /**
  * GET /api/settings/profile — Fetch full user settings.
@@ -69,10 +71,22 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'No valid fields to update.' }, { status: 400 });
   }
 
-  await prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: sessionUser.userId },
     data: update,
+    select: { id: true, username: true },
   });
+
+  // Invalidate every cache fragment that depends on this user's profile or
+  // visibility (profile page, badges, leaderboard). Each tag invalidation
+  // is best-effort — a failure must not break the user write.
+  for (const tag of tagsForUserChange(updated.id, updated.username)) {
+    try {
+      revalidateTag(tag);
+    } catch {
+      // ignore: revalidateTag may throw outside a request context (tests)
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -78,7 +78,11 @@ export function buildAdminRequest(
   if (session) {
     headers.set('cookie', session.cookieHeader);
   }
-  return new NextRequest(url, { ...init, headers });
+  // Strip `signal: null` (allowed by lib.dom RequestInit but not by Next's
+  // narrower RequestInit). Tests never pass an AbortSignal here.
+  const { signal: _signal, ...rest } = init;
+  void _signal;
+  return new NextRequest(url, { ...rest, headers });
 }
 
 export const ADMIN_TEST_COOKIE_NAME = ADMIN_SESSION_COOKIE_NAME;

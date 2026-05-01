@@ -6,6 +6,12 @@ export {
 } from './snapshot';
 export type { SnapshotPayload, RepoEntry, DailyBucket, ModelBreakdown } from './snapshot';
 
+export {
+  FORBIDDEN_CONTENT_FIELDS,
+  findForbiddenFields,
+} from './contentDenylist';
+export type { FindForbiddenOptions } from './contentDenylist';
+
 export type { RepoRefPrefs } from './types';
 
 export {

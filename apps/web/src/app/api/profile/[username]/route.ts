@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { isUserPubliclyVisible } from '@/lib/policy/userLifecycle';
 
 /**
  * GET /api/profile/[username]
  * Returns public profile data for a user.
+ *
+ * Lifecycle gating: deleted (deletedAt set) and suspended users return 404
+ * regardless of `profilePublic`. See `lib/policy/userLifecycle.ts`.
  */
 export async function GET(
   _request: Request,
@@ -23,7 +27,7 @@ export async function GET(
     },
   });
 
-  if (!user || !user.profilePublic) {
+  if (!user || !isUserPubliclyVisible(user)) {
     return NextResponse.json({ error: 'User not found or profile is private.' }, { status: 404 });
   }
 

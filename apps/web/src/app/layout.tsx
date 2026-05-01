@@ -32,8 +32,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </nav>
         <main className="max-w-5xl mx-auto px-6 py-8">{children}</main>
-        <footer className="border-t border-[#30363d] px-6 py-4 text-center text-xs text-[#484f58]">
-          Stats are self-reported estimates from local VS Code session data. Not affiliated with GitHub or Microsoft.
+        <footer className="border-t border-[#30363d] px-6 py-4 text-center text-xs text-[#484f58] space-y-2">
+          <div>
+            Stats are self-reported estimates from local VS Code session data. Not affiliated with GitHub or Microsoft.
+          </div>
+          <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+            <Link href="/impressum">Impressum</Link>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
+            <Link href="/contact">Contact</Link>
+            <Link href="/report-abuse">Report abuse</Link>
+          </nav>
         </footer>
       </body>
     </html>

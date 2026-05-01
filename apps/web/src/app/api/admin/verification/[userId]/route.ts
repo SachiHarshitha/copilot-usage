@@ -1,4 +1,10 @@
+import type { NextRequest } from 'next/server';
+
 import { verificationDetailHandler } from '@/lib/admin/verification';
 
-export const GET = verificationDetailHandler;
+// Thin wrapper: see /api/admin/action-log/route.ts for rationale.
+export async function GET(req: NextRequest, ctx: { params: Promise<{ userId: string }> }) {
+  return verificationDetailHandler(req, ctx);
+}
+
 export const dynamic = 'force-dynamic';
