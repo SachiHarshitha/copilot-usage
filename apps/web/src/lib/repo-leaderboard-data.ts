@@ -1,6 +1,6 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 
-import { prisma } from './db';
+import { prisma as defaultPrisma } from './db';
 import { userPubliclyVisibleSql } from './policy/userLifecycle';
 import { REPO_LEADERBOARD_PAGE_SIZE, type RepoLeaderboardSort } from './repo-leaderboard';
 
@@ -46,10 +46,13 @@ function orderByClause(sort: RepoLeaderboardSort): Prisma.Sql {
   return assertUnreachable(sort);
 }
 
-export async function getRepoLeaderboardEntries(options: {
-  sort: RepoLeaderboardSort;
-  page: number;
-}): Promise<RepoLeaderboardEntry[]> {
+export async function getRepoLeaderboardEntries(
+  options: {
+    sort: RepoLeaderboardSort;
+    page: number;
+  },
+  prisma: PrismaClient = defaultPrisma,
+): Promise<RepoLeaderboardEntry[]> {
   const offset = (options.page - 1) * REPO_LEADERBOARD_PAGE_SIZE;
   const orderBy = orderByClause(options.sort);
 

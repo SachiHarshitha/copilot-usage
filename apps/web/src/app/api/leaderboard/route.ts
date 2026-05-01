@@ -3,45 +3,30 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import {
   userPubliclyVisibleSql,
-  userPubliclyVisibleWhere,
 } from '@/lib/policy/userLifecycle';
+import {
+  USER_LEADERBOARD_PAGE_SIZE,
+  getUserLeaderboardAllTime,
+  type UserLeaderboardSort,
+} from '@/lib/leaderboard/getUserLeaderboardAllTime';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = USER_LEADERBOARD_PAGE_SIZE;
 
 /**
  * GET /api/leaderboard?sort=tokens|premium&since=7d|30d&page=1
+ *
+ * The all-time path (no `since`) is characterized by
+ * `lib/leaderboard/getUserLeaderboardAllTime.itest.ts` (Phase 0 baseline).
  */
 export async function GET(request: NextRequest) {
-  const sort = request.nextUrl.searchParams.get('sort') === 'premium' ? 'premium' : 'tokens';
+  const sort: UserLeaderboardSort =
+    request.nextUrl.searchParams.get('sort') === 'premium' ? 'premium' : 'tokens';
   const since = request.nextUrl.searchParams.get('since');
   const page = Math.max(1, parseInt(request.nextUrl.searchParams.get('page') || '1', 10));
 
   if (!since) {
-    // All-time from UserStat
-    const stats = await prisma.userStat.findMany({
-      where: { user: userPubliclyVisibleWhere() },
-      include: { user: { select: { username: true, avatarUrl: true } } },
-      orderBy: sort === 'premium' ? { premiumRequests: 'desc' } : { totalTokens: 'desc' },
-      take: PAGE_SIZE,
-      skip: (page - 1) * PAGE_SIZE,
-    });
-
-    return NextResponse.json({
-      entries: stats.map((s, i) => ({
-        rank: (page - 1) * PAGE_SIZE + i + 1,
-        username: s.user.username,
-        avatarUrl: s.user.avatarUrl,
-        totalTokens: s.totalTokens.toString(),
-        premiumRequests: s.premiumRequests,
-        totalRequests: s.totalRequests,
-        currentStreakDays: s.currentStreakDays,
-        rolling30DayTokens: s.rolling30DayTokens.toString(),
-        topModel: s.topModel,
-        workspaceCount: s.workspaceCount,
-      })),
-      page,
-      pageSize: PAGE_SIZE,
-    });
+    const entries = await getUserLeaderboardAllTime({ sort, page });
+    return NextResponse.json({ entries, page, pageSize: PAGE_SIZE });
   }
 
   // Date-filtered
