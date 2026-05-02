@@ -41,6 +41,9 @@ export class CostEstimatorPanel {
         if (msg.command === 'openGitHub') {
           vscode.env.openExternal(vscode.Uri.parse('https://github.com/SachiHarshitha/copilot-usage'));
         }
+        if (msg.command === 'openSettings') {
+          await vscode.commands.executeCommand('workbench.action.openSettings', 'copilot-usage');
+        }
       },
       null,
       this.disposables,

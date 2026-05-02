@@ -4,7 +4,7 @@
   "publisher": "emagin8",
   "author": "Sachith Liyanagama, liyanagama@outlook.de",
   "description": "A **local-first** analytics dashboard that parses your VS Code Copilot chat session data and visualises token usage, premium request estimates, and model distribution — all without sending any data externally.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.100.0"
@@ -36,7 +36,79 @@
         "title": "Copilot Usage: Cost Estimator (Preview)",
         "icon": "$(tag)"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Copilot Usage",
+      "properties": {
+        "copilot-usage.statusBar.duration": {
+          "type": "string",
+          "enum": ["daily", "monthly", "all-time"],
+          "enumDescriptions": [
+            "Today only — show token counts for the current day",
+            "This month — show token counts for the current calendar month (resets on the 1st)",
+            "All time — show cumulative token counts across all recorded sessions"
+          ],
+          "default": "all-time",
+          "description": "Token duration shown in the status bar."
+        },
+        "copilot-usage.workspaceAnalysis.dateRange": {
+          "type": "string",
+          "enum": ["today", "7d", "30d", "3m", "mtd", "ytd", "all"],
+          "enumDescriptions": [
+            "Today",
+            "Last 7 days",
+            "Last 30 days",
+            "Last 3 months",
+            "This month (MTD)",
+            "This year (YTD)",
+            "All time"
+          ],
+          "default": "30d",
+          "description": "Default date range for the Workspace Analysis panel."
+        },
+        "copilot-usage.workspaceAnalysis.autoRefreshSeconds": {
+          "type": "number",
+          "enum": [0, 30, 60, 120, 300],
+          "enumDescriptions": [
+            "Off",
+            "Every 30 seconds",
+            "Every minute",
+            "Every 2 minutes",
+            "Every 5 minutes"
+          ],
+          "default": 0,
+          "description": "Auto-refresh interval for the Workspace Analysis panel in seconds. Set to 0 to disable."
+        },
+        "copilot-usage.dashboard.dateRange": {
+          "type": "string",
+          "enum": ["today", "7d", "30d", "3m", "mtd", "ytd", "all"],
+          "enumDescriptions": [
+            "Today",
+            "Last 7 days",
+            "Last 30 days",
+            "Last 3 months",
+            "This month (MTD)",
+            "This year (YTD)",
+            "All time"
+          ],
+          "default": "30d",
+          "description": "Default date range for the Global Dashboard panel."
+        },
+        "copilot-usage.dashboard.autoRefreshSeconds": {
+          "type": "number",
+          "enum": [0, 30, 60, 120, 300],
+          "enumDescriptions": [
+            "Off",
+            "Every 30 seconds",
+            "Every minute",
+            "Every 2 minutes",
+            "Every 5 minutes"
+          ],
+          "default": 0,
+          "description": "Auto-refresh interval for the Global Dashboard panel in seconds. Set to 0 to disable."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

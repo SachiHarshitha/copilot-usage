@@ -1,8 +1,11 @@
-/** Status bar item showing workspace token count. */
+/** Status bar item showing workspace token count, split by input/output. */
 
 import * as vscode from 'vscode';
 import { findCurrentWorkspace } from '../core/discovery';
 import { parseAllFiles, flattenEvents } from '../core/aggregator';
+import { RequestEvent } from '../core/types';
+
+type StatusBarDuration = 'daily' | 'monthly' | 'all-time';
 
 export class StatusBarManager implements vscode.Disposable {
   private item: vscode.StatusBarItem;
@@ -11,13 +14,14 @@ export class StatusBarManager implements vscode.Disposable {
   constructor() {
     this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
     this.item.command = 'copilot-usage.workspaceAnalysis';
-    this.item.tooltip = 'Copilot Usage — Click to view workspace analysis';
     this.item.text = '$(copilot) …';
     this.item.show();
 
-    // Refresh when workspace changes
     this.disposables.push(
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()),
+      vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('copilot-usage')) { this.refresh(); }
+      }),
     );
 
     this.refresh();
@@ -27,6 +31,7 @@ export class StatusBarManager implements vscode.Disposable {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
       this.item.text = '$(copilot) No workspace';
+      this.item.tooltip = 'Copilot Usage — No workspace open';
       return;
     }
 
@@ -36,15 +41,32 @@ export class StatusBarManager implements vscode.Disposable {
       const ws = await findCurrentWorkspace(wsFileUri, folderPaths);
       if (!ws) {
         this.item.text = '$(copilot) No data';
+        this.item.tooltip = 'Copilot Usage — No session data found for this workspace';
         return;
       }
 
+      const duration = vscode.workspace.getConfiguration('copilot-usage')
+        .get<StatusBarDuration>('statusBar.duration', 'all-time');
+
       const parsed = await parseAllFiles([ws]);
-      const events = flattenEvents(parsed);
-      const totalTokens = events.reduce((sum, e) => sum + e.promptTokens + e.outputTokens, 0);
-      this.item.text = `$(copilot) ${formatCompact(totalTokens)} tokens`;
+      const allEvents = flattenEvents(parsed);
+      const events = filterByDuration(allEvents, duration);
+
+      const inputTokens = events.reduce((sum, e) => sum + e.promptTokens, 0);
+      const outputTokens = events.reduce((sum, e) => sum + e.outputTokens, 0);
+
+      const durationLabel = duration === 'daily' ? 'today' : duration === 'monthly' ? 'this month' : 'all time';
+      this.item.text = `$(copilot) $(arrow-up)${formatCompact(inputTokens)} $(arrow-down)${formatCompact(outputTokens)}`;
+      this.item.tooltip = new vscode.MarkdownString(
+        `**Copilot Usage** (${durationLabel})\n\n` +
+        `$(arrow-up) Input tokens: ${inputTokens.toLocaleString('en-US')}\n\n` +
+        `$(arrow-down) Output tokens: ${outputTokens.toLocaleString('en-US')}\n\n` +
+        `_Click to open workspace analysis. Change duration in Settings → Copilot Usage._`,
+        true,
+      );
     } catch {
       this.item.text = '$(copilot) Error';
+      this.item.tooltip = 'Copilot Usage — Error reading session data';
     }
   }
 
@@ -54,8 +76,28 @@ export class StatusBarManager implements vscode.Disposable {
   }
 }
 
+function filterByDuration(events: RequestEvent[], duration: StatusBarDuration): RequestEvent[] {
+  if (duration === 'all-time') { return events; }
+  const now = new Date();
+  const todayStr = toLocalDateStr(now);
+  const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return events.filter(e => {
+    if (typeof e.timestampMs !== 'number') { return false; }
+    const d = new Date(e.timestampMs);
+    if (duration === 'daily') { return toLocalDateStr(d) === todayStr; }
+    // monthly: current calendar month (MTD, resets on the 1st)
+    const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return m === monthStr;
+  });
+}
+
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function formatCompact(n: number): string {
   if (n >= 1_000_000) { return (n / 1_000_000).toFixed(1) + 'M'; }
   if (n >= 1_000) { return (n / 1_000).toFixed(1) + 'k'; }
   return String(n);
 }
+

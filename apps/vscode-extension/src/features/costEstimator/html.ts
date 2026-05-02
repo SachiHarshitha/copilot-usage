@@ -158,6 +158,7 @@ ${commonStyles()}
     <button class="btn btn-star" onclick="starGitHub()" title="Star on GitHub">⭐</button>
     <button class="btn btn-secondary" onclick="openDashboard()" title="Open Dashboard">📊</button>
     <button class="btn" onclick="refresh()" title="Refresh">↻</button>
+    <button class="btn btn-secondary" onclick="openSettings()" title="Settings">⚙</button>
   </div>
 </div>
 
@@ -243,6 +244,7 @@ function openDashboard() { vscode.postMessage({ command: 'openDashboard' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 function setSetting(key, value) { vscode.postMessage({ command: 'setSetting', key: key, value: value }); }
 function setRange(v) { vscode.postMessage({ command: 'setRange', range: v }); }
+function openSettings() { vscode.postMessage({ command: 'openSettings' }); }
 </script>
 </body></html>`;
 }

@@ -10,8 +10,6 @@ export class WorkspacePanel {
   private readonly panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
   private disposed = false;
-  private autoRefreshSeconds = 0;
-  private dateRange: DateRange = 'all';
 
   private constructor(panel: vscode.WebviewPanel, private extensionUri: vscode.Uri) {
     this.panel = panel;
@@ -20,20 +18,22 @@ export class WorkspacePanel {
     this.panel.webview.onDidReceiveMessage(
       async (msg) => {
         if (msg.command === 'refresh') { this.showLoading(); await this.loadData(); }
-        if (msg.command === 'setAutoRefresh') { this.autoRefreshSeconds = msg.seconds; }
-        if (msg.command === 'setDateRange') {
-          this.dateRange = normalizeDateRange(msg.range);
-          this.showLoading();
-          await this.loadData();
-        }
         if (msg.command === 'openDashboard') { await DashboardPanel.createOrShow(this.extensionUri); }
         if (msg.command === 'openCostEstimator' && enableCostEstimator) {
           await vscode.commands.executeCommand('copilot-usage.costEstimator');
         }
         if (msg.command === 'openGitHub') { vscode.env.openExternal(vscode.Uri.parse('https://github.com/SachiHarshitha/copilot-usage')); }
+        if (msg.command === 'openSettings') {
+          await vscode.commands.executeCommand('workbench.action.openSettings', 'copilot-usage');
+        }
       },
       null,
       this.disposables,
+    );
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('copilot-usage')) { this.loadData(); }
+      }),
     );
   }
 
@@ -73,9 +73,13 @@ export class WorkspacePanel {
   }
 
   private async loadData(): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('copilot-usage');
+    const dateRange = normalizeDateRange(cfg.get<string>('workspaceAnalysis.dateRange', '30d'));
+    const autoRefreshSeconds = cfg.get<number>('workspaceAnalysis.autoRefreshSeconds', 0);
+
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
-      this.setHtml(getWorkspaceHtml(undefined, undefined, undefined, undefined, 'No workspace folder open.', true, this.autoRefreshSeconds, this.dateRange));
+      this.setHtml(getWorkspaceHtml(undefined, undefined, undefined, undefined, 'No workspace folder open.', true, autoRefreshSeconds));
       return;
     }
 
@@ -87,18 +91,18 @@ export class WorkspacePanel {
         ? `workspace file: ${vscode.workspace.workspaceFile!.fsPath}`
         : folderPaths.join(', ');
       this.setHtml(getWorkspaceHtml(undefined, undefined, undefined, undefined,
-        `No Copilot session data found for this workspace.\n\nLooked for: ${searched}`, true, this.autoRefreshSeconds, this.dateRange));
+        `No Copilot session data found for this workspace.\n\nLooked for: ${searched}`, true, autoRefreshSeconds));
       return;
     }
 
     const parsed = await parseAllFiles([ws]);
     const allEvents = flattenEvents(parsed);
-    const events = filterEventsByDateRange(allEvents, this.dateRange);
+    const events = filterEventsByDateRange(allEvents, dateRange);
     const kpis = computeKpis(parsed, events);
     const models = computeModelStats(events);
     const daily = computeDailyStats(events);
 
-    this.setHtml(getWorkspaceHtml(kpis, models, daily, ws.workspacePath, undefined, false, this.autoRefreshSeconds, this.dateRange, monthsCovered(this.dateRange, events)));
+    this.setHtml(getWorkspaceHtml(kpis, models, daily, ws.workspacePath, undefined, false, autoRefreshSeconds, monthsCovered(dateRange, events)));
   }
 
   private dispose(): void {
@@ -116,8 +120,6 @@ export class DashboardPanel {
   private readonly panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
   private disposed = false;
-  private autoRefreshSeconds = 0;
-  private dateRange: DateRange = 'all';
 
   private constructor(panel: vscode.WebviewPanel, private extensionUri: vscode.Uri) {
     this.panel = panel;
@@ -126,20 +128,22 @@ export class DashboardPanel {
     this.panel.webview.onDidReceiveMessage(
       async (msg) => {
         if (msg.command === 'refresh') { this.showLoading(); await this.loadData(); }
-        if (msg.command === 'setAutoRefresh') { this.autoRefreshSeconds = msg.seconds; }
-        if (msg.command === 'setDateRange') {
-          this.dateRange = normalizeDateRange(msg.range);
-          this.showLoading();
-          await this.loadData();
-        }
         if (msg.command === 'openWorkspace') { await WorkspacePanel.createOrShow(this.extensionUri); }
         if (msg.command === 'openCostEstimator' && enableCostEstimator) {
           await vscode.commands.executeCommand('copilot-usage.costEstimator');
         }
         if (msg.command === 'openGitHub') { vscode.env.openExternal(vscode.Uri.parse('https://github.com/SachiHarshitha/copilot-usage')); }
+        if (msg.command === 'openSettings') {
+          await vscode.commands.executeCommand('workbench.action.openSettings', 'copilot-usage');
+        }
       },
       null,
       this.disposables,
+    );
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('copilot-usage')) { this.loadData(); }
+      }),
     );
   }
 
@@ -179,22 +183,26 @@ export class DashboardPanel {
   }
 
   private async loadData(): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('copilot-usage');
+    const dateRange = normalizeDateRange(cfg.get<string>('dashboard.dateRange', '30d'));
+    const autoRefreshSeconds = cfg.get<number>('dashboard.autoRefreshSeconds', 0);
+
     const workspaces = await discoverWorkspaces();
     if (workspaces.length === 0) {
-      this.setHtml(getDashboardHtml(undefined, undefined, undefined, undefined, 'No Copilot session data found.', this.autoRefreshSeconds, this.dateRange));
+      this.setHtml(getDashboardHtml(undefined, undefined, undefined, undefined, 'No Copilot session data found.', autoRefreshSeconds));
       return;
     }
 
     const parsed = await parseAllFiles(workspaces);
     const allEvents = flattenEvents(parsed);
-    const events = filterEventsByDateRange(allEvents, this.dateRange);
+    const events = filterEventsByDateRange(allEvents, dateRange);
     const kpis = computeKpis(parsed, events);
     const models = computeModelStats(events);
     const daily = computeDailyStats(events);
 
     const wsStats = computeWorkspaceStats(parsed, events);
 
-    this.setHtml(getDashboardHtml(kpis, models, daily, wsStats, undefined, this.autoRefreshSeconds, this.dateRange, monthsCovered(this.dateRange, events)));
+    this.setHtml(getDashboardHtml(kpis, models, daily, wsStats, undefined, autoRefreshSeconds, monthsCovered(dateRange, events)));
   }
 
   private dispose(): void {
@@ -263,18 +271,6 @@ function filterEventsByDateRange(events: RequestEvent[], range: DateRange): Requ
   return events.filter(e => typeof e.timestampMs === 'number' && e.timestampMs >= startMs);
 }
 
-function dateRangeSelect(range: DateRange): string {
-  const options = DATE_RANGES.map(r =>
-    `<option value="${r.v}"${r.v === range ? ' selected' : ''}>${esc(r.l)}</option>`
-  ).join('');
-  return `<select class="auto-refresh-select" id="dateRangeSelect" onchange="setDateRange(this.value)" title="Date range">${options}</select>`;
-}
-
-function dateRangeScript(): string {
-  return `
-function setDateRange(v) { vscode.postMessage({ command: 'setDateRange', range: v }); }
-`;
-}
 
 function getDashboardHtml(
   kpis?: KpiTotals,
@@ -283,7 +279,6 @@ function getDashboardHtml(
   wsStats?: WorkspaceStats[],
   error?: string,
   autoRefreshSeconds = 0,
-  dateRange: DateRange = 'all',
   months = 0,
 ): string {
   if (error || !kpis) {
@@ -321,8 +316,7 @@ ${commonStyles()}
     <button class="btn btn-secondary" onclick="openWorkspace()" title="Open Workspace View">📂</button>
     ${enableCostEstimator ? `<button class="btn btn-secondary" onclick="openCostEstimator()" title="Open Cost Estimator (Preview)">💵</button>` : ''}
     <button class="btn" onclick="refresh()" title="Refresh data">↻</button>
-    ${dateRangeSelect(dateRange)}
-    ${autoRefreshSelect(autoRefreshSeconds)}
+    <button class="btn btn-secondary" onclick="openSettings()" title="Settings">⚙</button>
   </div>
 </div>
 
@@ -361,8 +355,8 @@ function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openWorkspace() { vscode.postMessage({ command: 'openWorkspace' }); }
 function openCostEstimator() { vscode.postMessage({ command: 'openCostEstimator' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
-${dateRangeScript()}
-${autoRefreshScript()}
+function openSettings() { vscode.postMessage({ command: 'openSettings' }); }
+${autoRefreshScript(autoRefreshSeconds)}
 ${chartsScript(dailyLabels, dailyPrompt, dailyOutput, modelLabels, modelData)}
 </script>
 </body></html>`;
@@ -464,30 +458,12 @@ new Chart(document.getElementById('modelChart'), {
 `;
 }
 
-function autoRefreshSelect(seconds: number): string {
-  const opts = [
-    { v: 0, l: 'Auto: Off' },
-    { v: 30, l: '⏱ 30s' },
-    { v: 60, l: '⏱ 1m' },
-    { v: 120, l: '⏱ 2m' },
-    { v: 300, l: '⏱ 5m' },
-  ];
-  const options = opts.map(o =>
-    `<option value="${o.v}"${o.v === seconds ? ' selected' : ''}>${esc(o.l)}</option>`
-  ).join('');
-  return `<select class="auto-refresh-select" id="autoRefreshSelect" onchange="setAutoRefresh(this.value)" title="Auto-refresh interval">${options}</select>`;
-}
-
-function autoRefreshScript(): string {
+function autoRefreshScript(seconds: number): string {
   return `
-let _art = null;
-function setAutoRefresh(v) {
-  if (_art) { clearInterval(_art); _art = null; }
-  var s = parseInt(v, 10);
-  if (s > 0) { _art = setInterval(function() { refresh(); }, s * 1000); }
-  vscode.postMessage({ command: 'setAutoRefresh', seconds: s });
-}
-(function() { var el = document.getElementById('autoRefreshSelect'); if (el && parseInt(el.value, 10) > 0) { setAutoRefresh(el.value); } })();
+(function() {
+  var s = ${seconds};
+  if (s > 0) { setInterval(function() { refresh(); }, s * 1000); }
+})();
 `;
 }
 
@@ -536,7 +512,6 @@ function getWorkspaceHtml(
   error?: string,
   showDashboardButton = false,
   autoRefreshSeconds = 0,
-  dateRange: DateRange = 'all',
   months = 0,
 ): string {
   if (error || !kpis) {
@@ -571,8 +546,7 @@ ${commonStyles()}
     <button class="btn btn-secondary" onclick="openDashboard()" title="Open Global Dashboard">🌐</button>
     ${enableCostEstimator ? `<button class="btn btn-secondary" onclick="openCostEstimator()" title="Open Cost Estimator (Preview)">💵</button>` : ''}
     <button class="btn" onclick="refresh()" title="Refresh data">↻</button>
-    ${dateRangeSelect(dateRange)}
-    ${autoRefreshSelect(autoRefreshSeconds)}
+    <button class="btn btn-secondary" onclick="openSettings()" title="Settings">⚙</button>
   </div>
 </div>
 
@@ -605,8 +579,8 @@ function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openDashboard() { vscode.postMessage({ command: 'openDashboard' }); }
 function openCostEstimator() { vscode.postMessage({ command: 'openCostEstimator' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
-${dateRangeScript()}
-${autoRefreshScript()}
+function openSettings() { vscode.postMessage({ command: 'openSettings' }); }
+${autoRefreshScript(autoRefreshSeconds)}
 ${chartsScript(dailyLabels, dailyPrompt, dailyOutput, modelLabels, modelData)}
 </script>
 </body></html>`;
