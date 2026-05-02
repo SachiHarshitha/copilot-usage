@@ -40,49 +40,45 @@ function formatRepoDisplay(repo: {
   return repo.repoIdentity;
 }
 
-const getPublicUserBadgeSummaryCached = unstable_cache(
-  async (username: string): Promise<PublicUserBadgeSummary | null> => {
-    const user = await prisma.user.findUnique({
-      where: { username },
-      include: {
-        userStat: true,
-        privacySettings: true,
-        repoStats: {
-          where: { isPublic: true },
-          orderBy: { totalTokens: 'desc' },
-          take: 1,
-        },
-        _count: {
-          select: {
-            repoStats: {
-              where: { isPublic: true },
-            },
+async function fetchPublicUserBadgeSummary(username: string): Promise<PublicUserBadgeSummary | null> {
+  const user = await prisma.user.findUnique({
+    where: { username },
+    include: {
+      userStat: true,
+      privacySettings: true,
+      repoStats: {
+        where: { isPublic: true },
+        orderBy: { totalTokens: 'desc' },
+        take: 1,
+      },
+      _count: {
+        select: {
+          repoStats: {
+            where: { isPublic: true },
           },
         },
       },
-    });
+    },
+  });
 
-    if (!user || !isUserVisibleForFeature(user, 'badges') || !user.userStat) {
-      return null;
-    }
+  if (!user || !isUserVisibleForFeature(user, 'badges') || !user.userStat) {
+    return null;
+  }
 
-    return {
-      username: user.username,
-      displayName: user.displayName || user.username,
-      lifetimeTokens: user.userStat.totalTokens || BigInt(0),
-      totalRequests: user.userStat.totalRequests || 0,
-      premiumRequests: user.userStat.premiumRequests || 0,
-      weeklyTokens: user.userStat.weeklyTokens || BigInt(0),
-      rolling30DayTokens: user.userStat.rolling30DayTokens || BigInt(0),
-      currentStreakDays: user.userStat.currentStreakDays || 0,
-      bestStreakDays: user.userStat.bestStreakDays || 0,
-      topRepoName: user.repoStats[0] ? formatRepoDisplay(user.repoStats[0]) : null,
-      publicRepoCount: user._count.repoStats,
-    };
-  },
-  ['public-user-badge-summary-v1'],
-  { revalidate: 300, tags: ['public-user-badge-summary'] }
-);
+  return {
+    username: user.username,
+    displayName: user.displayName || user.username,
+    lifetimeTokens: Number(user.userStat.totalTokens || 0),
+    totalRequests: user.userStat.totalRequests || 0,
+    premiumRequests: user.userStat.premiumRequests || 0,
+    weeklyTokens: Number(user.userStat.weeklyTokens || 0),
+    rolling30DayTokens: Number(user.userStat.rolling30DayTokens || 0),
+    currentStreakDays: user.userStat.currentStreakDays || 0,
+    bestStreakDays: user.userStat.bestStreakDays || 0,
+    topRepoName: user.repoStats[0] ? formatRepoDisplay(user.repoStats[0]) : null,
+    publicRepoCount: user._count.repoStats,
+  };
+}
 
 const getPublicRepoBadgeSummaryCached = unstable_cache(
   async (repoSlug: string): Promise<PublicRepoBadgeSummary | null> => {
@@ -173,10 +169,10 @@ const getPublicRepoBadgeSummaryCached = unstable_cache(
 );
 
 export async function getPublicUserBadgeSummary(username: string): Promise<PublicUserBadgeSummary | null> {
-  // Per-username tag lets `revalidateTag(userBadgesByUsernameTag(username))`
-  // surgically invalidate just this user's badge cache on privacy/lifecycle change.
+  // Single unstable_cache layer keyed per-username so revalidateTag(userBadgesByUsernameTag(username))
+  // correctly invalidates this entry and re-runs the DB query.
   return unstable_cache(
-    () => getPublicUserBadgeSummaryCached(username),
+    () => fetchPublicUserBadgeSummary(username),
     ['public-user-badge-summary-by-username-v1', username],
     { revalidate: 300, tags: [userBadgesByUsernameTag(username), leaderboardTag()] }
   )();

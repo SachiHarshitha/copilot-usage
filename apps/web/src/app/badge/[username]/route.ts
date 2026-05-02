@@ -21,7 +21,7 @@ export async function GET(
     return new NextResponse(svg, {
       headers: {
         'Content-Type': 'image/svg+xml; charset=utf-8',
-        'Cache-Control': 'public, max-age=300',
+        'Cache-Control': 'no-store',
       },
     });
   }
@@ -61,7 +61,8 @@ export async function GET(
   return new NextResponse(svg, {
     headers: {
       'Content-Type': 'image/svg+xml; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+      'Cache-Control': `no-cache, s-maxage=300, stale-while-revalidate=600`,
+      'X-Robots-Tag': 'noindex',
     },
   });
 }

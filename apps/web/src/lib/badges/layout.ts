@@ -45,7 +45,7 @@ export const BADGE_LAYOUT_DEFAULTS: BadgeLayoutConstraint = {
   labelY: 39,
   valueY: 68,
   secondaryY: 67,
-  watermarkY: 88,
+  watermarkY: 91,
   barY: 76,
 };
 

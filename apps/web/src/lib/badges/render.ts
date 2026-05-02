@@ -94,9 +94,9 @@ export function renderBadgeSvg({
       <rect x="${layout.valueX}" y="${valueClipY}" width="${contentClipWidth}" height="30"/>
     </clipPath>
   </defs>
-  <rect x="2" y="2" rx="26" ry="26" width="${outerWidth}" height="${outerHeight}" fill="url(#${bgId})" stroke="rgba(255,255,255,.08)"/>
-  <rect x="${layout.constraint.iconBoxX}" y="${layout.constraint.iconBoxY}" rx="20" ry="20" width="${layout.constraint.iconBoxWidth}" height="${layout.constraint.iconBoxHeight}" fill="#0b1220" stroke="rgba(255,255,255,.06)"/>
-  <rect x="${layout.constraint.iconBoxX}" y="${layout.constraint.iconBoxY}" rx="20" ry="20" width="${layout.constraint.iconBoxWidth}" height="${layout.constraint.iconBoxHeight}" fill="url(#${glowId})" opacity=".16"/>
+  <rect x="2" y="2" rx="14" ry="14" width="${outerWidth}" height="${outerHeight}" fill="url(#${bgId})" stroke="rgba(255,255,255,.08)"/>
+  <rect x="${layout.constraint.iconBoxX}" y="${layout.constraint.iconBoxY}" rx="14" ry="14" width="${layout.constraint.iconBoxWidth}" height="${layout.constraint.iconBoxHeight}" fill="#0b1220" stroke="rgba(255,255,255,.06)"/>
+  <rect x="${layout.constraint.iconBoxX}" y="${layout.constraint.iconBoxY}" rx="14" ry="14" width="${layout.constraint.iconBoxWidth}" height="${layout.constraint.iconBoxHeight}" fill="url(#${glowId})" opacity=".16"/>
   <circle cx="${iconCenterX}" cy="${iconCenterY}" r="22" fill="${accent}" opacity=".15" filter="url(#${softId})"/>
   <text x="${iconCenterX}" y="${iconCenterY + 8}" text-anchor="middle" font-size="28" font-family="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, sans-serif">${escapedIcon}</text>
   <text x="${layout.labelX}" y="${layout.constraint.labelY}" clip-path="url(#${labelClipId})" font-size="15" font-weight="700" fill="#dbeafe" opacity=".9" letter-spacing="1.2" font-family="Inter, Arial, sans-serif">${escapedLabel}</text>

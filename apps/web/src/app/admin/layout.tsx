@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { AdminShell } from './components/AdminShell';
 
 export const metadata = {
   title: 'PromptStreak Admin',
@@ -9,24 +10,13 @@ export const metadata = {
  * Admin shell layout. Intentionally minimal — the admin surface is loopback-only
  * (see apps/web/src/middleware.ts) and intended for operator use over an SSH
  * tunnel. No public theming, no third-party scripts.
+ *
+ * Chrome (header + sidebar) is hidden on login routes — see AdminShell.
  */
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body
-        style={{
-          fontFamily: 'system-ui, sans-serif',
-          margin: 0,
-          padding: '24px',
-          background: '#0b0d12',
-          color: '#e6e6e6',
-        }}
-      >
-        <header style={{ borderBottom: '1px solid #2a2f3a', paddingBottom: 12, marginBottom: 24 }}>
-          <h1 style={{ margin: 0, fontSize: 18 }}>PromptStreak Admin</h1>
-        </header>
-        <main>{children}</main>
-      </body>
-    </html>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#0b223f_0%,#0b111a_38%,#070b12_100%)] text-slate-100">
+      <AdminShell>{children}</AdminShell>
+    </div>
   );
 }

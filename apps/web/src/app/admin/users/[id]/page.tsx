@@ -1,10 +1,8 @@
 import Link from 'next/link';
-import { cookies } from 'next/headers';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 
 import { prisma } from '@/lib/db';
-import { ADMIN_SESSION_COOKIE_NAME } from '@/lib/admin/sessionCookie';
-import { getActiveAdmin } from '@/lib/admin/auth/loginActions';
+import { requireAdminPage } from '@/lib/admin/requireAdminPage';
 import { UserActionButtons } from '../UserActionButtons';
 import { ActionLogPanel } from '../../components/ActionLogPanel';
 
@@ -15,10 +13,7 @@ export default async function AdminUserDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const token = (await cookies()).get(ADMIN_SESSION_COOKIE_NAME)?.value;
-  if (!token) redirect('/admin/login');
-  const admin = await getActiveAdmin(prisma, token);
-  if (!admin) redirect('/admin/login');
+  const admin = await requireAdminPage();
 
   const { id } = await params;
 

@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [badgeCacheBuster, setBadgeCacheBuster] = useState(0);
 
   useEffect(() => {
     Promise.all([
@@ -80,6 +81,7 @@ export default function SettingsPage() {
         setSettings((s) => s && { ...s, profilePublic: next });
       }
       setMessage('Privacy settings updated.');
+      setBadgeCacheBuster((n) => n + 1);
     }
     setSaving(false);
   }
@@ -118,11 +120,12 @@ export default function SettingsPage() {
 
   const baseUrl = 'https://promptstreak.dev';
   const cardUrl = `/card/${settings.username}.svg`;
-  const streakBadgeUrl = `/api/badges/${settings.username}/streak.svg`;
-  const lifetimeBadgeUrl = `/api/badges/${settings.username}/lifetime.svg`;
-  const rankBadgeUrl = `/api/badges/${settings.username}/rank.svg`;
-  const weeklyBadgeUrl = `/api/badges/${settings.username}/weekly.svg`;
-  const repoBadgeUrl = `/api/badges/${settings.username}/repo.svg`;
+  const bv = badgeCacheBuster > 0 ? `?v=${badgeCacheBuster}` : '';
+  const streakBadgeUrl = `/api/badges/${settings.username}/streak.svg${bv}`;
+  const lifetimeBadgeUrl = `/api/badges/${settings.username}/lifetime.svg${bv}`;
+  const rankBadgeUrl = `/api/badges/${settings.username}/rank.svg${bv}`;
+  const weeklyBadgeUrl = `/api/badges/${settings.username}/weekly.svg${bv}`;
+  const repoBadgeUrl = `/api/badges/${settings.username}/repo.svg${bv}`;
 
   const publicGithubRepo = settings.repos.find((r) => r.isPublic && r.displayMode === 'github' && r.githubRepo)?.githubRepo;
   const repoOwner = publicGithubRepo?.split('/')[0] || 'owner';

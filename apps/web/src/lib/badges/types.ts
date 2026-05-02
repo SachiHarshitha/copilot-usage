@@ -60,11 +60,11 @@ export interface BadgeMilestone extends BadgePalette {
 export interface PublicUserBadgeSummary {
   username: string;
   displayName: string;
-  lifetimeTokens: bigint;
+  lifetimeTokens: number;
   totalRequests: number;
   premiumRequests: number;
-  weeklyTokens: bigint;
-  rolling30DayTokens: bigint;
+  weeklyTokens: number;
+  rolling30DayTokens: number;
   currentStreakDays: number;
   bestStreakDays: number;
   topRepoName: string | null;

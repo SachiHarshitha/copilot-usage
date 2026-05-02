@@ -35,7 +35,7 @@ export default function AdminLoginPage() {
         setError(`Too many attempts. Try again in ${data.retryAfterSeconds ?? 60}s.`);
         return;
       }
-      if (!res.ok || !data.ok) {
+      if (!res.ok) {
         setError(data.error ?? 'Login failed.');
         return;
       }

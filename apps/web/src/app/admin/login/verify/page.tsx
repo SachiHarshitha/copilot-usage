@@ -6,7 +6,7 @@ type Mode = 'setup' | 'verify' | 'recovery' | 'unknown';
 
 interface SetupResponse {
   ok?: boolean;
-  otpauthUrl?: string;
+  otpauthUri?: string;
   recoveryCodes?: string[];
   error?: string;
 }
@@ -34,9 +34,9 @@ export default function AdminVerifyPage() {
       const res = await fetch('/api/admin/auth/2fa/setup', { method: 'POST' });
       const data: SetupResponse = await res.json().catch(() => ({}));
       if (cancelled) return;
-      if (res.ok && data.ok) {
+      if (res.ok) {
         setMode('setup');
-        setOtpauthUrl(data.otpauthUrl ?? null);
+        setOtpauthUrl(data.otpauthUri ?? null);
         setRecoveryCodes(data.recoveryCodes ?? null);
       } else if (res.status === 409) {
         setMode('verify');
@@ -69,8 +69,8 @@ export default function AdminVerifyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data: { ok?: boolean; error?: string } = await res.json().catch(() => ({}));
-      if (res.ok && data.ok) {
+      const data: { ok?: boolean; recoveryCodes?: string[]; error?: string } = await res.json().catch(() => ({}));
+      if (res.ok) {
         window.location.assign('/admin');
         return;
       }

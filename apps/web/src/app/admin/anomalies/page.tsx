@@ -1,11 +1,8 @@
 import Link from 'next/link';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/db';
-import { ADMIN_SESSION_COOKIE_NAME } from '@/lib/admin/sessionCookie';
-import { getActiveAdmin } from '@/lib/admin/auth/loginActions';
+import { requireAdminPage } from '@/lib/admin/requireAdminPage';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,10 +23,7 @@ export default async function AdminAnomaliesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const token = (await cookies()).get(ADMIN_SESSION_COOKIE_NAME)?.value;
-  if (!token) redirect('/admin/login');
-  const admin = await getActiveAdmin(prisma, token);
-  if (!admin) redirect('/admin/login');
+  const admin = await requireAdminPage();
 
   const params = await searchParams;
   const severity = params.severity || '';

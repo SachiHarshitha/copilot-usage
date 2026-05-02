@@ -125,9 +125,31 @@ try {
     $pgRunning = docker ps --format '{{.Names}}' | Select-String $PG_CONTAINER -Quiet
     Assert-LastExitCode "Failed to query running Docker containers."
 
+    # Check whether the running/existing container has the expected host port
+    # binding. A container created without -p will have an empty binding and
+    # can never be reached on localhost; the only fix is remove + recreate.
+    function Test-PortBound {
+        $binding = docker inspect $PG_CONTAINER --format "{{json .NetworkSettings.Ports}}" 2>$null
+        if ($LASTEXITCODE -ne 0) { return $false }
+        return ($binding -match '"HostPort"\s*:\s*"' + $PG_PORT + '"')
+    }
+
+    if ($pgRunning -and -not (Test-PortBound)) {
+        Write-Host "[1/5] Container running but port $PG_PORT is not mapped — recreating..."
+        docker stop $PG_CONTAINER | Out-Null
+        docker rm $PG_CONTAINER | Out-Null
+        $pgRunning = $false
+    }
+
     if (-not $pgRunning) {
         $pgExists = docker ps -a --format '{{.Names}}' | Select-String $PG_CONTAINER -Quiet
         Assert-LastExitCode "Failed to query Docker containers."
+
+        if ($pgExists -and -not (Test-PortBound)) {
+            Write-Host "[1/5] Existing container lacks port mapping — removing to recreate..."
+            docker rm $PG_CONTAINER | Out-Null
+            $pgExists = $false
+        }
 
         if ($pgExists) {
             Write-Host "[1/5] Starting existing PostgreSQL container..."
@@ -171,10 +193,30 @@ try {
             'DEV_TEST_ACCOUNT_AVATAR_URL=""'
             'GITHUB_CLIENT_ID=dummy-client-id'
             'GITHUB_CLIENT_SECRET=dummy-client-secret'
+            'GITHUB_TOKEN_ENCRYPTION_KEYS=''{"v1":"REPLACE_WITH_BASE64_32B_KEY"}'''
+            'GITHUB_TOKEN_ENCRYPTION_ACTIVE_KEY="v1"'
+            'ADMIN_NETWORK_GUARD=disabled'
+            'ADMIN_FINGERPRINT_SALT=""'
         ) | Set-Content $envPath
         Write-Host "[2/5] Created .env with dummy local credentials."
     } else {
         Write-Host "[2/5] .env already exists."
+    }
+
+    # Auto-generate crypto secrets if any are still placeholders or missing.
+    $envContent = Get-Content -Raw $envPath
+    $needsTokens = (
+        ($envContent -notmatch 'ADMIN_FINGERPRINT_SALT=') -or
+        ($envContent -match 'ADMIN_FINGERPRINT_SALT=""') -or
+        ($envContent -match "ADMIN_FINGERPRINT_SALT=''") -or
+        ($envContent -match 'ADMIN_FINGERPRINT_SALT=(\r?\n|$)') -or
+        ($envContent -match 'NEXTAUTH_SECRET="dev-secret-change-in-production"') -or
+        ($envContent -match 'GITHUB_TOKEN_ENCRYPTION_KEYS=.*REPLACE_WITH')
+    )
+    if ($needsTokens) {
+        Write-Host "[2/5] Generating missing crypto secrets..."
+        & (Join-Path $webRoot "scripts\generate-dev-tokens.ps1") -EnvFile $envPath
+        Assert-LastExitCode "generate-dev-tokens.ps1 failed."
     }
 
     Write-Host "[3/5] Installing dependencies if needed..."

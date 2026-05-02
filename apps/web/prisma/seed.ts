@@ -35,6 +35,13 @@ async function main() {
       create: { ...u, profilePublic: true },
     });
 
+    // Ensure demo users are visible on leaderboard / badges (opt-in required)
+    await prisma.privacySettings.upsert({
+      where: { userId: user.id },
+      update: { profilePublic: true, leaderboardOptIn: true, badgesEnabled: true },
+      create: { userId: user.id, profilePublic: true, leaderboardOptIn: true, badgesEnabled: true },
+    });
+
     // Create a device
     const device = await prisma.device.upsert({
       where: { tokenId: `dev-${u.username}` },

@@ -176,3 +176,35 @@ Add `apps/web/src/lib/flags.ts` reading from env: `identityDualRead`, `requirePr
 - Retention windows for `consent_events`, `account_deletion_jobs`, `UploadAudit`.
 - Final Privacy Policy / Impressum copy (English + German).
 - Whether disconnect deletes the account or only severs OAuth (Phase 5.1 default: severs only; user must run delete to remove data).
+
+---
+
+## Implementation Status (as of 2026-05-02, branch `feature/leaderboard`)
+
+| Phase | Status | Commit | Notes |
+|---|---|---|---|
+| Phase Q (Q.1–Q.6) | ✅ done | (rolled into 1a–1d, 2.x) | Lifecycle predicate, soft-delete account route, denylist, cache-tag scaffold, legal pages all landed via the renumbered phases below. |
+| Phase 0 — baseline characterization | ✅ done | — | Characterization tests landed alongside Q work; gates green throughout. |
+| Phase 1a — schema-only migration | ✅ done | `6f33a98` | All 7 GDPR tables added; privacy-first defaults verified; clean+existing DB push OK. |
+| Phase 1b — identity crypto + HMAC | ✅ done | `d0d56d4` | `lib/crypto/identityCrypto.ts` + 20 unit tests; AES-GCM key-ring reuse + dedicated HMAC pepper. |
+| Phase 1c — backfill + dual-read auth | ✅ done | — | `identitySync` + dual-read in `lib/auth.ts` + backfill script + 9 itests. |
+| Phase 1d — OAuth scope minimization | ✅ done | `2c93be1` | GitHub scope locked to `read:user`; regression test added. |
+| Phase 2 — privacy settings API + symmetric consent | ✅ done | — | `PATCH /api/settings/privacy` + writer + 11 itests; settings UI gains 3 independent toggles; legacy `User.profilePublic` bridge mirror retained. |
+| Phase 2.1 — public-surface opt-in gating | ✅ done | `acc3f80` | `userVisibleForFeatureWhere/Sql('profile'\|'leaderboard'\|'badges')` predicates wired into every public reader (profile, repo, leaderboard, IDE leaderboard, repo leaderboard, badges). |
+| Phase 2.2 — full cache-invalidation coverage | ✅ done | `95325e2` | Admin `suspend`/`restore`/`deleteUserHandler` now invalidate `tagsForUserChange` via injectable `revalidate` dep (mirrors `selfDelete` pattern). Soft-delete uses pre-tombstone username so `userBadgesByUsername(<original>)` is wiped. 5 new itests. |
+| Phase 3 — ingestion privacy hardening | ✅ done | (pre-existing) | `findForbiddenFields` (`packages/shared-schema/src/contentDenylist.ts`) wired into `apps/web/src/app/api/upload/route.ts` line 144 — runs *before* schema validation, covers v1 + v2 paths; all schemas already `.strict()`; 7 unit tests. |
+| Phase 3.1 — `/api/ingest/usage-snapshot` canonical alias | ⏳ deferred | — | Per v2 plan, defer until telemetry shows external need; `/api/upload` remains the single ingest path. |
+| Phase 4 — DSAR data export | ⏳ next | — | `POST /api/me/export` async + `GET /api/me/export/:id`; depends on 1a (schema) + 2 (privacy settings) — both done. |
+| Phase 5 — two-step deletion | ⏳ pending | — | `POST /api/me/deletion-request` → confirm → enqueue `account_deletion_jobs` worker. Q.2 already provides immediate-takedown half. |
+| Phase 5.1 — GitHub disconnect | ⏳ pending | — | Default policy: sever OAuth only. |
+| Phase 6 — legal/footer pages | ⏳ pending | — | Impressum, Privacy, Terms, Contact, Report-abuse stub. |
+| Phase 6.1 — abuse report endpoint | ⏳ pending | — | Public report POST + admin triage; rate-limited; uses `abuse_reports` table. |
+| Phase 7 — settings UX redesign | ⏳ pending | — | Depends on 4, 5, 6.1. |
+| Phase 8 — admin DSAR/moderation surfaces | ⏳ pending | — | Mask GitHub IDs in admin UI; reveal-with-audit pattern. |
+| Phase 9 — verification hardening | ⏳ pending | — | Cross-cutting privacy regression matrix. |
+| Phase 10 — drop `User.githubId` plaintext bridge | ⏳ pending | — | Gated on production bake metric showing 100% hash-lookup hits. |
+
+**Last green gates:** 246/246 unit · 197/197 itest · lint clean · build OK.
+
+**§20 release-blocker status:** all Q-phase blockers (private/deleted/suspended visibility, immediate-takedown on delete, ingestion accepts forbidden fields, missing legal footer except actual legal copy) are closed at the code/policy layer. Remaining MVP blockers are scoped to Phases 4 (export), 5 (two-step deletion), 6 (legal copy), 6.1 (abuse).
+
