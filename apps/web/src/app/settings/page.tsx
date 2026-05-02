@@ -12,6 +12,7 @@ interface PrivacySettings {
 interface UserSettings {
   displayName: string;
   profilePublic: boolean;
+  status: string;
   repos: { id: string; repoIdentity: string; displayMode: string; githubRepo: string | null; aliasLabel: string | null; isPublic: boolean }[];
   devices: { id: string; name: string | null; tokenId: string; lastSeenAt: string | null; createdAt: string }[];
   username: string;
@@ -134,6 +135,22 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-bold text-white mb-8">Settings</h1>
+
+      {settings.status === 'SUSPENDED' && (
+        <div className="flex items-start gap-3 rounded-lg border border-red-700/50 bg-red-950/40 px-4 py-3 text-sm text-red-300 mb-6">
+          <span className="mt-0.5 text-red-400">⚠</span>
+          <div>
+            <p className="font-medium text-red-200 mb-1">Your account is suspended</p>
+            <p className="text-red-400">
+              Public profile, leaderboard, and badge access are paused. If you believe this is an error,{' '}
+              <Link href="/contact" className="underline text-red-300 hover:text-white">
+                contact support
+              </Link>
+              .
+            </p>
+          </div>
+        </div>
+      )}
 
       {message && (
         <div className="bg-green-900/30 border border-green-700 text-green-400 text-sm px-4 py-2 rounded mb-6">

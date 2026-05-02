@@ -30,6 +30,7 @@ export async function GET() {
     displayName: user.displayName || user.username,
     profilePublic: user.profilePublic,
     username: user.username,
+    status: user.status,
     repos: user.repoStats.map((r) => ({
       id: r.id,
       repoIdentity: r.repoIdentity,

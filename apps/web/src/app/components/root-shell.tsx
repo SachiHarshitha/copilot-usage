@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { ProfileMenu } from './profile-menu';
+import { NotificationBar } from './notification-bar';
 
 interface SessionUserInfo {
   username: string;
@@ -19,9 +20,11 @@ function isAdminRoute(pathname: string | null): boolean {
 export function RootShell({
   children,
   sessionUser,
+  isSuspended = false,
 }: {
   children: ReactNode;
   sessionUser: SessionUserInfo | null;
+  isSuspended?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -52,6 +55,7 @@ export function RootShell({
         </div>
       </nav>
 
+      <NotificationBar isSuspended={isSuspended} />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">{children}</main>
 
       <footer className="space-y-2 border-t border-[#30363d] px-6 py-4 text-center text-xs text-[#484f58]">

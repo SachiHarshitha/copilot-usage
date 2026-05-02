@@ -84,9 +84,69 @@ export const deviceRevokedTemplate: MailTemplate<DeviceRevokedVars> = {
 export function registerUserTemplates(): void {
   registerMailTemplate(accountSuspendedTemplate);
   registerMailTemplate(deviceRevokedTemplate);
+  registerMailTemplate(contactInquiryTemplate);
+  registerMailTemplate(abuseReportTemplate);
 }
 
 registerUserTemplates();
+
+export interface ContactInquiryVars {
+  name: string;
+  email: string;
+  category: string;
+  message: string;
+}
+
+export const contactInquiryTemplate: MailTemplate<ContactInquiryVars> = {
+  id: 'contact-inquiry',
+  render: (vars) => ({
+    subject: `Contact form submission — ${vars.category}`,
+    text:
+      `New contact form submission on promptstreak.dev\n\n` +
+      `Name: ${vars.name || '(not provided)'}\n` +
+      `Email: ${vars.email}\n` +
+      `Category: ${vars.category}\n\n` +
+      `Message:\n${vars.message}`,
+    html:
+      `<p><strong>New contact form submission on promptstreak.dev</strong></p>` +
+      `<table>` +
+      `<tr><td><strong>Name:</strong></td><td>${escapeHtml(vars.name || '(not provided)')}</td></tr>` +
+      `<tr><td><strong>Email:</strong></td><td>${escapeHtml(vars.email)}</td></tr>` +
+      `<tr><td><strong>Category:</strong></td><td>${escapeHtml(vars.category)}</td></tr>` +
+      `</table>` +
+      `<p><strong>Message:</strong></p>` +
+      `<blockquote>${escapeHtml(vars.message).replace(/\n/g, '<br>')}</blockquote>`,
+  }),
+};
+
+export interface AbuseReportVars {
+  offendingUrl: string;
+  violationType: string;
+  description: string;
+  reporterEmail: string;
+}
+
+export const abuseReportTemplate: MailTemplate<AbuseReportVars> = {
+  id: 'abuse-report',
+  render: (vars) => ({
+    subject: `Abuse report — ${vars.violationType}`,
+    text:
+      `New abuse report on promptstreak.dev\n\n` +
+      `Offending URL: ${vars.offendingUrl}\n` +
+      `Violation type: ${vars.violationType}\n` +
+      `Reporter email: ${vars.reporterEmail}\n\n` +
+      `Description:\n${vars.description}`,
+    html:
+      `<p><strong>New abuse report on promptstreak.dev</strong></p>` +
+      `<table>` +
+      `<tr><td><strong>Offending URL:</strong></td><td><a href="${escapeHtml(safeUrl(vars.offendingUrl))}">${escapeHtml(vars.offendingUrl)}</a></td></tr>` +
+      `<tr><td><strong>Violation type:</strong></td><td>${escapeHtml(vars.violationType)}</td></tr>` +
+      `<tr><td><strong>Reporter email:</strong></td><td>${escapeHtml(vars.reporterEmail)}</td></tr>` +
+      `</table>` +
+      `<p><strong>Description:</strong></p>` +
+      `<blockquote>${escapeHtml(vars.description).replace(/\n/g, '<br>')}</blockquote>`,
+  }),
+};
 
 function escapeHtml(input: string): string {
   return input

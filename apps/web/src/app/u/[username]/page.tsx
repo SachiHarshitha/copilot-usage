@@ -65,6 +65,23 @@ export default async function ProfilePage({
 
   return (
     <div>
+      {/* Suspension notice — only shown to the account owner */}
+      {user.status === 'SUSPENDED' && sessionUser?.userId === user.id && (
+        <div className="flex items-start gap-3 rounded-lg border border-red-700/50 bg-red-950/40 px-4 py-3 text-sm text-red-300 mb-6">
+          <span className="mt-0.5 text-red-400">⚠</span>
+          <div>
+            <p className="font-medium text-red-200 mb-1">Your account is suspended</p>
+            <p className="text-red-400">
+              This profile and your stats are hidden from other users.{' '}
+              <Link href="/contact" className="underline text-red-300 hover:text-white">
+                Contact support
+              </Link>{' '}
+              if you believe this is an error.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         {safeAvatarUrl && (

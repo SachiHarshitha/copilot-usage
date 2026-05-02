@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
+import QRCode from 'qrcode';
 
 type Mode = 'setup' | 'verify' | 'recovery' | 'unknown';
 
@@ -23,6 +24,8 @@ interface SetupResponse {
 export default function AdminVerifyPage() {
   const [mode, setMode] = useState<Mode>('unknown');
   const [otpauthUrl, setOtpauthUrl] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [totpSecret, setTotpSecret] = useState<string | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -35,8 +38,16 @@ export default function AdminVerifyPage() {
       const data: SetupResponse = await res.json().catch(() => ({}));
       if (cancelled) return;
       if (res.ok) {
+        const uri = data.otpauthUri ?? null;
         setMode('setup');
-        setOtpauthUrl(data.otpauthUri ?? null);
+        setOtpauthUrl(uri);
+        if (uri) {
+          const secret = new URL(uri).searchParams.get('secret');
+          setTotpSecret(secret);
+          QRCode.toDataURL(uri, { width: 200, margin: 2 })
+            .then(setQrDataUrl)
+            .catch(() => setQrDataUrl(null));
+        }
         setRecoveryCodes(data.recoveryCodes ?? null);
       } else if (res.status === 409) {
         setMode('verify');
@@ -90,19 +101,40 @@ export default function AdminVerifyPage() {
       {mode === 'setup' && otpauthUrl && (
         <>
           <p style={{ fontSize: 13 }}>
-            Add this account to your authenticator app, then enter the 6-digit code below.
+            Scan the QR code with your authenticator app, then enter the 6-digit code below.
           </p>
-          <pre
-            style={{
-              background: '#181b22',
-              padding: 8,
-              borderRadius: 6,
-              fontSize: 11,
-              overflowX: 'auto',
-            }}
-          >
-            {otpauthUrl}
-          </pre>
+          {qrDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={qrDataUrl}
+              alt="TOTP QR code"
+              style={{ display: 'block', background: '#fff', padding: 8, borderRadius: 6, marginBottom: 12 }}
+            />
+          ) : (
+            <p style={{ fontSize: 12, color: '#8b949e' }}>Generating QR code…</p>
+          )}
+          {totpSecret && (
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 12, color: '#8b949e', marginBottom: 4 }}>
+                Or enter the secret manually:
+              </p>
+              <code
+                style={{
+                  display: 'block',
+                  background: '#181b22',
+                  border: '1px solid #3a4150',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  fontSize: 13,
+                  letterSpacing: '0.08em',
+                  userSelect: 'all',
+                  wordBreak: 'break-all',
+                }}
+              >
+                {totpSecret}
+              </code>
+            </div>
+          )}
           {recoveryCodes && (
             <details style={{ marginBottom: 12 }}>
               <summary style={{ cursor: 'pointer' }}>
