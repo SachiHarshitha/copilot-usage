@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getDictionary } from '@/lib/i18n/dictionary';
 import { getRequestLocale } from '@/lib/i18n/server';
+import { isUserVisibleForFeature } from '@/lib/policy/userLifecycle';
 
 export default async function RepoPage({
   params,
@@ -16,8 +17,11 @@ export default async function RepoPage({
   const dateFormatter = new Intl.DateTimeFormat(locale);
   const repoSlug = repo.join('/');
 
-  const user = await prisma.user.findUnique({ where: { username } });
-  if (!user || !user.profilePublic) notFound();
+  const user = await prisma.user.findUnique({
+    where: { username },
+    include: { privacySettings: true },
+  });
+  if (!user || !isUserVisibleForFeature(user, 'profile')) notFound();
 
   const repoIdentity = `github:${repoSlug}`;
   const repoStat = await prisma.repoStat.findUnique({

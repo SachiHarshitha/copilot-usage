@@ -145,9 +145,11 @@ export interface UserDetailResponse {
   /** Number of UploadLog entries in the last 30 days. */
   recentUploads30d: number;
   /**
-   * Verification surface placeholder. The VerificationAnomaly model does not
-   * yet exist in the schema; this field exists so the response shape is
-   * stable when verification ops land.
+   * Verification surface placeholder. The `VerificationAnomaly` model now
+   * exists in the schema, but anomaly-detection passes are not yet wired
+   * into the upload runtime. This field exists so the admin response shape
+   * is stable when verification ops land; values stay `'unknown'` / `0`
+   * until detection is implemented.
    */
   verificationStatus: 'unknown';
   /** Anomaly count placeholder, see verificationStatus comment. */

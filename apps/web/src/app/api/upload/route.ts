@@ -17,21 +17,80 @@ import { getUploadClientIp, isTrustedUploadProxyRequest } from '@/lib/upload-sec
 interface RejectedUploadLogInput {
   userId: string;
   deviceId: string;
+  tokenId?: string | null;
   ipHash: string;
+  userAgentHash?: string | null;
   payloadBytes: number;
+  payloadHash?: string | null;
   bucketCount?: number;
   earliestDate?: Date | null;
   latestDate?: Date | null;
+  rejectionCode?: string;
+}
+
+/**
+ * Best-effort audit row written for every upload (accepted or rejected).
+ * Today no signed-upload protocol is wired, so `signatureStatus` is always
+ * `MISSING`. Once verification Task 3.x lands, callers will pass the
+ * resolved status (VALID / INVALID / STALE_TIMESTAMP / REPLAYED_NONCE / …).
+ *
+ * Failures are swallowed because the audit row must never block an upload
+ * response — the primary `UploadLog` row remains the source of truth for
+ * accept/reject and is still written by the existing call sites.
+ */
+async function recordUploadAudit(input: {
+  userId: string;
+  deviceId: string;
+  tokenId?: string | null;
+  ipHash: string;
+  userAgentHash?: string | null;
+  payloadHash?: string | null;
+  accepted: boolean;
+  rejectionCode?: string | null;
+  signatureStatus?:
+    | 'VALID'
+    | 'MISSING'
+    | 'INVALID'
+    | 'STALE_TIMESTAMP'
+    | 'REPLAYED_NONCE'
+    | 'BODY_HASH_MISMATCH'
+    | 'DEVICE_REVOKED';
+  clientTimestamp?: Date | null;
+  clientVersion?: string | null;
+}): Promise<void> {
+  try {
+    await prisma.uploadAudit.create({
+      data: {
+        userId: input.userId,
+        deviceId: input.deviceId,
+        tokenId: input.tokenId ?? null,
+        clientTimestamp: input.clientTimestamp ?? null,
+        clientVersion: input.clientVersion ?? null,
+        payloadHash: input.payloadHash ?? null,
+        signatureStatus: input.signatureStatus ?? 'MISSING',
+        accepted: input.accepted,
+        rejectionCode: input.rejectionCode ?? null,
+        ipHash: input.ipHash,
+        userAgentHash: input.userAgentHash ?? null,
+      },
+    });
+  } catch {
+    // Best effort only — never block uploads on audit failures.
+  }
 }
 
 async function logRejectedUpload({
   userId,
   deviceId,
+  tokenId = null,
   ipHash,
+  userAgentHash = null,
   payloadBytes,
+  payloadHash = null,
   bucketCount = 0,
   earliestDate = null,
   latestDate = null,
+  rejectionCode,
 }: RejectedUploadLogInput): Promise<void> {
   try {
     await prisma.uploadLog.create({
@@ -49,6 +108,16 @@ async function logRejectedUpload({
   } catch {
     // Best effort only.
   }
+  await recordUploadAudit({
+    userId,
+    deviceId,
+    tokenId,
+    ipHash,
+    userAgentHash,
+    payloadHash,
+    accepted: false,
+    rejectionCode: rejectionCode ?? null,
+  });
 }
 
 /**
@@ -168,7 +237,12 @@ export async function POST(request: NextRequest) {
       body,
       userId,
       deviceId,
+      tokenId,
       ipHash,
+      userAgentHash: createHash('sha256')
+        .update(request.headers.get('user-agent') ?? '')
+        .digest('hex'),
+      payloadHash: createHash('sha256').update(rawPayload).digest('hex'),
       payloadBytes,
     });
   }
@@ -405,6 +479,19 @@ export async function POST(request: NextRequest) {
         accepted: false,
       },
     });
+    await recordUploadAudit({
+      userId,
+      deviceId,
+      tokenId,
+      ipHash,
+      userAgentHash: createHash('sha256')
+        .update(request.headers.get('user-agent') ?? '')
+        .digest('hex'),
+      payloadHash: createHash('sha256').update(rawPayload).digest('hex'),
+      accepted: false,
+      rejectionCode: 'v1_transaction_failed',
+      clientTimestamp: new Date(payload.clientUploadedAt),
+    });
 
     return NextResponse.json({ error: 'Internal server error during upload.' }, { status: 500 });
   }
@@ -423,6 +510,19 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  await recordUploadAudit({
+    userId,
+    deviceId,
+    tokenId,
+    ipHash,
+    userAgentHash: createHash('sha256')
+      .update(request.headers.get('user-agent') ?? '')
+      .digest('hex'),
+    payloadHash: createHash('sha256').update(rawPayload).digest('hex'),
+    accepted: true,
+    clientTimestamp: new Date(payload.clientUploadedAt),
+  });
+
   return NextResponse.json({ ok: true, logId: log.id });
 }
 
@@ -437,18 +537,33 @@ async function handleV2Upload({
   body,
   userId,
   deviceId,
+  tokenId,
   ipHash,
+  userAgentHash,
+  payloadHash,
   payloadBytes,
 }: {
   body: unknown;
   userId: string;
   deviceId: string;
+  tokenId: string;
   ipHash: string;
+  userAgentHash: string;
+  payloadHash: string;
   payloadBytes: number;
 }): Promise<NextResponse> {
   const parsed = AgentSnapshotSchema.safeParse(body);
   if (!parsed.success) {
-    await logRejectedUpload({ userId, deviceId, ipHash, payloadBytes });
+    await logRejectedUpload({
+      userId,
+      deviceId,
+      tokenId,
+      ipHash,
+      userAgentHash,
+      payloadBytes,
+      payloadHash,
+      rejectionCode: 'v2_validation_failed',
+    });
     return NextResponse.json(
       { error: 'Validation failed.', details: parsed.error.issues.slice(0, 5) },
       { status: 400 }
@@ -460,7 +575,16 @@ async function handleV2Upload({
   const observed = new Date(snapshot.observedAt).getTime();
   const now = Date.now();
   if (observed < now - 24 * 60 * 60 * 1000 || observed > now + 5 * 60 * 1000) {
-    await logRejectedUpload({ userId, deviceId, ipHash, payloadBytes });
+    await logRejectedUpload({
+      userId,
+      deviceId,
+      tokenId,
+      ipHash,
+      userAgentHash,
+      payloadBytes,
+      payloadHash,
+      rejectionCode: 'v2_stale_observed_at',
+    });
     return NextResponse.json(
       { error: 'observedAt is out of allowed time window.' },
       { status: 400 }
@@ -492,6 +616,17 @@ async function handleV2Upload({
         accepted: false,
       },
     });
+    await recordUploadAudit({
+      userId,
+      deviceId,
+      tokenId,
+      ipHash,
+      userAgentHash,
+      payloadHash,
+      accepted: false,
+      rejectionCode: 'v2_transaction_failed',
+      clientTimestamp: new Date(snapshot.observedAt),
+    });
     return NextResponse.json({ error: 'Internal server error during upload.' }, { status: 500 });
   }
 
@@ -506,6 +641,17 @@ async function handleV2Upload({
       latestDate: null,
       accepted: true,
     },
+  });
+
+  await recordUploadAudit({
+    userId,
+    deviceId,
+    tokenId,
+    ipHash,
+    userAgentHash,
+    payloadHash,
+    accepted: true,
+    clientTimestamp: new Date(snapshot.observedAt),
   });
 
   return NextResponse.json({ ok: true, logId: log.id, contract: 'v2' });

@@ -69,7 +69,53 @@ export class InMemoryMailService implements MailService {
 }
 
 /**
- * Process-wide singleton. Phase G swaps the backend behind this export by
- * editing this file only — call sites import the singleton directly.
+ * Process-wide singleton. The backend is selected lazily on first use from
+ * `MAIL_BACKEND`:
+ *   - `smtp`     → SMTP via nodemailer (production).
+ *   - anything else (default) → InMemoryMailService (dev/test).
+ *
+ * Resolution is lazy so importing this module never triggers SMTP config
+ * loading or `nodemailer` wiring at module-load time (keeps unit tests fast
+ * and tolerates missing env in non-mail paths).
  */
-export const mailService: MailService = new InMemoryMailService();
+let _resolved: MailService | null = null;
+
+function resolveMailServiceBackend(): MailService {
+  if (_resolved) return _resolved;
+
+  const backend = (process.env.MAIL_BACKEND ?? '').trim().toLowerCase();
+  if (backend === 'smtp') {
+    // Lazy require so test/dev paths don't pull nodemailer or hit env validation.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { loadMailConfig } = require('./smtpConfig') as typeof import('./smtpConfig');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createSmtpTransporter } = require('./smtpTransport') as typeof import('./smtpTransport');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { SmtpMailService } = require('./smtpMailService') as typeof import('./smtpMailService');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { prisma } = require('@/lib/db') as typeof import('@/lib/db');
+    const config = loadMailConfig();
+    const transporter = createSmtpTransporter(config);
+    _resolved = new SmtpMailService({ prisma, transporter, config });
+    return _resolved;
+  }
+
+  _resolved = new InMemoryMailService();
+  return _resolved;
+}
+
+/** Test/diagnostic hook: clear the cached backend so the next access re-resolves. */
+export function __resetResolvedMailServiceForTests(): void {
+  _resolved = null;
+}
+
+/**
+ * Process-wide mail service. Implemented as a thin proxy so imports stay
+ * stable (`import { mailService } from '@/lib/mail/mailService'`) while the
+ * concrete backend is resolved on first use from env.
+ */
+export const mailService: MailService = {
+  send(input: SendMailInput): Promise<SendMailResult> {
+    return resolveMailServiceBackend().send(input);
+  },
+};

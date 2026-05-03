@@ -43,15 +43,11 @@ key-ring entries).
 On the VPS:
 
 ```bash
-# 1. Provision the database schema (one time, or after schema changes).
+# 1. Provision the database schema and apply DB-layer triggers in one step.
+#    `db:deploy` runs `prisma db push` followed by the AdminActionLog
+#    append-only trigger. Idempotent — safe to re-run after any schema change.
 docker compose -f deploy/docker-compose.yml --env-file .env exec web \
-  pnpm --filter @promptstreak/web prisma db push --skip-generate
-
-# 1b. Apply the AdminActionLog append-only trigger. Idempotent — re-run any
-#     time `prisma db push` rebuilds the table. Required: AdminActionLog rows
-#     are tamper-resistant only after this trigger is in place.
-docker compose -f deploy/docker-compose.yml --env-file .env exec web \
-  pnpm --filter @promptstreak/web exec tsx scripts/applyAuditLogImmutability.ts
+  pnpm --filter @promptstreak/web db:deploy
 
 # 2. Create the first admin (interactive). The CLI prompts for password
 #    and prints the TOTP otpauth URL once.
@@ -98,8 +94,11 @@ follow-up `SUCCEEDED` or `FAILED` row linked via `metadata.attemptId`.
 To (re-)apply the trigger against any environment:
 
 ```bash
-# Production / staging — uses DATABASE_URL
-pnpm --filter @promptstreak/web exec tsx scripts/applyAuditLogImmutability.ts
+# Production / staging — uses DATABASE_URL. Runs prisma db push + trigger.
+pnpm --filter @promptstreak/web db:deploy
+
+# Trigger only (skip schema push):
+pnpm --filter @promptstreak/web db:apply-triggers
 
 # Local test database — uses DATABASE_URL_TEST
 pnpm --filter @promptstreak/web exec tsx scripts/applyAuditLogImmutability.ts --test

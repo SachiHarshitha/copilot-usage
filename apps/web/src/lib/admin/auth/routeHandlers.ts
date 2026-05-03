@@ -169,7 +169,15 @@ export async function confirmTwoFactorHandler(req: NextRequest): Promise<NextRes
   const guard = await withRateLimit(req, null);
   if (guard instanceof NextResponse) return guard;
   const body = (await readJson(req)) ?? {};
-  const code = typeof body.code === 'string' ? body.code : '';
+  // Accept either `code` (canonical) or `recoveryCode` (sent by the verify
+  // page UI). Without this, the recovery flow silently submits an empty
+  // string and always fails. See launch-readiness-gap-analysis.md (P1-C).
+  const code =
+    typeof body.code === 'string'
+      ? body.code
+      : typeof body.recoveryCode === 'string'
+        ? body.recoveryCode
+        : '';
   const token = readSessionCookie(req);
   try {
     const result = await confirmTwoFactorAction(prisma, token, code, {
@@ -211,7 +219,14 @@ export async function recoveryCodeHandler(req: NextRequest): Promise<NextRespons
   const guard = await withRateLimit(req, null);
   if (guard instanceof NextResponse) return guard;
   const body = (await readJson(req)) ?? {};
-  const code = typeof body.code === 'string' ? body.code : '';
+  // Accept both `code` (canonical) and `recoveryCode` (legacy client field) so
+  // recovery-code login from /admin/login/verify works end-to-end.
+  const code =
+    typeof body.code === 'string'
+      ? body.code
+      : typeof body.recoveryCode === 'string'
+        ? body.recoveryCode
+        : '';
   const token = readSessionCookie(req);
   try {
     const result = await verifyRecoveryCodeAction(prisma, token, code, {

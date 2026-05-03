@@ -14,6 +14,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "db:apply-triggers": "tsx --env-file-if-exists=.env scripts/applyAuditLogImmutability.ts",
+    "db:deploy": "pnpm db:push && pnpm db:apply-triggers",
     "db:test:setup": "tsx scripts/setupTestDb.ts",
     "db:test:reset": "tsx scripts/setupTestDb.ts --reset",
     "admin:create": "tsx --env-file-if-exists=.env scripts/createAdmin.ts",

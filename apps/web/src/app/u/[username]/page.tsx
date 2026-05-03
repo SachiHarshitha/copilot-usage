@@ -25,6 +25,7 @@ export default async function ProfilePage({
     where: { username },
     include: {
       userStat: true,
+      privacySettings: true,
       repoStats: {
         where: { isPublic: true },
         orderBy: { totalTokens: 'desc' },
@@ -36,8 +37,7 @@ export default async function ProfilePage({
   if (
     !user ||
     !canViewProfile({
-      profilePublic: user.profilePublic,
-      ownerUserId: user.id,
+      user,
       viewerUserId: sessionUser?.userId || null,
     })
   ) {

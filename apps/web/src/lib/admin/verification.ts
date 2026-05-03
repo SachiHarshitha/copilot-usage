@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 
 import { prisma as defaultPrisma } from '@/lib/db';
 import { adminAuthErrorToResponse, requireAdmin } from '@/lib/admin/requireAdmin';
+import { withAuditedAction } from '@/lib/admin/auth/audit';
+import { getClientIpFromHeaders, hashIp, hashUserAgent } from '@/lib/admin/auth/clientFingerprint';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -173,4 +175,117 @@ export async function verificationDetailHandler(
     updatedAt: row.updatedAt.toISOString(),
   };
   return NextResponse.json(body);
+}
+
+/**
+ * Disconnect a user's GitHub-billing verification linkage.
+ *
+ * Implementable today without the GitHub-billing fetch worker (Verification
+ * Task 3.6): we simply zero out the recorded verification state. Refresh,
+ * by contrast, requires that worker and stays out of the launch surface.
+ *
+ * Idempotent: a 200 response is returned whether or not a `UserVerification`
+ * row existed. The mutation is wrapped in `withAuditedAction` so the admin
+ * action log captures the actor + before/after snapshot.
+ */
+export async function disconnectVerificationCore(
+  prisma: PrismaClient,
+  admin: { id: string; email: string },
+  userId: string,
+  audit: { ipHash: string | null; userAgentHash: string | null },
+): Promise<{ ok: true; cleared: boolean } | { error: 'not_found' }> {
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  if (!target) return { error: 'not_found' };
+
+  const before = await prisma.userVerification.findUnique({
+    where: { userId: target.id },
+  });
+
+  await withAuditedAction(prisma, {
+    adminUserId: admin.id,
+    adminEmail: admin.email,
+    action: 'VERIFICATION_DISCONNECT',
+    targetType: 'User',
+    targetId: target.id,
+    ipHash: audit.ipHash,
+    userAgentHash: audit.userAgentHash,
+    before: before
+      ? {
+          githubBillingConnected: before.githubBillingConnected,
+          githubBillingStatus: before.githubBillingStatus,
+          publicBadgeEligible: before.publicBadgeEligible,
+        }
+      : null,
+    after: {
+      githubBillingConnected: false,
+      githubBillingStatus: 'NOT_CONNECTED',
+      publicBadgeEligible: false,
+    },
+    run: async () => {
+      if (!before) return;
+      await prisma.userVerification.update({
+        where: { userId: target.id },
+        data: {
+          githubBillingConnected: false,
+          githubBillingStatus: 'NOT_CONNECTED',
+          verifiedAt: null,
+          lastHealthyAt: null,
+          currentPeriodKey: null,
+          localPremiumRequests: null,
+          verifiedPremiumRequests: null,
+          differenceAbsolute: null,
+          differencePercent: null,
+          mismatchScore: 0,
+          // Eligibility resets to false; manual badge overrides remain in
+          // AdminBadgeOverride and continue to take precedence on read.
+          publicBadgeEligible: false,
+        },
+      });
+    },
+  });
+
+  return { ok: true, cleared: !!before };
+}
+
+/**
+ * POST /api/admin/verification/[userId]/disconnect — admin disconnect handler.
+ *
+ * Refresh is intentionally NOT exposed at launch: it requires the GitHub-
+ * billing fetch worker (Verification Task 3.6). See `docs/launch-readiness-
+ * gap-analysis.md` for the launch-claim boundary.
+ */
+export async function disconnectVerificationHandler(
+  req: NextRequest,
+  ctx: { params: { userId: string } | Promise<{ userId: string }> },
+  deps: HandlerDeps = {},
+): Promise<NextResponse> {
+  const prisma = deps.prisma ?? defaultPrisma;
+
+  let admin;
+  try {
+    admin = await requireAdmin(req, { prisma, minRole: 'MODERATOR' });
+  } catch (err) {
+    const res = adminAuthErrorToResponse(err);
+    if (res) return res;
+    throw err;
+  }
+
+  const params = await Promise.resolve(ctx.params);
+  const ip = getClientIpFromHeaders(req.headers);
+  const result = await disconnectVerificationCore(
+    prisma,
+    { id: admin.id, email: admin.email },
+    params.userId,
+    {
+      ipHash: hashIp(ip),
+      userAgentHash: hashUserAgent(req.headers.get('user-agent')),
+    },
+  );
+  if ('error' in result) {
+    return NextResponse.json({ error: result.error }, { status: 404 });
+  }
+  return NextResponse.json(result);
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { generateCardSvg, formatNumber } from '@/lib/svg';
+import { isUserVisibleForFeature } from '@/lib/policy/userLifecycle';
 
 /**
  * GET /card/[username].svg
@@ -14,10 +15,10 @@ export async function GET(
 
   const user = await prisma.user.findUnique({
     where: { username },
-    include: { userStat: true },
+    include: { userStat: true, privacySettings: true },
   });
 
-  if (!user || !user.profilePublic || !user.userStat) {
+  if (!user || !isUserVisibleForFeature(user, 'profile') || !user.userStat) {
     return new NextResponse(
       `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="50"><text x="10" y="30" fill="#8b949e" font-family="sans-serif" font-size="14">User not found or profile is private.</text></svg>`,
       {

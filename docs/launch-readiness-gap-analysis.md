@@ -1,0 +1,185 @@
+# PromptStreak Launch Readiness Gap Analysis
+
+## Purpose
+This document translates the current research in [docs/reality.md](docs/reality.md) into an implementation-focused launch plan for the coming week.
+
+Primary objective:
+- Ship a trustworthy, supportable public web + API baseline next week.
+- Freeze public API behavior after launch hardening.
+- Start VS Code extension work only after the API contract is stable.
+
+## Source Inputs
+- [docs/reality.md](docs/reality.md)
+- [docs/promptstreak-verification-concrete-spec.md](docs/promptstreak-verification-concrete-spec.md)
+- [docs/promptstreak-verification-implementation-plan.md](docs/promptstreak-verification-implementation-plan.md)
+
+## Executive Read
+Current state is strong for core product usage (auth, linking, upload, profiles, leaderboards, badges), but there are trust, consistency, and operational gaps that are high-risk for a public launch.
+
+Most critical launch gap:
+- Verification runtime is incomplete relative to data model and docs (UploadAudit/VerificationAnomaly write path, refresh/disconnect API coverage, signed-upload parity).
+
+Most critical extension dependency gap:
+- Public API behavior is not yet frozen and docs are not fully aligned to runtime behavior.
+
+## Gap Inventory and Launch Impact
+
+| Gap | Current state | Launch risk | Priority |
+|---|---|---|---|
+| Upload verification telemetry not fully runtime-wired | Upload path does not consistently write UploadAudit/VerificationAnomaly in runtime | Trust claims and moderation confidence are weaker than expected | P0 |
+| Verification mutation endpoints missing | Read routes exist; refresh/disconnect routes are deferred | Incomplete user/admin verification lifecycle | P0 |
+| Mixed visibility enforcement paths | Some routes use new lifecycle policy, others legacy checks | Inconsistent public/private behavior and user confusion | P0 |
+| Public API and docs drift | Multiple docs claim behavior not yet implemented | Integration failures, support load, extension rework | P0 |
+| Abuse report persistence missing | Abuse reports sent by mail path but not persisted in runtime | Compliance/auditability and moderation workflow gaps | P1 |
+| SMTP backend not clearly active in production path | In-memory singleton still appears as active default in code path | Delivery reliability and incident response risk | P1 |
+| Repo visibility model migration incomplete | Legacy profilePublic path still active in places | Future policy complexity and inconsistent semantics | P1 |
+| Recovery code payload mismatch in admin flow | Verify payload mismatch noted in reality report | Operator lockout/support burden edge case | P1 |
+| Trigger-based audit immutability not environment-verified | SQL + runbook exist, deployment state uncertain | Audit integrity uncertainty in incidents | P1 |
+| Spec-only verification schema entities not implemented | Concrete spec includes entities not in runtime schema | Planning confusion, not an immediate blocker if scope narrowed | P2 |
+
+## Required Features Before Public Launch (P0)
+
+### 1) Verification Runtime Baseline
+Implement the minimum viable verification path that matches launch claims.
+
+Required outcomes:
+- Upload path writes UploadAudit for every upload.
+- Upload path writes VerificationAnomaly for invalid/replayed/stale signature outcomes.
+- Signature status is recorded consistently and queryable for admin/ops views.
+
+Exit criteria:
+- End-to-end integration test proves UploadAudit creation on unsigned and signed uploads.
+- End-to-end integration test proves anomaly creation on replay and invalid signature cases.
+- Admin verification/anomaly views display newly created records from live upload flow.
+
+### 2) Verification Lifecycle Endpoints (User + Admin)
+Close the most visible API lifecycle holes.
+
+Required outcomes:
+- User endpoint(s) for refresh/disconnect are present and functioning.
+- Admin mutation route(s) for verification refresh/disconnect are present or explicitly removed from claim surface.
+
+Exit criteria:
+- Contract tests for each route and status code family.
+- Settings/admin UI flows can exercise these endpoints without manual DB steps.
+
+### 3) Visibility Policy Consistency
+Eliminate mixed legacy/new visibility logic before broader traffic.
+
+Required outcomes:
+- Public surface routes and APIs consistently apply the same lifecycle policy logic.
+- No route should still rely on legacy-only profile checks if policy helper is intended source of truth.
+
+Exit criteria:
+- Route inventory checklist with each public route mapped to policy gate type.
+- Automated tests covering profile visibility, leaderboard eligibility, and badge visibility combinations.
+
+### 4) Public API Stabilization + Documentation Sync
+Freeze behavior before extension integration starts.
+
+Required outcomes:
+- Publish a canonical API contract (inputs, auth, status codes, error schema).
+- Remove or clearly mark non-implemented endpoints from docs.
+- Align web docs, verification docs, and implementation plan language to actual runtime.
+
+Exit criteria:
+- API contract doc approved as source of truth.
+- Breaking-change policy for post-launch updates documented.
+- No known doc/code contradictions in launch-critical routes.
+
+## Should Implement in Launch Week if Capacity Allows (P1)
+
+### 5) Abuse Report Persistence
+- Persist abuse submissions to AbuseReport (or equivalent) in addition to mail.
+- Ensure moderation can search and triage without mailbox dependency.
+
+### 6) Production Mail Path Hardening
+- Confirm SMTP service is active in runtime path (not only test path).
+- Add health signal and failure logging thresholds.
+
+### 7) Recovery Code Flow Fix
+- Align admin verify payload contract and handler expectations.
+- Add regression test for recovery-code login path.
+
+### 8) Audit Immutability Verification
+- Validate trigger deployment in each environment.
+- Add explicit operational check in runbook with evidence artifact.
+
+## Defer Until After Launch (P2)
+
+- Full spec-level expansion of verification schema entities not needed for immediate launch narrative.
+- Full migration off legacy visibility fields can proceed after launch if policy behavior is already consistent at the route level.
+- Hard enforcement cutoff for signed uploads can be staged after observing adoption metrics.
+
+## One-Week Implementation Sequence
+
+### Day 1
+- Lock launch scope and claims (P0 only).
+- Create route-level policy consistency checklist.
+- Freeze candidate API contract draft.
+
+### Day 2
+- Implement verification runtime baseline (UploadAudit + anomaly writes).
+- Add integration tests for signed/unsigned/replay/invalid cases.
+
+### Day 3
+- Implement missing verification lifecycle endpoints (refresh/disconnect).
+- Add user/admin contract tests.
+
+### Day 4
+- Complete visibility policy unification across public routes/APIs.
+- Add matrix tests for visibility outcomes.
+
+### Day 5
+- Resolve doc/code drift, publish canonical API contract, finalize launch claims.
+- Run launch readiness verification suite and generate evidence snapshot.
+
+### Day 6 (buffer)
+- P1 items by risk order: recovery payload fix, abuse persistence, SMTP runtime hardening.
+
+### Day 7 (go/no-go)
+- Execute go/no-go checklist.
+- Freeze API contract tag for extension team handoff.
+
+## API Freeze Criteria (Extension Unblock Gate)
+The VS Code extension work should start only after all criteria below are true:
+
+1. Upload API contract is stable and versioned.
+2. Auth and signature requirements are finalized with backward-compat notes.
+3. Error payload schema is standardized for 4xx/5xx responses.
+4. Verification lifecycle endpoints are present (or intentionally excluded and documented).
+5. Public visibility rules are deterministic and tested.
+6. Launch docs match runtime behavior for all launch-exposed endpoints.
+
+## Suggested Launch Claims Boundaries
+Use only claims backed by runtime behavior at launch.
+
+Safe claims once P0 done:
+- GitHub sign-in, device linking, usage upload, public profile/repo/leaderboard/badges.
+- Privacy and visibility controls with consistent policy behavior.
+- Verification and anti-cheat signals with clear scope language.
+
+Avoid until P1/P2 complete:
+- Fully end-to-end verified usage across all dimensions.
+- Guaranteed abuse persistence unless DB persistence is live.
+- Strong mail-delivery guarantees unless runtime SMTP path is confirmed.
+
+## Go/No-Go Checklist
+
+Go only if all items are true:
+- P0 exit criteria complete.
+- No known launch-critical doc/runtime contradictions.
+- Launch verification test suite green.
+- Incident runbook includes verification and mail-path checks.
+- API contract tagged and shared for extension handoff.
+
+No-Go if any of these remain:
+- Verification writes still test-only.
+- Route-level policy behavior still inconsistent.
+- Public docs still advertise non-existent endpoints.
+
+## Immediate Next Artifacts to Produce
+- API source-of-truth document for launch routes.
+- Route-level visibility gate matrix (public pages + public APIs).
+- Launch evidence report (test results + endpoint checks + operational checks).
+

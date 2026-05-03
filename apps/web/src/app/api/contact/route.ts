@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { mailService } from '@/lib/mail/mailService';
 import { getSessionUser } from '@/lib/auth';
+import { prisma } from '@/lib/db';
 
 // ---------------------------------------------------------------------------
 // In-process rate limiter: max 5 submissions per IP per hour.
@@ -46,6 +47,39 @@ function isValidUrl(value: string): boolean {
     return u.protocol === 'http:' || u.protocol === 'https:';
   } catch {
     return false;
+  }
+}
+
+/**
+ * Best-effort classification of an abuse-report subject from the offending
+ * URL. Keeps mapping conservative: anything we cannot parse is recorded as
+ * USER with the raw URL path as the identifier so moderators can still act.
+ */
+function classifyAbuseSubject(offendingUrl: string): {
+  subjectKind: 'USER' | 'REPO' | 'BADGE';
+  subjectIdentifier: string;
+} {
+  try {
+    const u = new URL(offendingUrl);
+    const segments = u.pathname.split('/').filter(Boolean);
+    const [first, second, ...rest] = segments;
+
+    if (first === 'r' && second && rest.length > 0) {
+      // /r/[username]/[...repo]
+      return { subjectKind: 'REPO', subjectIdentifier: `${second}/${rest.join('/')}`.slice(0, 200) };
+    }
+    if (first === 'u' && second) {
+      // /u/[username] (and nested e.g. /u/x/achievements)
+      return { subjectKind: 'USER', subjectIdentifier: second.slice(0, 200) };
+    }
+    if (first === 'badge' || first === 'card' || (first === 'api' && second === 'badges')) {
+      const candidate = first === 'api' ? rest[0] : second;
+      const ident = (candidate ?? '').replace(/\.svg$/i, '');
+      return { subjectKind: 'BADGE', subjectIdentifier: (ident || u.pathname).slice(0, 200) };
+    }
+    return { subjectKind: 'USER', subjectIdentifier: u.pathname.slice(0, 200) || offendingUrl.slice(0, 200) };
+  } catch {
+    return { subjectKind: 'USER', subjectIdentifier: offendingUrl.slice(0, 200) };
   }
 }
 
@@ -104,6 +138,27 @@ export async function POST(req: NextRequest) {
     if (!contactEmail) {
       console.error('[contact] CONTACT_EMAIL env var not set');
       return NextResponse.json({ ok: true }); // silent — don't reveal config gaps
+    }
+
+    // Persist the report first so moderation has a durable record even if
+    // outbound mail later fails. Persistence failures must not silently drop
+    // the report — we surface a 500 so the client can retry.
+    const { subjectKind, subjectIdentifier } = classifyAbuseSubject(offendingUrl);
+    try {
+      await prisma.abuseReport.create({
+        data: {
+          reporterUserId: userId,
+          reporterEmail,
+          reporterIpHash: ipHash,
+          subjectKind,
+          subjectIdentifier,
+          reason: violationType || 'unspecified',
+          description,
+        },
+      });
+    } catch (err) {
+      console.error('[contact] failed to persist abuse report', err);
+      return NextResponse.json({ error: 'Could not record the report. Please try again.' }, { status: 500 });
     }
 
     const mail = mailService;

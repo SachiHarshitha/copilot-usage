@@ -25,14 +25,13 @@ export default async function AchievementsPage({
 
   const user = await prisma.user.findUnique({
     where: { username },
-    include: { userStat: true },
+    include: { userStat: true, privacySettings: true },
   });
 
   if (
     !user ||
     !canViewProfile({
-      profilePublic: user.profilePublic,
-      ownerUserId: user.id,
+      user,
       viewerUserId: sessionUser?.userId || null,
     }) ||
     !user.userStat
