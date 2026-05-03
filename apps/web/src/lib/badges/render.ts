@@ -146,7 +146,7 @@ export function renderRankCardSvg({
   <text x="160" y="118" text-anchor="middle" font-size="12" font-weight="700" fill="#cbd5e1" font-family="Inter, Arial, sans-serif">${escapeXml(tone.toUpperCase())}</text>
   <rect x="44" y="128" width="232" height="3" rx="2" fill="rgba(255,255,255,.08)"/>
   <rect x="44" y="128" width="${barWidth}" height="3" rx="2" fill="url(#bar)"/>
-  <text x="160" y="168" text-anchor="middle" font-size="10" fill="rgba(255,255,255,.24)" letter-spacing=".8" font-family="Inter, Arial, sans-serif">${escapeXml(watermark)}</text>
+  <text x="160" y="163" text-anchor="middle" font-size="10" fill="rgba(255,255,255,.24)" letter-spacing=".8" font-family="Inter, Arial, sans-serif">${escapeXml(watermark)}</text>
 </svg>`;
 }
 

@@ -6,6 +6,8 @@ import {
   userVisibleForFeatureSql,
   userVisibleForFeatureWhere,
 } from '@/lib/policy/userLifecycle';
+import { getDictionary } from '@/lib/i18n/dictionary';
+import { getRequestLocale } from '@/lib/i18n/server';
 
 interface SearchParams {
   sort?: string;
@@ -21,6 +23,9 @@ export default async function LeaderboardPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
+  const locale = await getRequestLocale();
+  const dictionary = getDictionary(locale);
+  const numberFormatter = new Intl.NumberFormat(locale);
   const sort = params.sort === 'premium' ? 'premium' : 'tokens';
   const since = params.since; // '7d' | '30d' | undefined (all-time)
   const page = Math.max(1, parseInt(params.page || '1', 10));
@@ -113,31 +118,31 @@ export default async function LeaderboardPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-6">Leaderboard</h1>
+      <h1 className="text-2xl font-bold text-white mb-6">{dictionary.leaderboard.title}</h1>
 
       <div className="flex gap-3 mb-4 flex-wrap">
         <Link
           href="/leaderboard/repos"
           className="text-sm border border-[#30363d] text-[#8b949e] px-3 py-1 rounded-md no-underline hover:border-[#8b949e] hover:text-white"
         >
-          Repo Leaderboard
+          {dictionary.leaderboard.repoLeaderboard}
         </Link>
         <Link
           href="/leaderboard/ides"
           className="text-sm border border-[#30363d] text-[#8b949e] px-3 py-1 rounded-md no-underline hover:border-[#8b949e] hover:text-white"
         >
-          IDE Ranking
+          {dictionary.leaderboard.ideRanking}
         </Link>
       </div>
 
       {/* Filters */}
       <div className="flex gap-3 mb-6 flex-wrap">
-        <FilterLink href="/leaderboard" active={!since} label="All Time" />
-        <FilterLink href={`/leaderboard?since=30d&sort=${sort}`} active={since === '30d'} label="Last 30 Days" />
-        <FilterLink href={`/leaderboard?since=7d&sort=${sort}`} active={since === '7d'} label="Last 7 Days" />
+        <FilterLink href="/leaderboard" active={!since} label={dictionary.leaderboard.allTime} />
+        <FilterLink href={`/leaderboard?since=30d&sort=${sort}`} active={since === '30d'} label={dictionary.leaderboard.last30d} />
+        <FilterLink href={`/leaderboard?since=7d&sort=${sort}`} active={since === '7d'} label={dictionary.leaderboard.last7d} />
         <span className="text-[#30363d]">|</span>
-        <FilterLink href={`/leaderboard?sort=tokens${since ? `&since=${since}` : ''}`} active={sort === 'tokens'} label="By Tokens" />
-        <FilterLink href={`/leaderboard?sort=premium${since ? `&since=${since}` : ''}`} active={sort === 'premium'} label="By Premium" />
+        <FilterLink href={`/leaderboard?sort=tokens${since ? `&since=${since}` : ''}`} active={sort === 'tokens'} label={dictionary.leaderboard.byTokens} />
+        <FilterLink href={`/leaderboard?sort=premium${since ? `&since=${since}` : ''}`} active={sort === 'premium'} label={dictionary.leaderboard.byPremium} />
       </div>
 
       {/* Table */}
@@ -146,21 +151,21 @@ export default async function LeaderboardPage({
           <thead>
             <tr className="border-b border-[#30363d] text-[#8b949e]">
               <th className="text-left py-3 px-2 w-12">#</th>
-              <th className="text-left py-3 px-2">User</th>
-              <th className="text-left py-3 px-2">Rank</th>
-              <th className="text-right py-3 px-2">Total Tokens</th>
-              <th className="text-right py-3 px-2">Streak</th>
-              <th className="text-right py-3 px-2">Premium Reqs</th>
-              <th className="text-right py-3 px-2">Requests</th>
-              <th className="text-right py-3 px-2">Top Model</th>
-              <th className="text-right py-3 px-2">Workspaces</th>
+              <th className="text-left py-3 px-2">{dictionary.leaderboard.colUser}</th>
+              <th className="text-left py-3 px-2">{dictionary.leaderboard.colRank}</th>
+              <th className="text-right py-3 px-2">{dictionary.leaderboard.colTotalTokens}</th>
+              <th className="text-right py-3 px-2">{dictionary.leaderboard.colStreak}</th>
+              <th className="text-right py-3 px-2">{dictionary.leaderboard.colPremiumReqs}</th>
+              <th className="text-right py-3 px-2">{dictionary.leaderboard.colRequests}</th>
+              <th className="text-right py-3 px-2">{dictionary.leaderboard.colTopModel}</th>
+              <th className="text-right py-3 px-2">{dictionary.leaderboard.colWorkspaces}</th>
             </tr>
           </thead>
           <tbody>
             {entries.length === 0 && (
               <tr>
                 <td colSpan={9} className="py-12 text-center text-[#8b949e]">
-                  No public users yet. Be the first to share your stats!
+                  {dictionary.leaderboard.empty}
                 </td>
               </tr>
             )}
@@ -182,10 +187,10 @@ export default async function LeaderboardPage({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={`/api/badges/${e.username}/rank.svg`} alt={`${e.username} rank`} className="h-7 w-auto" />
                   </td>
-                  <td className="py-3 px-2 text-right font-mono">{Number(e.totalTokens).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right font-mono">{numberFormatter.format(Number(e.totalTokens))}</td>
                   <td className="py-3 px-2 text-right font-mono">🔥 {e.currentStreakDays}</td>
                   <td className="py-3 px-2 text-right font-mono">{e.premiumRequests.toFixed(1)}</td>
-                  <td className="py-3 px-2 text-right font-mono">{e.totalRequests.toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right font-mono">{numberFormatter.format(e.totalRequests)}</td>
                   <td className="py-3 px-2 text-right text-[#8b949e]">{e.topModel || '–'}</td>
                   <td className="py-3 px-2 text-right">{e.workspaceCount}</td>
                 </tr>
@@ -202,7 +207,7 @@ export default async function LeaderboardPage({
             href={`/leaderboard?page=${page - 1}${sort !== 'tokens' ? `&sort=${sort}` : ''}${since ? `&since=${since}` : ''}`}
             className="text-sm border border-[#30363d] px-3 py-1.5 rounded-md no-underline hover:border-[#8b949e]"
           >
-            ← Previous
+            {dictionary.leaderboard.prev}
           </Link>
         )}
         {entries.length === PAGE_SIZE && (
@@ -210,7 +215,7 @@ export default async function LeaderboardPage({
             href={`/leaderboard?page=${page + 1}${sort !== 'tokens' ? `&sort=${sort}` : ''}${since ? `&since=${since}` : ''}`}
             className="text-sm border border-[#30363d] px-3 py-1.5 rounded-md no-underline hover:border-[#8b949e]"
           >
-            Next →
+            {dictionary.leaderboard.next}
           </Link>
         )}
       </div>

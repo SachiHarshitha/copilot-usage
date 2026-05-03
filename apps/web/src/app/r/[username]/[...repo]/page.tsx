@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { getDictionary } from '@/lib/i18n/dictionary';
+import { getRequestLocale } from '@/lib/i18n/server';
 
 export default async function RepoPage({
   params,
@@ -8,6 +10,10 @@ export default async function RepoPage({
   params: Promise<{ username: string; repo: string[] }>;
 }) {
   const { username, repo } = await params;
+  const locale = await getRequestLocale();
+  const dictionary = getDictionary(locale);
+  const numberFormatter = new Intl.NumberFormat(locale);
+  const dateFormatter = new Intl.DateTimeFormat(locale);
   const repoSlug = repo.join('/');
 
   const user = await prisma.user.findUnique({ where: { username } });
@@ -30,30 +36,31 @@ export default async function RepoPage({
     <div>
       <div className="mb-6">
         <Link href={`/u/${username}`} className="text-sm text-[#8b949e] hover:text-white">
-          ← Back to {username}&apos;s profile
+          ← {dictionary.repoPage.back} @{username}
         </Link>
       </div>
 
       <h1 className="text-2xl font-bold text-white mb-2">{repoSlug}</h1>
       <p className="text-sm text-[#8b949e] mb-8">
-        by <Link href={`/u/${username}`}>@{username}</Link>
-        {' · '}Last synced {repoStat.lastSyncedAt.toLocaleDateString()}
+        {dictionary.repoPage.by} <Link href={`/u/${username}`}>@{username}</Link>
+        {' · '}
+        {dictionary.repoPage.lastSynced} {dateFormatter.format(repoStat.lastSyncedAt)}
       </p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <KpiCard label="Total Tokens" value={Number(repoStat.totalTokens).toLocaleString()} />
-        <KpiCard label="Requests" value={repoStat.requests.toLocaleString()} />
-        <KpiCard label="Prompt Tokens" value={Number(repoStat.promptTokens).toLocaleString()} />
-        <KpiCard label="Output Tokens" value={Number(repoStat.outputTokens).toLocaleString()} />
+        <KpiCard label={dictionary.repoPage.totalTokens} value={numberFormatter.format(Number(repoStat.totalTokens))} />
+        <KpiCard label={dictionary.repoPage.requests} value={numberFormatter.format(repoStat.requests)} />
+        <KpiCard label={dictionary.repoPage.promptTokens} value={numberFormatter.format(Number(repoStat.promptTokens))} />
+        <KpiCard label={dictionary.repoPage.outputTokens} value={numberFormatter.format(Number(repoStat.outputTokens))} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <KpiCard label="Premium Requests" value={repoStat.premiumReqs.toFixed(1)} />
-        <KpiCard label="Top Model" value={repoStat.topModel || 'N/A'} />
+        <KpiCard label={dictionary.repoPage.premiumRequests} value={repoStat.premiumReqs.toFixed(1)} />
+        <KpiCard label={dictionary.repoPage.topModel} value={repoStat.topModel || dictionary.repoPage.na} />
       </div>
 
       <div className="mt-8 bg-[#161b22] border border-[#30363d] rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Embed Repo Badges</h2>
+        <h2 className="text-lg font-semibold text-white mb-4">{dictionary.repoPage.embedTitle}</h2>
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={leaderboardBadgeUrl} alt="Repo rank badge" className="mb-2" />

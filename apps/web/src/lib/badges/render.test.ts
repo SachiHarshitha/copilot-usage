@@ -76,6 +76,13 @@ test('renderRankCardSvg and renderAchievementCardSvg include key fields', () => 
 
   assert.equal(rankSvg.includes('GOLD'), true);
   assert.equal(rankSvg.includes('GO'), true);
+  assert.equal(
+    /<text x="160" y="163" text-anchor="middle" font-size="10"[\s\S]*promptstreak\.dev<\/text>/.test(
+      rankSvg,
+    ),
+    true,
+    'rank watermark should stay inside the bottom border with a safe baseline',
+  );
   assert.equal(achievementSvg.includes('LIFETIME'), true);
   assert.equal(achievementSvg.includes('Spark'), true);
 });

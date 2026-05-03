@@ -2,17 +2,36 @@
 
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { useI18n } from '@/app/components/i18n-provider';
 
-const VIOLATION_TYPES = [
+const VIOLATION_VALUES = [
   'Harassment',
   'Impersonation',
   'Unlawful content',
   'Spam',
   'Other',
 ] as const;
-type ViolationType = (typeof VIOLATION_TYPES)[number];
+type ViolationType = (typeof VIOLATION_VALUES)[number];
+
+function getViolationLabel(value: ViolationType, dictionary: ReturnType<typeof useI18n>['dictionary']): string {
+  switch (value) {
+    case 'Harassment':
+      return dictionary.reportForm.violations.harassment;
+    case 'Impersonation':
+      return dictionary.reportForm.violations.impersonation;
+    case 'Unlawful content':
+      return dictionary.reportForm.violations.unlawfulContent;
+    case 'Spam':
+      return dictionary.reportForm.violations.spam;
+    case 'Other':
+      return dictionary.reportForm.violations.other;
+    default:
+      return value;
+  }
+}
 
 export default function ReportAbusePage() {
+  const { dictionary } = useI18n();
   const [offendingUrl, setOffendingUrl] = useState('');
   const [violationType, setViolationType] = useState<ViolationType>('Harassment');
   const [description, setDescription] = useState('');
@@ -33,7 +52,7 @@ export default function ReportAbusePage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { error?: string }).error ?? 'Submission failed. Please try again.');
+        setError((data as { error?: string }).error ?? dictionary.reportForm.submissionFailed);
         return;
       }
       setSuccess(true);
@@ -45,13 +64,12 @@ export default function ReportAbusePage() {
   if (success) {
     return (
       <div className="max-w-2xl mx-auto w-full">
-        <LegalCard title="Report abuse" lastUpdated="2026-04-21">
+        <LegalCard title={dictionary.reportForm.title} lastUpdated="2026-04-21">
           <div className="flex flex-col items-center py-8 text-center gap-3">
             <span className="text-3xl text-green-400">✓</span>
-            <p className="text-white font-medium">Report received</p>
+            <p className="text-white font-medium">{dictionary.reportForm.successTitle}</p>
             <p className="text-sm text-[#8b949e]">
-              Thank you for your report. We investigate all legitimate reports and act on confirmed
-              violations.
+              {dictionary.reportForm.successBody}
             </p>
           </div>
         </LegalCard>
@@ -61,15 +79,14 @@ export default function ReportAbusePage() {
 
   return (
     <div className="max-w-2xl mx-auto w-full">
-      <LegalCard title="Report abuse" lastUpdated="2026-04-21">
+      <LegalCard title={dictionary.reportForm.title} lastUpdated="2026-04-21">
         <Section>
           <p className="text-sm text-[#8b949e] leading-relaxed">
-            Use this form to report harassment, impersonation, unlawful content, or any other
-            violation of our{' '}
+            {dictionary.reportForm.intro}{' '}
             <a href="/terms" className="text-brand-400 hover:text-brand-300 underline">
-              Terms of Use
+              {dictionary.reportForm.terms}
             </a>
-            . We acknowledge legitimate reports promptly and act on confirmed violations.
+            {dictionary.reportForm.introTail}
           </p>
         </Section>
 
@@ -77,33 +94,33 @@ export default function ReportAbusePage() {
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
-                Offending URL <span className="text-red-400">*</span>
+                {dictionary.reportForm.offendingUrl} <span className="text-red-400">*</span>
               </label>
               <input
                 type="url"
                 required
                 value={offendingUrl}
                 onChange={(e) => setOffendingUrl(e.target.value)}
-                placeholder="https://promptstreak.dev/u/..."
+                placeholder={dictionary.reportForm.urlPlaceholder}
                 className={inputClass}
               />
               <p className="mt-1 text-xs text-[#484f58]">
-                The profile, repo badge, or page URL that violates our terms.
+                {dictionary.reportForm.urlHint}
               </p>
             </div>
 
             <div>
               <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
-                Violation type <span className="text-red-400">*</span>
+                {dictionary.reportForm.violationType} <span className="text-red-400">*</span>
               </label>
               <select
                 value={violationType}
                 onChange={(e) => setViolationType(e.target.value as ViolationType)}
                 className={inputClass}
               >
-                {VIOLATION_TYPES.map((t) => (
+                {VIOLATION_VALUES.map((t) => (
                   <option key={t} value={t}>
-                    {t}
+                    {getViolationLabel(t, dictionary)}
                   </option>
                 ))}
               </select>
@@ -112,7 +129,7 @@ export default function ReportAbusePage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-medium text-[#8b949e]">
-                  Description <span className="text-red-400">*</span>
+                  {dictionary.reportForm.description} <span className="text-red-400">*</span>
                 </label>
                 <span className="text-xs text-[#484f58]">{description.length}/2000</span>
               </div>
@@ -121,25 +138,25 @@ export default function ReportAbusePage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value.slice(0, 2000))}
                 rows={5}
-                placeholder="Describe the violation in detail..."
+                placeholder={dictionary.reportForm.descriptionPlaceholder}
                 className={`${inputClass} resize-y`}
               />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
-                Your email <span className="text-red-400">*</span>
+                {dictionary.reportForm.yourEmail} <span className="text-red-400">*</span>
               </label>
               <input
                 type="email"
                 required
                 value={reporterEmail}
                 onChange={(e) => setReporterEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={dictionary.reportForm.emailPlaceholder}
                 className={inputClass}
               />
               <p className="mt-1 text-xs text-[#484f58]">
-                Used only to confirm receipt — never shared publicly.
+                {dictionary.reportForm.emailHint}
               </p>
             </div>
 
@@ -150,7 +167,7 @@ export default function ReportAbusePage() {
             )}
 
             <button type="submit" disabled={busy} className={submitClass}>
-              {busy ? 'Submitting…' : 'Submit report'}
+              {busy ? dictionary.reportForm.submitting : dictionary.reportForm.submit}
             </button>
           </form>
         </Section>

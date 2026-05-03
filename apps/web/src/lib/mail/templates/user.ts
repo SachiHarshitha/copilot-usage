@@ -88,13 +88,12 @@ export function registerUserTemplates(): void {
   registerMailTemplate(abuseReportTemplate);
 }
 
-registerUserTemplates();
-
 export interface ContactInquiryVars {
   name: string;
   email: string;
   category: string;
   message: string;
+  userId?: string;
 }
 
 export const contactInquiryTemplate: MailTemplate<ContactInquiryVars> = {
@@ -103,6 +102,7 @@ export const contactInquiryTemplate: MailTemplate<ContactInquiryVars> = {
     subject: `Contact form submission — ${vars.category}`,
     text:
       `New contact form submission on promptstreak.dev\n\n` +
+      `User ID: ${vars.userId || '(anonymous)'}\n` +
       `Name: ${vars.name || '(not provided)'}\n` +
       `Email: ${vars.email}\n` +
       `Category: ${vars.category}\n\n` +
@@ -110,6 +110,7 @@ export const contactInquiryTemplate: MailTemplate<ContactInquiryVars> = {
     html:
       `<p><strong>New contact form submission on promptstreak.dev</strong></p>` +
       `<table>` +
+      `<tr><td><strong>User ID:</strong></td><td>${escapeHtml(vars.userId || '(anonymous)')}</td></tr>` +
       `<tr><td><strong>Name:</strong></td><td>${escapeHtml(vars.name || '(not provided)')}</td></tr>` +
       `<tr><td><strong>Email:</strong></td><td>${escapeHtml(vars.email)}</td></tr>` +
       `<tr><td><strong>Category:</strong></td><td>${escapeHtml(vars.category)}</td></tr>` +
@@ -124,6 +125,7 @@ export interface AbuseReportVars {
   violationType: string;
   description: string;
   reporterEmail: string;
+  userId?: string;
 }
 
 export const abuseReportTemplate: MailTemplate<AbuseReportVars> = {
@@ -132,6 +134,7 @@ export const abuseReportTemplate: MailTemplate<AbuseReportVars> = {
     subject: `Abuse report — ${vars.violationType}`,
     text:
       `New abuse report on promptstreak.dev\n\n` +
+      `User ID: ${vars.userId || '(anonymous)'}\n` +
       `Offending URL: ${vars.offendingUrl}\n` +
       `Violation type: ${vars.violationType}\n` +
       `Reporter email: ${vars.reporterEmail}\n\n` +
@@ -139,6 +142,7 @@ export const abuseReportTemplate: MailTemplate<AbuseReportVars> = {
     html:
       `<p><strong>New abuse report on promptstreak.dev</strong></p>` +
       `<table>` +
+      `<tr><td><strong>User ID:</strong></td><td>${escapeHtml(vars.userId || '(anonymous)')}</td></tr>` +
       `<tr><td><strong>Offending URL:</strong></td><td><a href="${escapeHtml(safeUrl(vars.offendingUrl))}">${escapeHtml(vars.offendingUrl)}</a></td></tr>` +
       `<tr><td><strong>Violation type:</strong></td><td>${escapeHtml(vars.violationType)}</td></tr>` +
       `<tr><td><strong>Reporter email:</strong></td><td>${escapeHtml(vars.reporterEmail)}</td></tr>` +
@@ -162,3 +166,5 @@ function escapeHtml(input: string): string {
 function safeUrl(input: string): string {
   return /^https?:\/\//i.test(input) ? input : 'about:blank';
 }
+
+registerUserTemplates();

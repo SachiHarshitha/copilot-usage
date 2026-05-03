@@ -2,14 +2,31 @@
 
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { useI18n } from '@/app/components/i18n-provider';
 
-const CATEGORIES = ['General', 'Privacy', 'Security', 'Other'] as const;
-type Category = (typeof CATEGORIES)[number];
+const CATEGORY_VALUES = ['General', 'Privacy', 'Security', 'Other'] as const;
+type CategoryValue = (typeof CATEGORY_VALUES)[number];
+
+function getCategoryLabel(value: CategoryValue, dictionary: ReturnType<typeof useI18n>['dictionary']): string {
+  switch (value) {
+    case 'General':
+      return dictionary.contactForm.categories.general;
+    case 'Privacy':
+      return dictionary.contactForm.categories.privacy;
+    case 'Security':
+      return dictionary.contactForm.categories.security;
+    case 'Other':
+      return dictionary.contactForm.categories.other;
+    default:
+      return value;
+  }
+}
 
 export default function ContactPage() {
+  const { dictionary } = useI18n();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [category, setCategory] = useState<Category>('General');
+  const [category, setCategory] = useState<CategoryValue>('General');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -27,7 +44,7 @@ export default function ContactPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { error?: string }).error ?? 'Submission failed. Please try again.');
+        setError((data as { error?: string }).error ?? dictionary.contactForm.submissionFailed);
         return;
       }
       setSuccess(true);
@@ -39,12 +56,12 @@ export default function ContactPage() {
   if (success) {
     return (
       <div className="max-w-2xl mx-auto w-full">
-        <LegalCard title="Contact" lastUpdated="2026-04-21">
+        <LegalCard title={dictionary.contactForm.title} lastUpdated="2026-04-21">
           <div className="flex flex-col items-center py-8 text-center gap-3">
             <span className="text-3xl text-green-400">✓</span>
-            <p className="text-white font-medium">Message sent</p>
+            <p className="text-white font-medium">{dictionary.contactForm.successTitle}</p>
             <p className="text-sm text-[#8b949e]">
-              Thank you for reaching out. We&apos;ll get back to you as soon as possible.
+              {dictionary.contactForm.successBody}
             </p>
           </div>
         </LegalCard>
@@ -54,15 +71,14 @@ export default function ContactPage() {
 
   return (
     <div className="max-w-2xl mx-auto w-full">
-      <LegalCard title="Contact" lastUpdated="2026-04-21">
+      <LegalCard title={dictionary.contactForm.title} lastUpdated="2026-04-21">
         <Section>
           <p className="text-sm text-[#8b949e] leading-relaxed">
-            Use this form for privacy, security or general questions about promptstreak.dev. For
-            abuse or content violations, use the{' '}
+            {dictionary.contactForm.intro}{' '}
             <a href="/report-abuse" className="text-brand-400 hover:text-brand-300 underline">
-              Report abuse
+              {dictionary.contactForm.reportAbuse}
             </a>{' '}
-            page instead.
+            {dictionary.contactForm.pageInstead}
           </p>
         </Section>
 
@@ -70,42 +86,43 @@ export default function ContactPage() {
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
-                Name <span className="text-[#484f58]">(optional)</span>
+                {dictionary.contactForm.name}{' '}
+                <span className="text-[#484f58]">{dictionary.contactForm.optional}</span>
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 maxLength={200}
-                placeholder="Your name"
+                placeholder={dictionary.contactForm.namePlaceholder}
                 className={inputClass}
               />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
-                Email <span className="text-red-400">*</span>
+                {dictionary.contactForm.email} <span className="text-red-400">*</span>
               </label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder={dictionary.contactForm.emailPlaceholder}
                 className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#8b949e] mb-1.5">Category</label>
+              <label className="block text-xs font-medium text-[#8b949e] mb-1.5">{dictionary.contactForm.category}</label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as Category)}
+                onChange={(e) => setCategory(e.target.value as CategoryValue)}
                 className={inputClass}
               >
-                {CATEGORIES.map((c) => (
+                {CATEGORY_VALUES.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {getCategoryLabel(c, dictionary)}
                   </option>
                 ))}
               </select>
@@ -114,7 +131,7 @@ export default function ContactPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-medium text-[#8b949e]">
-                  Message <span className="text-red-400">*</span>
+                  {dictionary.contactForm.message} <span className="text-red-400">*</span>
                 </label>
                 <span className="text-xs text-[#484f58]">{message.length}/2000</span>
               </div>
@@ -123,7 +140,7 @@ export default function ContactPage() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value.slice(0, 2000))}
                 rows={5}
-                placeholder="Describe your question or request..."
+                placeholder={dictionary.contactForm.messagePlaceholder}
                 className={`${inputClass} resize-y`}
               />
             </div>
@@ -135,7 +152,7 @@ export default function ContactPage() {
             )}
 
             <button type="submit" disabled={busy} className={submitClass}>
-              {busy ? 'Sending…' : 'Send message'}
+              {busy ? dictionary.contactForm.sending : dictionary.contactForm.send}
             </button>
           </form>
         </Section>

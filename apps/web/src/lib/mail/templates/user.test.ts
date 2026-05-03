@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 
 import { _resetMailTemplates } from '../templates';
 import {
+  abuseReportTemplate,
   accountSuspendedTemplate,
+  contactInquiryTemplate,
   deviceRevokedTemplate,
   registerUserTemplates,
 } from './user';
@@ -58,4 +60,32 @@ test('href URLs other than http(s) collapse to about:blank (no javascript: URIs)
   });
   assert.match(out.html, /href="about:blank"/);
   assert.equal(out.html.includes('javascript:'), false);
+});
+
+test('contact-inquiry includes userId when provided', () => {
+  freshRegistry();
+  const out = contactInquiryTemplate.render({
+    name: 'Alex',
+    email: 'alex@example.com',
+    category: 'General',
+    message: 'Need help with my account',
+    userId: 'usr_12345',
+  });
+
+  assert.match(out.text, /User ID:\s*usr_12345/);
+  assert.match(out.html, /<strong>User ID:<\/strong>/);
+  assert.match(out.html, /usr_12345/);
+});
+
+test('abuse-report includes anonymous marker when userId is missing', () => {
+  freshRegistry();
+  const out = abuseReportTemplate.render({
+    offendingUrl: 'https://promptstreak.dev/u/spam-user',
+    violationType: 'Spam',
+    description: 'Repeated badge spam',
+    reporterEmail: 'reporter@example.com',
+  });
+
+  assert.match(out.text, /User ID:\s*\(anonymous\)/);
+  assert.match(out.html, /\(anonymous\)/);
 });

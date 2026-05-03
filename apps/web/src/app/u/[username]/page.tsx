@@ -6,6 +6,8 @@ import { computeRank, computeUnlockedLifetime, computeUnlockedStreak } from '@/l
 import { getSessionUser } from '@/lib/auth';
 import { canViewProfile } from '@/lib/profile-policy';
 import { getAllowedAvatarUrl } from '@/lib/profile-menu';
+import { getDictionary } from '@/lib/i18n/dictionary';
+import { getRequestLocale } from '@/lib/i18n/server';
 
 export default async function ProfilePage({
   params,
@@ -14,6 +16,10 @@ export default async function ProfilePage({
 }) {
   const { username } = await params;
   const sessionUser = await getSessionUser();
+  const locale = await getRequestLocale();
+  const dictionary = getDictionary(locale);
+  const numberFormatter = new Intl.NumberFormat(locale);
+  const dateFormatter = new Intl.DateTimeFormat(locale);
 
   const user = await prisma.user.findUnique({
     where: { username },
@@ -70,13 +76,13 @@ export default async function ProfilePage({
         <div className="flex items-start gap-3 rounded-lg border border-red-700/50 bg-red-950/40 px-4 py-3 text-sm text-red-300 mb-6">
           <span className="mt-0.5 text-red-400">⚠</span>
           <div>
-            <p className="font-medium text-red-200 mb-1">Your account is suspended</p>
+            <p className="font-medium text-red-200 mb-1">{dictionary.profile.suspendedTitle}</p>
             <p className="text-red-400">
-              This profile and your stats are hidden from other users.{' '}
+              {dictionary.profile.suspendedBody}{' '}
               <Link href="/contact" className="underline text-red-300 hover:text-white">
-                Contact support
+                {dictionary.profile.contactSupport}
               </Link>{' '}
-              if you believe this is an error.
+              {dictionary.profile.suspendedErrorTail}
             </p>
           </div>
         </div>
@@ -90,38 +96,38 @@ export default async function ProfilePage({
         <div>
           <h1 className="text-2xl font-bold text-white">{user.displayName || user.username}</h1>
           <p className="text-sm text-[#8b949e]">
-            @{user.username} · Joined {user.createdAt.toLocaleDateString()}
-            {stat?.lastSyncedAt && ` · Last synced ${stat.lastSyncedAt.toLocaleDateString()}`}
+            @{user.username} · {dictionary.profile.joined} {dateFormatter.format(user.createdAt)}
+            {stat?.lastSyncedAt && ` · ${dictionary.profile.lastSynced} ${dateFormatter.format(stat.lastSyncedAt)}`}
           </p>
         </div>
       </div>
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <KpiCard label="Total Tokens" value={stat ? Number(stat.totalTokens).toLocaleString() : '0'} />
-        <KpiCard label="Current Streak" value={stat ? `${stat.currentStreakDays} days` : '0'} />
-        <KpiCard label="Premium Requests" value={stat ? stat.premiumRequests.toFixed(1) : '0'} />
-        <KpiCard label="30-Day Tokens" value={stat ? Number(stat.rolling30DayTokens).toLocaleString() : '0'} />
-        <KpiCard label="Best Streak" value={stat ? `${stat.bestStreakDays} days` : '0'} />
+        <KpiCard label={dictionary.profile.totalTokens} value={stat ? numberFormatter.format(Number(stat.totalTokens)) : '0'} />
+        <KpiCard label={dictionary.profile.currentStreak} value={stat ? `${stat.currentStreakDays} ${dictionary.profile.days}` : '0'} />
+        <KpiCard label={dictionary.profile.premiumRequests} value={stat ? stat.premiumRequests.toFixed(1) : '0'} />
+        <KpiCard label={dictionary.profile.rolling30d} value={stat ? numberFormatter.format(Number(stat.rolling30DayTokens)) : '0'} />
+        <KpiCard label={dictionary.profile.bestStreak} value={stat ? `${stat.bestStreakDays} ${dictionary.profile.days}` : '0'} />
       </div>
 
       {/* Additional stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        <KpiCard label="Total Requests" value={stat ? stat.totalRequests.toLocaleString() : '0'} />
-        <KpiCard label="This Week" value={stat ? Number(stat.weeklyTokens).toLocaleString() : '0'} />
-        <KpiCard label="Prompt Tokens" value={stat ? Number(stat.promptTokens).toLocaleString() : '0'} />
-        <KpiCard label="Output Tokens" value={stat ? Number(stat.outputTokens).toLocaleString() : '0'} />
-        <KpiCard label="Top Model" value={stat?.topModel || 'N/A'} />
-        <KpiCard label="Workspaces" value={stat ? stat.workspaceCount.toString() : '0'} />
+        <KpiCard label={dictionary.profile.totalRequests} value={stat ? numberFormatter.format(stat.totalRequests) : '0'} />
+        <KpiCard label={dictionary.profile.thisWeek} value={stat ? numberFormatter.format(Number(stat.weeklyTokens)) : '0'} />
+        <KpiCard label={dictionary.profile.promptTokens} value={stat ? numberFormatter.format(Number(stat.promptTokens)) : '0'} />
+        <KpiCard label={dictionary.profile.outputTokens} value={stat ? numberFormatter.format(Number(stat.outputTokens)) : '0'} />
+        <KpiCard label={dictionary.profile.topModel} value={stat?.topModel || dictionary.profile.na} />
+        <KpiCard label={dictionary.profile.workspaces} value={stat ? stat.workspaceCount.toString() : '0'} />
       </div>
 
       {/* Rank card */}
       {rankCardUrl && (
         <div className="mb-8 bg-[#161b22] border border-[#30363d] rounded-lg p-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-white">Current Rank</h2>
+            <h2 className="text-lg font-semibold text-white">{dictionary.profile.currentRank}</h2>
             <Link href={`/u/${username}/achievements`} className="text-xs text-[#8b949e] hover:text-white no-underline">
-              View full achievements
+              {dictionary.profile.viewAchievements}
             </Link>
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -132,7 +138,7 @@ export default async function ProfilePage({
       {/* Achievement preview */}
       {featuredAchievements.length > 0 && (
         <div className="mb-8 bg-[#161b22] border border-[#30363d] rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Unlocked Achievements</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">{dictionary.profile.unlockedAchievements}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {featuredAchievements.map((key) => {
               const url = `/api/badges/${username}/achievements/${key}.svg`;
@@ -150,16 +156,16 @@ export default async function ProfilePage({
       {/* Public Repos */}
       {user.repoStats.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-lg font-semibold text-white mb-4">Public Repos / Projects</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">{dictionary.profile.publicRepos}</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#30363d] text-[#8b949e]">
-                  <th className="text-left py-2 px-2">Repo</th>
-                  <th className="text-right py-2 px-2">Tokens</th>
-                  <th className="text-right py-2 px-2">Requests</th>
-                  <th className="text-right py-2 px-2">Premium</th>
-                  <th className="text-right py-2 px-2">Top Model</th>
+                  <th className="text-left py-2 px-2">{dictionary.profile.colRepo}</th>
+                  <th className="text-right py-2 px-2">{dictionary.profile.colTokens}</th>
+                  <th className="text-right py-2 px-2">{dictionary.profile.colRequests}</th>
+                  <th className="text-right py-2 px-2">{dictionary.profile.colPremium}</th>
+                  <th className="text-right py-2 px-2">{dictionary.profile.colTopModel}</th>
                 </tr>
               </thead>
               <tbody>
@@ -182,9 +188,9 @@ export default async function ProfilePage({
                         )}
                       </td>
                       <td className="py-2 px-2 text-right font-mono">
-                        {Number(r.totalTokens).toLocaleString()}
+                        {numberFormatter.format(Number(r.totalTokens))}
                       </td>
-                      <td className="py-2 px-2 text-right font-mono">{r.requests.toLocaleString()}</td>
+                      <td className="py-2 px-2 text-right font-mono">{numberFormatter.format(r.requests)}</td>
                       <td className="py-2 px-2 text-right font-mono">{r.premiumReqs.toFixed(1)}</td>
                       <td className="py-2 px-2 text-right text-[#8b949e]">{r.topModel || '–'}</td>
                     </tr>
@@ -198,9 +204,9 @@ export default async function ProfilePage({
 
       {/* Badge / Card Embed */}
       <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Embed in your README</h2>
+        <h2 className="text-lg font-semibold text-white mb-4">{dictionary.profile.embedTitle}</h2>
         <div className="mb-4">
-          <p className="text-xs text-[#8b949e] mb-2">Dynamic badges:</p>
+          <p className="text-xs text-[#8b949e] mb-2">{dictionary.profile.dynamicBadges}</p>
           <div className="space-y-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={streakBadgeUrl} alt="Streak badge" className="mb-1" />
@@ -212,7 +218,7 @@ export default async function ProfilePage({
         </div>
 
         <div className="mb-4">
-          <p className="text-xs text-[#8b949e] mb-1">Markdown snippets:</p>
+          <p className="text-xs text-[#8b949e] mb-1">{dictionary.profile.markdownSnippets}</p>
           {badgeMarkdownSamples.map((sample) => (
             <code key={sample} className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
               {sample}
@@ -221,7 +227,7 @@ export default async function ProfilePage({
         </div>
 
         <div className="mb-4">
-          <p className="text-xs text-[#8b949e] mb-1">Legacy badge:</p>
+          <p className="text-xs text-[#8b949e] mb-1">{dictionary.profile.legacyBadge}</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/badge/${username}.svg?stat=tokens&label=PromptStreak`} alt="promptstreak.dev badge" className="mb-2" />
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
@@ -230,7 +236,7 @@ export default async function ProfilePage({
         </div>
 
         <div>
-          <p className="text-xs text-[#8b949e] mb-1">Stat Card:</p>
+          <p className="text-xs text-[#8b949e] mb-1">{dictionary.profile.statCard}</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={cardUrl} alt="promptstreak.dev card" className="mb-2 max-w-[400px]" />
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">

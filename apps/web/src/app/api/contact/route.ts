@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { mailService } from '@/lib/mail/mailService';
+import { getSessionUser } from '@/lib/auth';
 
 // ---------------------------------------------------------------------------
 // In-process rate limiter: max 5 submissions per IP per hour.
@@ -77,6 +78,8 @@ export async function POST(req: NextRequest) {
   }
 
   const b = body as Record<string, unknown>;
+  const sessionUser = await getSessionUser();
+  const userId = sessionUser?.userId ?? null;
 
   // ---- Contact inquiry ----
   const isAbuse = typeof b.offendingUrl === 'string' && b.offendingUrl.trim().length > 0;
@@ -107,7 +110,7 @@ export async function POST(req: NextRequest) {
     await mail.send({
       to: [contactEmail],
       templateId: 'abuse-report',
-      variables: { offendingUrl, violationType, description, reporterEmail },
+      variables: { offendingUrl, violationType, description, reporterEmail, userId },
     });
 
     return NextResponse.json({ ok: true });
@@ -136,7 +139,7 @@ export async function POST(req: NextRequest) {
   await mail2.send({
     to: [contactEmail2],
     templateId: 'contact-inquiry',
-    variables: { name, email, category, message },
+    variables: { name, email, category, message, userId },
   });
 
   return NextResponse.json({ ok: true });

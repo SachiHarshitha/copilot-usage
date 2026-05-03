@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { getAllowedAvatarUrl, getProfileAvatarInitial } from '@/lib/profile-menu';
+import { useI18n } from './i18n-provider';
 
 interface ProfileMenuProps {
   username: string;
@@ -14,6 +15,7 @@ export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const safeAvatarUrl = getAllowedAvatarUrl(avatarUrl);
+  const { dictionary } = useI18n();
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -44,7 +46,7 @@ export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
         type="button"
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        aria-label="Open profile menu"
+        aria-label={dictionary.profileMenu.openAria}
         onClick={() => setIsOpen((value) => !value)}
         className="group inline-flex items-center rounded-full border border-[#30363d] bg-[#161b22] pl-1 pr-1 py-1 text-sm shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors hover:border-[#4f5b6b]"
       >
@@ -73,7 +75,7 @@ export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
       {isOpen && (
         <div
           role="menu"
-          aria-label="Profile menu"
+          aria-label={dictionary.profileMenu.menuAria}
           className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-xl border border-[#30363d] bg-[#161b22] py-1 shadow-xl"
         >
           <Link
@@ -82,7 +84,7 @@ export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
             onClick={() => setIsOpen(false)}
             className="block px-3 py-2 text-sm text-[#c9d1d9] no-underline hover:bg-[#0d1117]"
           >
-            My Profile
+            {dictionary.profileMenu.myProfile}
           </Link>
           <Link
             href="/settings"
@@ -90,7 +92,7 @@ export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
             onClick={() => setIsOpen(false)}
             className="block px-3 py-2 text-sm text-[#c9d1d9] no-underline hover:bg-[#0d1117]"
           >
-            Settings
+            {dictionary.profileMenu.settings}
           </Link>
           <div className="my-1 h-px bg-[#30363d]" />
           <Link
@@ -99,7 +101,7 @@ export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
             onClick={() => setIsOpen(false)}
             className="block px-3 py-2 text-sm text-[#fca5a5] no-underline hover:bg-[#0d1117]"
           >
-            Log out
+            {dictionary.profileMenu.logout}
           </Link>
         </div>
       )}

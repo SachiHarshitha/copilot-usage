@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getSessionUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { getRequestLocale } from '@/lib/i18n/server';
 import { RootShell } from './components/root-shell';
 import './globals.css';
 
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const sessionUser = await getSessionUser();
+  const locale = await getRequestLocale();
 
   let isSuspended = false;
   if (sessionUser) {
@@ -22,9 +24,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body className="min-h-screen">
-        <RootShell sessionUser={sessionUser} isSuspended={isSuspended}>{children}</RootShell>
+        <RootShell sessionUser={sessionUser} isSuspended={isSuspended} locale={locale}>
+          {children}
+        </RootShell>
       </body>
     </html>
   );

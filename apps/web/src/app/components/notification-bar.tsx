@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { useI18n } from './i18n-provider';
 
 interface NotificationBarProps {
   isSuspended: boolean;
 }
 
 export function NotificationBar({ isSuspended }: NotificationBarProps) {
+  const { dictionary } = useI18n();
   if (!isSuspended) return null;
 
   return (
@@ -16,13 +18,13 @@ export function NotificationBar({ isSuspended }: NotificationBarProps) {
     >
       <span className="text-red-400">⚠</span>
       <span>
-        Your account has been suspended. Public profile and leaderboard visibility are paused.
+        {dictionary.notification.suspendedMessage}
       </span>
       <Link
         href="/contact"
         className="ml-1 whitespace-nowrap font-medium text-red-200 underline underline-offset-2 hover:text-white no-underline hover:no-underline"
       >
-        Contact support →
+        {dictionary.notification.contactSupport}
       </Link>
     </div>
   );

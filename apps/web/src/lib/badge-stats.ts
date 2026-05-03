@@ -16,13 +16,13 @@ export type { RankTier };
 export interface PublicUserBadgeStats {
   username: string;
   displayName: string;
-  lifetimeTokens: bigint;
+  lifetimeTokens: number;
   totalRequests: number;
   premiumRequests: number;
-  weeklyTokens: bigint;
+  weeklyTokens: number;
   currentStreakDays: number;
   bestStreakDays: number;
-  rolling30DayTokens: bigint;
+  rolling30DayTokens: number;
   topRepoName: string | null;
   publicRepoCount: number;
   unlockedLifetimeMilestones: string[];

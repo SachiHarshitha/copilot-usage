@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useI18n } from '@/app/components/i18n-provider';
+import type { AppLocale } from '@/lib/i18n/types';
 
 interface PrivacySettings {
   profilePublic: boolean;
@@ -19,8 +21,10 @@ interface UserSettings {
 }
 
 export default function SettingsPage() {
+  const { dictionary, locale } = useI18n();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
+  const [language, setLanguage] = useState<AppLocale>('en');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -30,8 +34,9 @@ export default function SettingsPage() {
     Promise.all([
       fetch('/api/settings/profile').then((r) => (r.ok ? r.json() : null)),
       fetch('/api/settings/privacy').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/settings/language').then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([profileResp, privacyResp]) => {
+      .then(([profileResp, privacyResp, languageResp]) => {
         setSettings(profileResp);
         if (privacyResp) {
           setPrivacy({
@@ -40,21 +45,24 @@ export default function SettingsPage() {
             badgesEnabled: !!privacyResp.badgesEnabled,
           });
         }
+        if (languageResp?.locale) {
+          setLanguage(languageResp.locale as AppLocale);
+        }
       })
       .catch(() => setSettings(null))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="text-[#8b949e]">Loading settings...</p>;
+  if (loading) return <p className="text-[#8b949e]">{dictionary.settings.loading}</p>;
   if (!settings) {
     return (
       <div className="text-center py-12">
-        <p className="text-[#8b949e] mb-4">You need to sign in to access settings.</p>
+        <p className="text-[#8b949e] mb-4">{dictionary.settings.signInRequired}</p>
         <Link
           href="/api/auth/signin"
           className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg no-underline"
         >
-          Sign in with GitHub
+          {dictionary.settings.signInButton}
         </Link>
       </div>
     );
@@ -81,8 +89,25 @@ export default function SettingsPage() {
       if (field === 'profilePublic') {
         setSettings((s) => s && { ...s, profilePublic: next });
       }
-      setMessage('Privacy settings updated.');
+      setMessage(dictionary.settings.privacyUpdated);
       setBadgeCacheBuster((n) => n + 1);
+    }
+    setSaving(false);
+  }
+
+  async function updateLanguage(nextLanguage: AppLocale) {
+    setSaving(true);
+    const res = await fetch('/api/settings/language', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locale: nextLanguage }),
+    });
+    if (res.ok) {
+      setLanguage(nextLanguage);
+      setMessage(dictionary.settings.languageUpdated);
+      setTimeout(() => {
+        window.location.reload();
+      }, 150);
     }
     setSaving(false);
   }
@@ -104,7 +129,7 @@ export default function SettingsPage() {
   }
 
   async function revokeDevice(deviceId: string) {
-    if (!confirm('Revoke this device? It will no longer be able to upload data.')) return;
+    if (!confirm(dictionary.settings.revokeConfirm)) return;
     const res = await fetch(`/api/devices/${deviceId}`, { method: 'DELETE' });
     if (res.ok) {
       setSettings((s) => s && { ...s, devices: s.devices.filter((d) => d.id !== deviceId) });
@@ -112,7 +137,7 @@ export default function SettingsPage() {
   }
 
   async function deleteAccount() {
-    if (!confirm('Delete your account? This will remove ALL your data permanently. This cannot be undone.')) return;
+    if (!confirm(dictionary.settings.deleteConfirm)) return;
     const res = await fetch('/api/account', { method: 'DELETE' });
     if (res.ok) {
       window.location.href = '/';
@@ -134,17 +159,17 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-white mb-8">Settings</h1>
+      <h1 className="text-2xl font-bold text-white mb-8">{dictionary.settings.title}</h1>
 
       {settings.status === 'SUSPENDED' && (
         <div className="flex items-start gap-3 rounded-lg border border-red-700/50 bg-red-950/40 px-4 py-3 text-sm text-red-300 mb-6">
           <span className="mt-0.5 text-red-400">⚠</span>
           <div>
-            <p className="font-medium text-red-200 mb-1">Your account is suspended</p>
+            <p className="font-medium text-red-200 mb-1">{dictionary.settings.suspendedTitle}</p>
             <p className="text-red-400">
-              Public profile, leaderboard, and badge access are paused. If you believe this is an error,{' '}
+              {dictionary.settings.suspendedBody}{' '}
               <Link href="/contact" className="underline text-red-300 hover:text-white">
-                contact support
+                {dictionary.settings.contactSupport}
               </Link>
               .
             </p>
@@ -159,62 +184,81 @@ export default function SettingsPage() {
       )}
 
       {/* Account */}
-      <Section title="Account">
-        <p className="text-sm text-[#8b949e] mb-2">Display Name: <span className="text-white">{settings.displayName}</span></p>
-        <p className="text-sm text-[#8b949e] mb-4">Username: <span className="text-white">@{settings.username}</span></p>
+      <Section title={dictionary.settings.account}>
+        <p className="text-sm text-[#8b949e] mb-2">{dictionary.settings.displayName}: <span className="text-white">{settings.displayName}</span></p>
+        <p className="text-sm text-[#8b949e] mb-4">{dictionary.settings.username}: <span className="text-white">@{settings.username}</span></p>
         <button
           onClick={deleteAccount}
           className="text-sm text-red-400 border border-red-800 px-3 py-1.5 rounded hover:bg-red-900/30"
         >
-          Delete Account
+          {dictionary.settings.deleteAccount}
         </button>
       </Section>
 
+      {/* Language */}
+      <Section title={dictionary.settings.language}>
+        <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
+          {dictionary.settings.languageLabel}
+        </label>
+        <select
+          value={language}
+          onChange={(e) => updateLanguage(e.target.value as AppLocale)}
+          disabled={saving}
+          className="w-full rounded-md bg-[#161b22] border border-[#30363d] px-3 py-2 text-sm text-white focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        >
+          <option value="en">{dictionary.languageNames.en}</option>
+          <option value="de">{dictionary.languageNames.de}</option>
+          <option value="zh">{dictionary.languageNames.zh}</option>
+          <option value="es">{dictionary.languageNames.es}</option>
+        </select>
+        <p className="text-xs text-[#8b949e] mt-2">{dictionary.settings.languageHint}</p>
+      </Section>
+
       {/* Privacy */}
-      <Section title="Privacy">
+      <Section title={dictionary.settings.privacy}>
         <p className="text-xs text-[#8b949e] mb-4">
-          Each control is independent. Turning a setting off immediately removes the related public surface.
-          Withdrawing consent is recorded just like granting it.
+          {dictionary.settings.privacyIntroLine1}{' '}
+          {dictionary.settings.privacyIntroLine2}
         </p>
         {privacy ? (
           <div className="space-y-3">
             <PrivacyRow
-              label="Public profile"
-              hint="Allow anyone to view your profile page at /u/your-username."
+              label={dictionary.settings.profilePublicLabel}
+              hint={dictionary.settings.profilePublicHint}
               enabled={privacy.profilePublic}
               disabled={saving}
               onToggle={() => togglePrivacyField('profilePublic')}
             />
             <PrivacyRow
-              label="Show on public leaderboards"
-              hint="Include your username and aggregated stats on global leaderboards. Requires public profile."
+              label={dictionary.settings.leaderboardLabel}
+              hint={dictionary.settings.leaderboardHint}
               enabled={privacy.leaderboardOptIn}
               disabled={saving || !privacy.profilePublic}
               onToggle={() => togglePrivacyField('leaderboardOptIn')}
             />
             <PrivacyRow
-              label="Show public badges"
-              hint="Render SVG badges (streak, lifetime, rank) at public badge URLs. Requires public profile."
+              label={dictionary.settings.badgesLabel}
+              hint={dictionary.settings.badgesHint}
               enabled={privacy.badgesEnabled}
               disabled={saving || !privacy.profilePublic}
               onToggle={() => togglePrivacyField('badgesEnabled')}
             />
           </div>
         ) : (
-          <p className="text-sm text-[#8b949e]">Privacy settings unavailable.</p>
+          <p className="text-sm text-[#8b949e]">{dictionary.settings.privacyUnavailable}</p>
         )}
       </Section>
 
       {/* Repos */}
-      <Section title="Repo Visibility">
+      <Section title={dictionary.settings.repoVisibility}>
         {settings.repos.length === 0 ? (
-          <p className="text-sm text-[#8b949e]">No repos synced yet.</p>
+          <p className="text-sm text-[#8b949e]">{dictionary.settings.reposNone}</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#30363d] text-[#8b949e]">
-                <th className="text-left py-2">Repo</th>
-                <th className="text-right py-2">Visibility</th>
+                <th className="text-left py-2">{dictionary.settings.repoColRepo}</th>
+                <th className="text-right py-2">{dictionary.settings.repoColVisibility}</th>
               </tr>
             </thead>
             <tbody>
@@ -232,7 +276,7 @@ export default function SettingsPage() {
                           : 'bg-[#21262d] text-[#8b949e] border border-[#30363d]'
                       }`}
                     >
-                      {r.isPublic ? 'Public' : 'Private'}
+                      {r.isPublic ? dictionary.settings.public : dictionary.settings.private}
                     </button>
                   </td>
                 </tr>
@@ -243,9 +287,9 @@ export default function SettingsPage() {
       </Section>
 
       {/* Devices */}
-      <Section title="Devices">
+      <Section title={dictionary.settings.devices}>
         {settings.devices.length === 0 ? (
-          <p className="text-sm text-[#8b949e]">No devices linked yet.</p>
+          <p className="text-sm text-[#8b949e]">{dictionary.settings.devicesNone}</p>
         ) : (
           <div className="space-y-3">
             {settings.devices.map((d) => (
@@ -253,15 +297,15 @@ export default function SettingsPage() {
                 <div>
                   <p className="text-sm text-white">{d.name || `Device ${d.tokenId.slice(0, 8)}...`}</p>
                   <p className="text-xs text-[#8b949e]">
-                    Created {new Date(d.createdAt).toLocaleDateString()}
-                    {d.lastSeenAt && ` · Last seen ${new Date(d.lastSeenAt).toLocaleDateString()}`}
+                    {dictionary.settings.createdOn} {new Date(d.createdAt).toLocaleDateString(locale)}
+                    {d.lastSeenAt && ` · ${dictionary.settings.lastSeen} ${new Date(d.lastSeenAt).toLocaleDateString(locale)}`}
                   </p>
                 </div>
                 <button
                   onClick={() => revokeDevice(d.id)}
                   className="text-xs text-red-400 border border-red-800 px-2 py-1 rounded hover:bg-red-900/30"
                 >
-                  Revoke
+                  {dictionary.settings.revoke}
                 </button>
               </div>
             ))}
@@ -270,9 +314,9 @@ export default function SettingsPage() {
       </Section>
 
       {/* Badge Preview */}
-      <Section title="Badges">
+      <Section title={dictionary.settings.badges}>
         <div className="mb-4">
-          <p className="text-xs text-[#8b949e] mb-1">User Badge Preview:</p>
+          <p className="text-xs text-[#8b949e] mb-1">{dictionary.settings.userBadgePreview}</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={streakBadgeUrl} alt="Streak badge preview" className="mb-2" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -286,7 +330,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="mb-4">
-          <p className="text-xs text-[#8b949e] mb-1">README snippets (user):</p>
+          <p className="text-xs text-[#8b949e] mb-1">{dictionary.settings.readmeUserSnippets}</p>
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
             {`[![PromptStreak Streak](${baseUrl}${streakBadgeUrl})](${baseUrl}/u/${settings.username})`}
           </code>
@@ -305,7 +349,7 @@ export default function SettingsPage() {
         </div>
 
         <div>
-          <p className="text-xs text-[#8b949e] mb-1">Legacy card:</p>
+          <p className="text-xs text-[#8b949e] mb-1">{dictionary.settings.legacyCard}</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={cardUrl} alt="Card preview" className="mb-2 max-w-[400px]" />
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
@@ -314,7 +358,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-5">
-          <p className="text-xs text-[#8b949e] mb-1">README snippets (repo):</p>
+          <p className="text-xs text-[#8b949e] mb-1">{dictionary.settings.readmeRepoSnippets}</p>
           <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
             {`[![PromptStreak Rank](${baseUrl}/api/badges/repo/${repoOwner}/${repoName}/leaderboard.svg)](${baseUrl}/r/${settings.username}/${repoOwner}/${repoName})`}
           </code>
