@@ -21,24 +21,49 @@ export function getWorkspaceStorageRoot(): string {
   }
 }
 
-/** Resolve workspace.json → human-readable workspace path. */
-async function resolveWorkspace(workspaceDir: string): Promise<{ id: string; path: string }> {
+/** Strip a URI scheme and decode percent-encoding → plain file path. */
+function uriToPath(uri: string): string {
+  if (uri.startsWith('file:///')) {
+    return decodeURIComponent(uri.slice(8));
+  }
+  if (uri.startsWith('vscode-userdata:///')) {
+    return decodeURIComponent(uri.slice('vscode-userdata:///'.length));
+  }
+  return decodeURIComponent(uri);
+}
+
+/** Resolve workspace.json → human-readable workspace path + any referenced folder paths. */
+async function resolveWorkspace(workspaceDir: string): Promise<{ id: string; path: string; referencedFolders: string[] }> {
   const id = path.basename(workspaceDir);
   let wsPath = '';
+  const referencedFolders: string[] = [];
   const wsJson = path.join(workspaceDir, 'workspace.json');
   try {
     const raw = await fs.readFile(wsJson, 'utf-8');
     const data = JSON.parse(raw);
     const uri: string = data.folder || data.workspace || '';
-    if (uri.startsWith('file:///')) {
-      wsPath = decodeURIComponent(uri.slice(8));  // strip file:///
-    } else if (uri) {
-      wsPath = decodeURIComponent(uri);
+    if (uri) { wsPath = uriToPath(uri); }
+
+    // For multi-root workspaces, read the referenced workspace.json and
+    // extract its folder list so we can match by folder path in Strategy 3.
+    if (data.workspace && wsPath) {
+      try {
+        const wsRaw = await fs.readFile(wsPath, 'utf-8');
+        const wsData = JSON.parse(wsRaw);
+        if (Array.isArray(wsData.folders)) {
+          for (const f of wsData.folders) {
+            const folderPath: string = f.uri ? uriToPath(f.uri) : f.path || '';
+            if (folderPath) { referencedFolders.push(folderPath); }
+          }
+        }
+      } catch {
+        // workspace.json unreadable or malformed — fine
+      }
     }
   } catch {
     // workspace.json missing or malformed — fine
   }
-  return { id, path: wsPath };
+  return { id, path: wsPath, referencedFolders };
 }
 
 /** Discover all workspaces that have chatSessions with JSONL or JSON files. */
@@ -82,6 +107,7 @@ export async function discoverWorkspaces(
       results.push({
         workspaceId: ws.id,
         workspacePath: ws.path,
+        referencedFolders: ws.referencedFolders,
         sessionFiles: files,
       });
     }
@@ -132,16 +158,43 @@ export async function findCurrentWorkspace(
     let wsFilePath = workspaceFileUri;
     if (wsFilePath.startsWith('file:///')) {
       wsFilePath = decodeURIComponent(wsFilePath.slice(8));
+    } else if (wsFilePath.startsWith('vscode-userdata:///')) {
+      // VS Code uses vscode-userdata:// for auto-created multi-root (untitled) workspaces
+      wsFilePath = decodeURIComponent(wsFilePath.slice('vscode-userdata:///'.length));
     }
     const normFile = normalizePath(wsFilePath);
     const match = workspaces.find(ws => normalizePath(ws.workspacePath) === normFile);
     if (match) { return match; }
   }
 
-  // Strategy 2: match by folder paths (single-folder workspaces)
+  // Strategy 2: multi-root workspaces — match by folder list inside the referenced
+  // workspace.json. Must run BEFORE the single-folder path match (Strategy 3) because
+  // a multi-root storage entry's workspacePath points to a workspace.json file, not a
+  // folder, but an old single-folder entry for the same folder path would wrongly match
+  // first if we checked workspacePath equality before checking referencedFolders.
+  if (workspaceFileUri) {
+    for (const fp of folderPaths) {
+      const normFolder = normalizePath(fp);
+      const match = workspaces.find(
+        ws => (ws.referencedFolders ?? []).some(rf => normalizePath(rf) === normFolder),
+      );
+      if (match) { return match; }
+    }
+  }
+
+  // Strategy 3: match by folder paths (single-folder workspaces)
   for (const fp of folderPaths) {
     const normFolder = normalizePath(fp);
     const match = workspaces.find(ws => normalizePath(ws.workspacePath) === normFolder);
+    if (match) { return match; }
+  }
+
+  // Strategy 4: last-resort referenced-folder match when no workspaceFileUri was provided
+  for (const fp of folderPaths) {
+    const normFolder = normalizePath(fp);
+    const match = workspaces.find(
+      ws => (ws.referencedFolders ?? []).some(rf => normalizePath(rf) === normFolder),
+    );
     if (match) { return match; }
   }
 

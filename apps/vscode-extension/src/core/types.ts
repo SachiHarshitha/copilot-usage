@@ -32,6 +32,7 @@ export interface ParsedFile {
 export interface WorkspaceInfo {
   workspaceId: string;
   workspacePath: string;
+  referencedFolders?: string[];  // folder paths listed in a multi-root workspace.json
   sessionFiles: string[];  // absolute paths
 }
 

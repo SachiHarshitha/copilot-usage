@@ -230,6 +230,10 @@ function handleResult(state: ParseState, v: Record<string, unknown>, requestInde
   if (!timestampMs) {
     timestampMs = state.requestTimestamps.get(requestIndex);
   }
+  if (!timestampMs) {
+    // Fall back to session creation date so date-range filters can still bucket this event
+    timestampMs = state.anchor?.creationDate;
+  }
 
   const chatSessionId = state.anchor?.chatSessionId || '';
 
