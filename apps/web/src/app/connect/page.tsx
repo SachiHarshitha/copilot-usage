@@ -8,7 +8,7 @@ export default function ConnectPage() {
   const { dictionary } = useI18n();
 
   return (
-    <Suspense fallback={<div className="max-w-lg mx-auto py-16 text-center"><p className="text-[#8b949e]">{dictionary.connect.loading}</p></div>}>
+    <Suspense fallback={<div className="max-w-lg mx-auto py-16 text-center"><p className="text-[var(--text-secondary)]">{dictionary.connect.loading}</p></div>}>
       <ConnectInner />
     </Suspense>
   );
@@ -55,9 +55,9 @@ function ConnectInner() {
 
   return (
     <div className="max-w-lg mx-auto py-16 text-center">
-      <h1 className="text-2xl font-bold text-white mb-6">{dictionary.connect.title}</h1>
+      <h1 className="text-2xl font-bold text-[var(--foreground)] mb-6">{dictionary.connect.title}</h1>
 
-      {status === 'loading' && <p className="text-[#8b949e]">{dictionary.connect.linking}</p>}
+      {status === 'loading' && <p className="text-[var(--text-secondary)]">{dictionary.connect.linking}</p>}
 
       {status === 'error' && (
         <div className="bg-red-900/30 border border-red-700 text-red-400 px-4 py-3 rounded">
@@ -70,13 +70,13 @@ function ConnectInner() {
           <div className="bg-green-900/30 border border-green-700 text-green-400 px-4 py-3 rounded mb-6">
             {dictionary.connect.success}
           </div>
-          <p className="text-sm text-[#8b949e] mb-4">
+          <p className="text-sm text-[var(--text-secondary)] mb-4">
             {dictionary.connect.copyHint}
           </p>
-          <code className="block bg-[#0d1117] border border-[#30363d] text-sm p-4 rounded break-all text-white select-all">
+          <code className="block bg-[var(--background)] border border-[var(--card-border)] text-sm p-4 rounded break-all text-[var(--foreground)] select-all">
             {token}
           </code>
-          <p className="text-xs text-[#8b949e] mt-4">
+          <p className="text-xs text-[var(--text-secondary)] mt-4">
             {dictionary.connect.secureHint}{' '}
             <a href="/settings">{dictionary.connect.settingsDevices}</a>.
           </p>

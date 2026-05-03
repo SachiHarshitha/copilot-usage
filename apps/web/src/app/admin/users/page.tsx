@@ -63,9 +63,9 @@ export default async function AdminUsersPage({
           style={{
             flex: 1,
             padding: '8px 10px',
-            background: '#1a1f2a',
-            color: '#e6e6e6',
-            border: '1px solid #2a2f3a',
+            background: 'var(--surface-soft)',
+            color: 'var(--foreground)',
+            border: '1px solid var(--card-border)',
             borderRadius: 6,
           }}
         />
@@ -74,7 +74,7 @@ export default async function AdminUsersPage({
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead>
-          <tr style={{ borderBottom: '1px solid #2a2f3a', textAlign: 'left' }}>
+          <tr style={{ borderBottom: '1px solid var(--card-border)', textAlign: 'left' }}>
             <th style={th}>Username</th>
             <th style={th}>Display</th>
             <th style={th}>Status</th>
@@ -84,21 +84,21 @@ export default async function AdminUsersPage({
         </thead>
         <tbody>
           {visible.map((u) => (
-            <tr key={u.id} style={{ borderBottom: '1px solid #1a1f2a' }}>
+            <tr key={u.id} style={{ borderBottom: '1px solid var(--surface-soft)' }}>
               <td style={td}>{u.username}</td>
               <td style={td}>{u.displayName ?? '—'}</td>
               <td style={td}>
                 {u.deletedAt ? (
-                  <span style={{ color: '#ff7675' }}>deleted</span>
+                  <span style={{ color: 'var(--danger)' }}>deleted</span>
                 ) : u.status === 'SUSPENDED' ? (
-                  <span style={{ color: '#fdcb6e' }}>suspended</span>
+                  <span style={{ color: 'var(--warning)' }}>suspended</span>
                 ) : (
-                  <span style={{ color: '#55efc4' }}>active</span>
+                  <span style={{ color: 'var(--success)' }}>active</span>
                 )}
               </td>
               <td style={td}>{u.createdAt.toISOString().slice(0, 10)}</td>
               <td style={td}>
-                <Link href={`/admin/users/${u.id}`} style={{ color: '#74b9ff' }}>
+                <Link href={`/admin/users/${u.id}`} style={{ color: 'var(--accent-border)' }}>
                   View →
                 </Link>
               </td>
@@ -106,7 +106,7 @@ export default async function AdminUsersPage({
           ))}
           {visible.length === 0 && (
             <tr>
-              <td colSpan={5} style={{ ...td, color: '#9aa0aa' }}>
+              <td colSpan={5} style={{ ...td, color: 'var(--text-secondary)' }}>
                 No users match.
               </td>
             </tr>
@@ -121,7 +121,7 @@ export default async function AdminUsersPage({
               pathname: '/admin/users',
               query: { ...(q ? { q } : {}), cursor: nextCursor },
             }}
-            style={{ color: '#74b9ff' }}
+            style={{ color: 'var(--accent-border)' }}
           >
             Next page →
           </Link>
@@ -133,12 +133,12 @@ export default async function AdminUsersPage({
 
 const btn: React.CSSProperties = {
   padding: '8px 14px',
-  background: '#2a2f3a',
-  color: '#e6e6e6',
-  border: '1px solid #3a4150',
+  background: 'var(--card-border)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 6,
   cursor: 'pointer',
 };
 
-const th: React.CSSProperties = { padding: '8px 6px', fontWeight: 600, color: '#9aa0aa' };
+const th: React.CSSProperties = { padding: '8px 6px', fontWeight: 600, color: 'var(--text-secondary)' };
 const td: React.CSSProperties = { padding: '8px 6px' };

@@ -35,13 +35,13 @@ export default async function RepoPage({
   return (
     <div>
       <div className="mb-6">
-        <Link href={`/u/${username}`} className="text-sm text-[#8b949e] hover:text-white">
+        <Link href={`/u/${username}`} className="text-sm text-[var(--text-secondary)] hover:text-[var(--foreground)]">
           ← {dictionary.repoPage.back} @{username}
         </Link>
       </div>
 
-      <h1 className="text-2xl font-bold text-white mb-2">{repoSlug}</h1>
-      <p className="text-sm text-[#8b949e] mb-8">
+      <h1 className="text-2xl font-bold text-[var(--foreground)] mb-2">{repoSlug}</h1>
+      <p className="text-sm text-[var(--text-secondary)] mb-8">
         {dictionary.repoPage.by} <Link href={`/u/${username}`}>@{username}</Link>
         {' · '}
         {dictionary.repoPage.lastSynced} {dateFormatter.format(repoStat.lastSyncedAt)}
@@ -59,8 +59,8 @@ export default async function RepoPage({
         <KpiCard label={dictionary.repoPage.topModel} value={repoStat.topModel || dictionary.repoPage.na} />
       </div>
 
-      <div className="mt-8 bg-[#161b22] border border-[#30363d] rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">{dictionary.repoPage.embedTitle}</h2>
+      <div className="mt-8 bg-[var(--surface-elevated)] border border-[var(--card-border)] rounded-lg p-6">
+        <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">{dictionary.repoPage.embedTitle}</h2>
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={leaderboardBadgeUrl} alt="Repo rank badge" className="mb-2" />
@@ -69,13 +69,13 @@ export default async function RepoPage({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={modelsBadgeUrl} alt="Repo models badge" className="mb-3" />
 
-        <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+        <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all mb-2">
           {`[![PromptStreak Rank](${baseUrl}${leaderboardBadgeUrl})](${baseUrl}/r/${username}/${owner}/${repoName})`}
         </code>
-        <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+        <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all mb-2">
           {`[![PromptStreak Tokens](${baseUrl}${tokensBadgeUrl})](${baseUrl}/r/${username}/${owner}/${repoName})`}
         </code>
-        <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
+        <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all">
           {`[![PromptStreak Models](${baseUrl}${modelsBadgeUrl})](${baseUrl}/r/${username}/${owner}/${repoName})`}
         </code>
       </div>
@@ -85,9 +85,9 @@ export default async function RepoPage({
 
 function KpiCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-4">
-      <p className="text-xs text-[#8b949e] mb-1">{label}</p>
-      <p className="text-xl font-bold text-white">{value}</p>
+    <div className="bg-[var(--surface-elevated)] border border-[var(--card-border)] rounded-lg p-4">
+      <p className="text-xs text-[var(--text-secondary)] mb-1">{label}</p>
+      <p className="text-xl font-bold text-[var(--foreground)]">{value}</p>
     </div>
   );
 }

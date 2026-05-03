@@ -15,7 +15,7 @@ export const metadata = {
  */
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#0b223f_0%,#0b111a_38%,#070b12_100%)] text-slate-100">
+    <div className="min-h-screen bg-[var(--surface-soft)] text-[var(--foreground)]">
       <AdminShell>{children}</AdminShell>
     </div>
   );

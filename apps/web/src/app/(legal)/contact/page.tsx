@@ -59,8 +59,8 @@ export default function ContactPage() {
         <LegalCard title={dictionary.contactForm.title} lastUpdated="2026-04-21">
           <div className="flex flex-col items-center py-8 text-center gap-3">
             <span className="text-3xl text-green-400">✓</span>
-            <p className="text-white font-medium">{dictionary.contactForm.successTitle}</p>
-            <p className="text-sm text-[#8b949e]">
+            <p className="text-[var(--foreground)] font-medium">{dictionary.contactForm.successTitle}</p>
+            <p className="text-sm text-[var(--text-secondary)]">
               {dictionary.contactForm.successBody}
             </p>
           </div>
@@ -73,7 +73,7 @@ export default function ContactPage() {
     <div className="max-w-2xl mx-auto w-full">
       <LegalCard title={dictionary.contactForm.title} lastUpdated="2026-04-21">
         <Section>
-          <p className="text-sm text-[#8b949e] leading-relaxed">
+          <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
             {dictionary.contactForm.intro}{' '}
             <a href="/report-abuse" className="text-brand-400 hover:text-brand-300 underline">
               {dictionary.contactForm.reportAbuse}
@@ -85,9 +85,9 @@ export default function ContactPage() {
         <Section>
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
                 {dictionary.contactForm.name}{' '}
-                <span className="text-[#484f58]">{dictionary.contactForm.optional}</span>
+                <span className="text-[var(--text-tertiary)]">{dictionary.contactForm.optional}</span>
               </label>
               <input
                 type="text"
@@ -100,7 +100,7 @@ export default function ContactPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
                 {dictionary.contactForm.email} <span className="text-red-400">*</span>
               </label>
               <input
@@ -114,7 +114,7 @@ export default function ContactPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#8b949e] mb-1.5">{dictionary.contactForm.category}</label>
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">{dictionary.contactForm.category}</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as CategoryValue)}
@@ -130,10 +130,10 @@ export default function ContactPage() {
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-medium text-[#8b949e]">
+                <label className="block text-xs font-medium text-[var(--text-secondary)]">
                   {dictionary.contactForm.message} <span className="text-red-400">*</span>
                 </label>
-                <span className="text-xs text-[#484f58]">{message.length}/2000</span>
+                <span className="text-xs text-[var(--text-tertiary)]">{message.length}/2000</span>
               </div>
               <textarea
                 required
@@ -175,14 +175,14 @@ function LegalCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[#0d1117] border border-[#30363d] rounded-xl p-8">
+    <div className="bg-[var(--background)] border border-[var(--card-border)] rounded-xl p-8">
       <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">{title}</h1>
-        <span className="text-xs text-[#484f58] bg-[#161b22] border border-[#30363d] rounded px-2 py-0.5">
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">{title}</h1>
+        <span className="text-xs text-[var(--text-tertiary)] bg-[var(--surface-elevated)] border border-[var(--card-border)] rounded px-2 py-0.5">
           Last updated: {lastUpdated}
         </span>
       </div>
-      <div className="divide-y divide-[#21262d]">{children}</div>
+      <div className="divide-y divide-[var(--surface-hover)]">{children}</div>
     </div>
   );
 }
@@ -192,7 +192,7 @@ function Section({ children }: { children: React.ReactNode }) {
 }
 
 const inputClass =
-  'w-full rounded-md bg-[#161b22] border border-[#30363d] px-3 py-2 text-sm text-white placeholder-[#484f58] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  'w-full rounded-md bg-[var(--surface-elevated)] border border-[var(--card-border)] px-3 py-2 text-sm text-[var(--foreground)] placeholder-[var(--text-tertiary)] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
 const submitClass =
   'rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed';

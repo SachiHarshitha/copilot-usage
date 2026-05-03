@@ -49,7 +49,7 @@ export default async function AdminVerificationDetailPage({
   return (
     <section>
       <div style={{ marginBottom: 12 }}>
-        <Link href="/admin/verification" style={{ color: '#74b9ff' }}>← All verification rows</Link>
+        <Link href="/admin/verification" style={{ color: 'var(--accent-border)' }}>← All verification rows</Link>
       </div>
       <h2 style={{ marginTop: 0 }}>
         Verification — {user?.username ?? userId}
@@ -58,7 +58,7 @@ export default async function AdminVerificationDetailPage({
       <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 16px' }}>
         <dt style={dt}>user</dt>
         <dd style={dd}>
-          <Link href={`/admin/users/${userId}`} style={{ color: '#74b9ff' }}>{userId}</Link>
+          <Link href={`/admin/users/${userId}`} style={{ color: 'var(--accent-border)' }}>{userId}</Link>
         </dd>
         <dt style={dt}>github billing connected</dt>
         <dd style={dd}>{row.githubBillingConnected ? 'yes' : 'no'}</dd>
@@ -91,25 +91,25 @@ export default async function AdminVerificationDetailPage({
       </dl>
 
       <div style={{ marginTop: 24 }}>
-        <h3 style={{ fontSize: 14, color: '#9aa0aa', marginBottom: 8 }}>
+        <h3 style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
           Open anomalies for this user
         </h3>
         {openAnomalies.length === 0 ? (
-          <p style={{ color: '#9aa0aa' }}>None open.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>None open.</p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {openAnomalies.map((a) => (
               <li
                 key={a.id}
-                style={{ borderBottom: '1px solid #1a1f2a', padding: '6px 0', fontSize: 13 }}
+                style={{ borderBottom: '1px solid var(--surface-soft)', padding: '6px 0', fontSize: 13 }}
               >
-                <span style={{ color: '#9aa0aa', fontFamily: 'monospace' }}>
+                <span style={{ color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
                   {a.detectedAt.toISOString().slice(0, 19).replace('T', ' ')}
                 </span>{' '}
                 <strong>{a.severity}</strong>{' '}
                 <span style={{ fontFamily: 'monospace' }}>{a.code}</span>{' '}
                 — {a.summary}{' '}
-                <Link href={`/admin/anomalies/${a.id}`} style={{ color: '#74b9ff' }}>
+                <Link href={`/admin/anomalies/${a.id}`} style={{ color: 'var(--accent-border)' }}>
                   open →
                 </Link>
               </li>
@@ -119,25 +119,25 @@ export default async function AdminVerificationDetailPage({
       </div>
 
       <div style={{ marginTop: 24 }}>
-        <h3 style={{ fontSize: 14, color: '#9aa0aa', marginBottom: 8 }}>
+        <h3 style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
           Manual badge override
         </h3>
         {activeOverride ? (
           <div
             style={{
-              border: '1px solid #2a2f3a',
+              border: '1px solid var(--card-border)',
               borderRadius: 6,
               padding: 12,
               marginBottom: 8,
-              background: '#0f1218',
+              background: 'var(--surface-soft)',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
               <div>
-                <strong style={{ color: activeOverride.eligible ? '#55efc4' : '#fdcb6e' }}>
+                <strong style={{ color: activeOverride.eligible ? 'var(--success)' : 'var(--warning)' }}>
                   Active: forces eligible = {activeOverride.eligible ? 'true' : 'false'}
                 </strong>
-                <div style={{ fontSize: 12, color: '#9aa0aa', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
                   set {activeOverride.createdAt.slice(0, 19).replace('T', ' ')} UTC
                   {activeOverride.expiresAt
                     ? ` · expires ${activeOverride.expiresAt.slice(0, 19).replace('T', ' ')} UTC`
@@ -154,7 +154,7 @@ export default async function AdminVerificationDetailPage({
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <span style={{ color: '#9aa0aa', fontSize: 13 }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
               No active override. Computed eligibility ({row.publicBadgeEligible ? 'true' : 'false'})
               applies.
             </span>
@@ -168,19 +168,19 @@ export default async function AdminVerificationDetailPage({
 
         {recentOverrides.length > 0 && (
           <details style={{ marginTop: 8 }}>
-            <summary style={{ cursor: 'pointer', fontSize: 12, color: '#9aa0aa' }}>
+            <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
               History ({recentOverrides.length} most recent)
             </summary>
             <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0' }}>
               {recentOverrides.map((o) => (
                 <li
                   key={o.id}
-                  style={{ borderBottom: '1px solid #1a1f2a', padding: '6px 0', fontSize: 12 }}
+                  style={{ borderBottom: '1px solid var(--surface-soft)', padding: '6px 0', fontSize: 12 }}
                 >
-                  <span style={{ color: '#9aa0aa', fontFamily: 'monospace' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
                     {o.createdAt.toISOString().slice(0, 19).replace('T', ' ')}
                   </span>{' '}
-                  <strong style={{ color: o.eligible ? '#55efc4' : '#fdcb6e' }}>
+                  <strong style={{ color: o.eligible ? 'var(--success)' : 'var(--warning)' }}>
                     {o.eligible ? 'true' : 'false'}
                   </strong>{' '}
                   {o.expiresAt
@@ -194,7 +194,7 @@ export default async function AdminVerificationDetailPage({
         )}
       </div>
 
-      <p style={{ marginTop: 24, fontSize: 12, color: '#9aa0aa' }}>
+      <p style={{ marginTop: 24, fontSize: 12, color: 'var(--text-secondary)' }}>
         Refresh and disconnect actions are deferred until the GitHub-billing
         verification worker (Verification Task 3.6) lands. Once Task 4.1
         (`recomputeBadgeEligibility`) is in, it will consult the active
@@ -205,5 +205,5 @@ export default async function AdminVerificationDetailPage({
   );
 }
 
-const dt: React.CSSProperties = { color: '#9aa0aa' };
+const dt: React.CSSProperties = { color: 'var(--text-secondary)' };
 const dd: React.CSSProperties = { margin: 0, fontFamily: 'monospace', fontSize: 13 };

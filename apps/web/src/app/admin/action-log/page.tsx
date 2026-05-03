@@ -63,7 +63,7 @@ export default async function AdminActionLogPage({
   return (
     <section>
       <h2 style={{ marginTop: 0 }}>Admin action log</h2>
-      <p style={{ color: '#9aa0aa', marginTop: 0 }}>
+      <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
         Read-only audit. Rows cannot be modified — even by admins.
       </p>
       <form
@@ -104,7 +104,7 @@ export default async function AdminActionLogPage({
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
-          <tr style={{ borderBottom: '1px solid #2a2f3a', textAlign: 'left' }}>
+          <tr style={{ borderBottom: '1px solid var(--card-border)', textAlign: 'left' }}>
             <th style={th}>When</th>
             <th style={th}>Action</th>
             <th style={th}>Target</th>
@@ -117,7 +117,7 @@ export default async function AdminActionLogPage({
             const meta = r.metadata as { status?: string } | null;
             const status = meta?.status ?? '—';
             return (
-              <tr key={r.id} style={{ borderBottom: '1px solid #1a1f2a' }}>
+              <tr key={r.id} style={{ borderBottom: '1px solid var(--surface-soft)' }}>
                 <td style={td}>{r.createdAt.toISOString()}</td>
                 <td style={{ ...td, fontFamily: 'monospace' }}>{r.action}</td>
                 <td style={{ ...td, fontFamily: 'monospace' }}>
@@ -128,17 +128,17 @@ export default async function AdminActionLogPage({
                     ...td,
                     color:
                       status === 'SUCCEEDED'
-                        ? '#55efc4'
+                        ? 'var(--success)'
                         : status === 'FAILED'
-                          ? '#ff7675'
+                          ? 'var(--danger)'
                           : status === 'ATTEMPTED'
-                            ? '#fdcb6e'
-                            : '#9aa0aa',
+                            ? 'var(--warning)'
+                            : 'var(--text-secondary)',
                   }}
                 >
                   {status}
                 </td>
-                <td style={{ ...td, fontFamily: 'monospace', color: '#74b9ff' }}>
+                <td style={{ ...td, fontFamily: 'monospace', color: 'var(--accent-border)' }}>
                   {r.adminEmailHash.slice(0, 12)}…
                 </td>
               </tr>
@@ -146,7 +146,7 @@ export default async function AdminActionLogPage({
           })}
           {visible.length === 0 && (
             <tr>
-              <td colSpan={5} style={{ ...td, color: '#9aa0aa' }}>
+              <td colSpan={5} style={{ ...td, color: 'var(--text-secondary)' }}>
                 No rows match.
               </td>
             </tr>
@@ -161,7 +161,7 @@ export default async function AdminActionLogPage({
               pathname: '/admin/action-log',
               query: { ...sp, cursor: nextCursor },
             }}
-            style={{ color: '#74b9ff' }}
+            style={{ color: 'var(--accent-border)' }}
           >
             Next page →
           </Link>
@@ -173,19 +173,19 @@ export default async function AdminActionLogPage({
 
 const input: React.CSSProperties = {
   padding: '8px 10px',
-  background: '#1a1f2a',
-  color: '#e6e6e6',
-  border: '1px solid #2a2f3a',
+  background: 'var(--surface-soft)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--card-border)',
   borderRadius: 6,
   fontFamily: 'monospace',
 };
 const btn: React.CSSProperties = {
   padding: '8px 14px',
-  background: '#2a2f3a',
-  color: '#e6e6e6',
-  border: '1px solid #3a4150',
+  background: 'var(--card-border)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 6,
   cursor: 'pointer',
 };
-const th: React.CSSProperties = { padding: '6px 6px', fontWeight: 600, color: '#9aa0aa' };
+const th: React.CSSProperties = { padding: '6px 6px', fontWeight: 600, color: 'var(--text-secondary)' };
 const td: React.CSSProperties = { padding: '6px 6px' };

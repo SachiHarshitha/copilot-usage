@@ -54,29 +54,29 @@ export default async function AdminUserDetailPage({
   return (
     <section>
       <div style={{ marginBottom: 12 }}>
-        <Link href="/admin/users" style={{ color: '#74b9ff' }}>
+        <Link href="/admin/users" style={{ color: 'var(--accent-border)' }}>
           ← All users
         </Link>
       </div>
       <h2 style={{ marginTop: 0 }}>{user.username}</h2>
       <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 16px' }}>
-        <dt style={{ color: '#9aa0aa' }}>id</dt>
+        <dt style={dt}>id</dt>
         <dd style={{ margin: 0, fontFamily: 'monospace' }}>{user.id}</dd>
-        <dt style={{ color: '#9aa0aa' }}>github id</dt>
+        <dt style={dt}>github id</dt>
         <dd style={{ margin: 0 }}>{user.githubId}</dd>
-        <dt style={{ color: '#9aa0aa' }}>display</dt>
+        <dt style={dt}>display</dt>
         <dd style={{ margin: 0 }}>{user.displayName ?? '—'}</dd>
-        <dt style={{ color: '#9aa0aa' }}>profile</dt>
+        <dt style={dt}>profile</dt>
         <dd style={{ margin: 0 }}>{user.profilePublic ? 'public' : 'private'}</dd>
-        <dt style={{ color: '#9aa0aa' }}>created</dt>
+        <dt style={dt}>created</dt>
         <dd style={{ margin: 0 }}>{user.createdAt.toISOString()}</dd>
-        <dt style={{ color: '#9aa0aa' }}>status</dt>
+        <dt style={dt}>status</dt>
         <dd style={{ margin: 0 }}>
           {user.deletedAt
             ? `deleted (${user.deletedAt.toISOString()})`
             : user.status.toLowerCase()}
         </dd>
-        <dt style={{ color: '#9aa0aa' }}>uploads (30d)</dt>
+        <dt style={dt}>uploads (30d)</dt>
         <dd style={{ margin: 0 }}>{recentUploads30d}</dd>
       </dl>
 
@@ -97,3 +97,5 @@ export default async function AdminUserDetailPage({
     </section>
   );
 }
+
+const dt: React.CSSProperties = { color: 'var(--text-secondary)' };

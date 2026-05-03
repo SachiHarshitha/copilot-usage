@@ -33,21 +33,21 @@ export default async function RepoLeaderboardPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-2">{dictionary.repoLeaderboard.title}</h1>
-      <p className="text-sm text-[#8b949e] mb-6">
+      <h1 className="text-2xl font-bold text-[var(--foreground)] mb-2">{dictionary.repoLeaderboard.title}</h1>
+      <p className="text-sm text-[var(--text-secondary)] mb-6">
         {dictionary.repoLeaderboard.subtitle}
       </p>
 
       <div className="flex gap-3 mb-4 flex-wrap">
         <Link
           href="/leaderboard"
-          className="text-sm border border-[#30363d] text-[#8b949e] px-3 py-1 rounded-md no-underline hover:border-[#8b949e] hover:text-white"
+          className="text-sm border border-[var(--card-border)] text-[var(--text-secondary)] px-3 py-1 rounded-md no-underline hover:border-[var(--text-secondary)] hover:text-[var(--foreground)]"
         >
           {dictionary.repoLeaderboard.userLeaderboard}
         </Link>
         <Link
           href="/leaderboard/ides"
-          className="text-sm border border-[#30363d] text-[#8b949e] px-3 py-1 rounded-md no-underline hover:border-[#8b949e] hover:text-white"
+          className="text-sm border border-[var(--card-border)] text-[var(--text-secondary)] px-3 py-1 rounded-md no-underline hover:border-[var(--text-secondary)] hover:text-[var(--foreground)]"
         >
           {dictionary.repoLeaderboard.ideRanking}
         </Link>
@@ -63,7 +63,7 @@ export default async function RepoLeaderboardPage({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[#30363d] text-[#8b949e]">
+            <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
               <th className="text-left py-3 px-2 w-12">#</th>
               <th className="text-left py-3 px-2">{dictionary.repoLeaderboard.colRepo}</th>
               <th className="text-left py-3 px-2">{dictionary.repoLeaderboard.colRepoRank}</th>
@@ -77,7 +77,7 @@ export default async function RepoLeaderboardPage({
           <tbody>
             {entries.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-[#8b949e]">
+                <td colSpan={8} className="py-12 text-center text-[var(--text-secondary)]">
                   {dictionary.repoLeaderboard.empty}
                 </td>
               </tr>
@@ -89,19 +89,19 @@ export default async function RepoLeaderboardPage({
               const safeAvatarUrl = getAllowedAvatarUrl(entry.topAvatarUrl);
 
               return (
-                <tr key={`${entry.rank}-${entry.repoSlug}`} className="border-b border-[#21262d] hover:bg-[#161b22]">
-                  <td className="py-3 px-2 text-[#8b949e]">{entry.rank}</td>
+                <tr key={`${entry.rank}-${entry.repoSlug}`} className="border-b border-[var(--surface-hover)] hover:bg-[var(--surface-elevated)]">
+                  <td className="py-3 px-2 text-[var(--text-secondary)]">{entry.rank}</td>
                   <td className="py-3 px-2">
                     <div className="flex items-center gap-2">
                       {safeAvatarUrl && (
                         <Image src={safeAvatarUrl} alt="" width={24} height={24} className="w-6 h-6 rounded-full" />
                       )}
                       {repoHref ? (
-                        <Link href={repoHref} className="text-white font-medium no-underline hover:underline">
+                        <Link href={repoHref} className="text-[var(--foreground)] font-medium no-underline hover:underline">
                           {entry.repoSlug}
                         </Link>
                       ) : (
-                        <span className="text-white font-medium">{entry.repoSlug}</span>
+                        <span className="text-[var(--foreground)] font-medium">{entry.repoSlug}</span>
                       )}
                     </div>
                   </td>
@@ -125,7 +125,7 @@ export default async function RepoLeaderboardPage({
         {page > 1 && (
           <Link
             href={buildRepoLeaderboardHref({ page: page - 1, sort })}
-            className="text-sm border border-[#30363d] px-3 py-1.5 rounded-md no-underline hover:border-[#8b949e]"
+            className="text-sm border border-[var(--card-border)] px-3 py-1.5 rounded-md no-underline hover:border-[var(--text-secondary)]"
           >
             {dictionary.repoLeaderboard.prev}
           </Link>
@@ -133,7 +133,7 @@ export default async function RepoLeaderboardPage({
         {entries.length === REPO_LEADERBOARD_PAGE_SIZE && (
           <Link
             href={buildRepoLeaderboardHref({ page: page + 1, sort })}
-            className="text-sm border border-[#30363d] px-3 py-1.5 rounded-md no-underline hover:border-[#8b949e]"
+            className="text-sm border border-[var(--card-border)] px-3 py-1.5 rounded-md no-underline hover:border-[var(--text-secondary)]"
           >
             {dictionary.repoLeaderboard.next}
           </Link>
@@ -160,7 +160,7 @@ function FilterLink({
       className={`text-sm px-3 py-1 rounded-md no-underline ${
         sort === activeSort
           ? 'bg-brand-600 text-white'
-          : 'border border-[#30363d] text-[#8b949e] hover:border-[#8b949e] hover:text-white'
+          : 'border border-[var(--card-border)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)] hover:text-[var(--foreground)]'
       }`}
     >
       {label}

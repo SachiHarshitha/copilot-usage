@@ -13,21 +13,21 @@ interface Props {
 
 const btn: React.CSSProperties = {
   padding: '6px 12px',
-  background: '#2a2f3a',
-  color: '#e6e6e6',
-  border: '1px solid #3a4150',
+  background: 'var(--card-border)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 6,
   cursor: 'pointer',
 };
 const btnDisabled: React.CSSProperties = { ...btn, opacity: 0.4, cursor: 'not-allowed' };
-const btnPrimary: React.CSSProperties = { ...btn, borderColor: '#74b9ff', color: '#74b9ff' };
+const btnPrimary: React.CSSProperties = { ...btn, borderColor: 'var(--accent-border)', color: 'var(--accent-border)' };
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: 8,
-  background: '#0b0d12',
-  color: '#e6e6e6',
-  border: '1px solid #2a2f3a',
+  background: 'var(--background)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--card-border)',
   borderRadius: 6,
   fontFamily: 'inherit',
 };
@@ -117,8 +117,8 @@ export function BadgeOverrideButton({ userId, currentEligible, canOverride }: Pr
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#11151c',
-              border: '1px solid #2a2f3a',
+              background: 'var(--surface-elevated)',
+              border: '1px solid var(--card-border)',
               borderRadius: 8,
               padding: 24,
               maxWidth: 520,
@@ -126,14 +126,14 @@ export function BadgeOverrideButton({ userId, currentEligible, canOverride }: Pr
             }}
           >
             <h3 style={{ marginTop: 0 }}>Override badge eligibility</h3>
-            <p style={{ color: '#9aa0aa', fontSize: 13, marginTop: 0 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>
               Forces <code>publicBadgeEligible</code> to the chosen value regardless
               of computed eligibility. Newer overrides supersede older ones.
               Recorded in the audit log.
             </p>
 
             <label style={{ display: 'block', marginBottom: 12 }}>
-              <span style={{ display: 'block', fontSize: 12, color: '#9aa0aa', marginBottom: 4 }}>
+              <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
                 Eligible
               </span>
               <select
@@ -147,7 +147,7 @@ export function BadgeOverrideButton({ userId, currentEligible, canOverride }: Pr
             </label>
 
             <label style={{ display: 'block', marginBottom: 12 }}>
-              <span style={{ display: 'block', fontSize: 12, color: '#9aa0aa', marginBottom: 4 }}>
+              <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
                 Reason (max 500 chars, stored verbatim)
               </span>
               <textarea
@@ -156,13 +156,13 @@ export function BadgeOverrideButton({ userId, currentEligible, canOverride }: Pr
                 rows={3}
                 style={{ ...inputStyle, resize: 'vertical' }}
               />
-              <div style={{ fontSize: 12, color: '#9aa0aa', textAlign: 'right' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
                 {reason.length}/500
               </div>
             </label>
 
             <label style={{ display: 'block', marginBottom: 12 }}>
-              <span style={{ display: 'block', fontSize: 12, color: '#9aa0aa', marginBottom: 4 }}>
+              <span style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
                 Expires at (optional — leave blank for indefinite)
               </span>
               <input
@@ -173,7 +173,7 @@ export function BadgeOverrideButton({ userId, currentEligible, canOverride }: Pr
               />
             </label>
 
-            {error && <div style={{ color: '#ff7675', marginTop: 8 }}>{error}</div>}
+            {error && <div style={{ color: 'var(--danger)', marginTop: 8 }}>{error}</div>}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
               <button type="button" style={btn} onClick={close} disabled={busy}>

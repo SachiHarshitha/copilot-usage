@@ -108,21 +108,21 @@ export default function AdminVerifyPage() {
             <img
               src={qrDataUrl}
               alt="TOTP QR code"
-              style={{ display: 'block', background: '#fff', padding: 8, borderRadius: 6, marginBottom: 12 }}
+              style={{ display: 'block', background: 'var(--on-accent)', padding: 8, borderRadius: 6, marginBottom: 12 }}
             />
           ) : (
-            <p style={{ fontSize: 12, color: '#8b949e' }}>Generating QR code…</p>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Generating QR code…</p>
           )}
           {totpSecret && (
             <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 12, color: '#8b949e', marginBottom: 4 }}>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
                 Or enter the secret manually:
               </p>
               <code
                 style={{
                   display: 'block',
-                  background: '#181b22',
-                  border: '1px solid #3a4150',
+                  background: 'var(--surface-elevated)',
+                  border: '1px solid var(--border-strong)',
                   borderRadius: 6,
                   padding: '8px 10px',
                   fontSize: 13,
@@ -164,7 +164,7 @@ export default function AdminVerifyPage() {
             style={inputStyle}
           />
         </label>
-        {error && <p style={{ color: '#ff8080', fontSize: 13 }}>{error}</p>}
+        {error && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
         <button type="submit" disabled={busy} style={buttonStyle}>
           {busy ? 'Verifying…' : 'Verify'}
         </button>
@@ -191,17 +191,17 @@ export default function AdminVerifyPage() {
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 10px',
-  background: '#181b22',
-  color: '#e6e6e6',
-  border: '1px solid #3a4150',
+  background: 'var(--surface-elevated)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 6,
   fontSize: 14,
 };
 
 const buttonStyle: React.CSSProperties = {
   padding: '8px 14px',
-  background: '#3a86ff',
-  color: '#fff',
+  background: 'var(--accent-border)',
+  color: 'var(--on-accent)',
   border: 0,
   borderRadius: 6,
   cursor: 'pointer',
@@ -211,7 +211,7 @@ const buttonStyle: React.CSSProperties = {
 const linkStyle: React.CSSProperties = {
   background: 'transparent',
   border: 0,
-  color: '#3a86ff',
+  color: 'var(--accent-border)',
   cursor: 'pointer',
   textDecoration: 'underline',
   padding: 0,

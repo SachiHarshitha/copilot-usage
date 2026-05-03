@@ -118,18 +118,18 @@ export default async function LeaderboardPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-6">{dictionary.leaderboard.title}</h1>
+      <h1 className="text-2xl font-bold text-[var(--foreground)] mb-6">{dictionary.leaderboard.title}</h1>
 
       <div className="flex gap-3 mb-4 flex-wrap">
         <Link
           href="/leaderboard/repos"
-          className="text-sm border border-[#30363d] text-[#8b949e] px-3 py-1 rounded-md no-underline hover:border-[#8b949e] hover:text-white"
+          className="text-sm border border-[var(--card-border)] text-[var(--text-secondary)] px-3 py-1 rounded-md no-underline hover:border-[var(--text-secondary)] hover:text-[var(--foreground)]"
         >
           {dictionary.leaderboard.repoLeaderboard}
         </Link>
         <Link
           href="/leaderboard/ides"
-          className="text-sm border border-[#30363d] text-[#8b949e] px-3 py-1 rounded-md no-underline hover:border-[#8b949e] hover:text-white"
+          className="text-sm border border-[var(--card-border)] text-[var(--text-secondary)] px-3 py-1 rounded-md no-underline hover:border-[var(--text-secondary)] hover:text-[var(--foreground)]"
         >
           {dictionary.leaderboard.ideRanking}
         </Link>
@@ -140,7 +140,7 @@ export default async function LeaderboardPage({
         <FilterLink href="/leaderboard" active={!since} label={dictionary.leaderboard.allTime} />
         <FilterLink href={`/leaderboard?since=30d&sort=${sort}`} active={since === '30d'} label={dictionary.leaderboard.last30d} />
         <FilterLink href={`/leaderboard?since=7d&sort=${sort}`} active={since === '7d'} label={dictionary.leaderboard.last7d} />
-        <span className="text-[#30363d]">|</span>
+        <span className="text-[var(--card-border)]">|</span>
         <FilterLink href={`/leaderboard?sort=tokens${since ? `&since=${since}` : ''}`} active={sort === 'tokens'} label={dictionary.leaderboard.byTokens} />
         <FilterLink href={`/leaderboard?sort=premium${since ? `&since=${since}` : ''}`} active={sort === 'premium'} label={dictionary.leaderboard.byPremium} />
       </div>
@@ -149,7 +149,7 @@ export default async function LeaderboardPage({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[#30363d] text-[#8b949e]">
+            <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
               <th className="text-left py-3 px-2 w-12">#</th>
               <th className="text-left py-3 px-2">{dictionary.leaderboard.colUser}</th>
               <th className="text-left py-3 px-2">{dictionary.leaderboard.colRank}</th>
@@ -164,7 +164,7 @@ export default async function LeaderboardPage({
           <tbody>
             {entries.length === 0 && (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-[#8b949e]">
+                <td colSpan={9} className="py-12 text-center text-[var(--text-secondary)]">
                   {dictionary.leaderboard.empty}
                 </td>
               </tr>
@@ -173,14 +173,14 @@ export default async function LeaderboardPage({
               const safeAvatarUrl = getAllowedAvatarUrl(e.avatarUrl);
 
               return (
-                <tr key={e.userId} className="border-b border-[#21262d] hover:bg-[#161b22]">
-                  <td className="py-3 px-2 text-[#8b949e]">{(page - 1) * PAGE_SIZE + i + 1}</td>
+                <tr key={e.userId} className="border-b border-[var(--surface-hover)] hover:bg-[var(--surface-elevated)]">
+                  <td className="py-3 px-2 text-[var(--text-secondary)]">{(page - 1) * PAGE_SIZE + i + 1}</td>
                   <td className="py-3 px-2">
                     <Link href={`/u/${e.username}`} className="flex items-center gap-2 no-underline">
                       {safeAvatarUrl && (
                         <Image src={safeAvatarUrl} alt="" width={24} height={24} className="w-6 h-6 rounded-full" />
                       )}
-                      <span className="text-white font-medium">{e.username}</span>
+                      <span className="text-[var(--foreground)] font-medium">{e.username}</span>
                     </Link>
                   </td>
                   <td className="py-3 px-2">
@@ -191,7 +191,7 @@ export default async function LeaderboardPage({
                   <td className="py-3 px-2 text-right font-mono">🔥 {e.currentStreakDays}</td>
                   <td className="py-3 px-2 text-right font-mono">{e.premiumRequests.toFixed(1)}</td>
                   <td className="py-3 px-2 text-right font-mono">{numberFormatter.format(e.totalRequests)}</td>
-                  <td className="py-3 px-2 text-right text-[#8b949e]">{e.topModel || '–'}</td>
+                  <td className="py-3 px-2 text-right text-[var(--text-secondary)]">{e.topModel || '–'}</td>
                   <td className="py-3 px-2 text-right">{e.workspaceCount}</td>
                 </tr>
               );
@@ -205,7 +205,7 @@ export default async function LeaderboardPage({
         {page > 1 && (
           <Link
             href={`/leaderboard?page=${page - 1}${sort !== 'tokens' ? `&sort=${sort}` : ''}${since ? `&since=${since}` : ''}`}
-            className="text-sm border border-[#30363d] px-3 py-1.5 rounded-md no-underline hover:border-[#8b949e]"
+            className="text-sm border border-[var(--card-border)] px-3 py-1.5 rounded-md no-underline hover:border-[var(--text-secondary)]"
           >
             {dictionary.leaderboard.prev}
           </Link>
@@ -213,7 +213,7 @@ export default async function LeaderboardPage({
         {entries.length === PAGE_SIZE && (
           <Link
             href={`/leaderboard?page=${page + 1}${sort !== 'tokens' ? `&sort=${sort}` : ''}${since ? `&since=${since}` : ''}`}
-            className="text-sm border border-[#30363d] px-3 py-1.5 rounded-md no-underline hover:border-[#8b949e]"
+            className="text-sm border border-[var(--card-border)] px-3 py-1.5 rounded-md no-underline hover:border-[var(--text-secondary)]"
           >
             {dictionary.leaderboard.next}
           </Link>
@@ -230,7 +230,7 @@ function FilterLink({ href, active, label }: { href: string; active: boolean; la
       className={`text-sm px-3 py-1 rounded-md no-underline ${
         active
           ? 'bg-brand-600 text-white'
-          : 'border border-[#30363d] text-[#8b949e] hover:border-[#8b949e] hover:text-white'
+          : 'border border-[var(--card-border)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)] hover:text-[var(--foreground)]'
       }`}
     >
       {label}

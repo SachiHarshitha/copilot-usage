@@ -101,10 +101,10 @@ export default async function AdminUploadAuditsPage({
   return (
     <section>
       <div style={{ marginBottom: 12 }}>
-        <Link href="/admin" style={{ color: '#74b9ff' }}>← Dashboard</Link>
+        <Link href="/admin" style={{ color: 'var(--accent-border)' }}>← Dashboard</Link>
       </div>
       <h2 style={{ marginTop: 0 }}>Upload audits</h2>
-      <p style={{ color: '#9aa0aa', fontSize: 13, marginTop: 0 }}>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>
         Triage view over <code>UploadAudit</code>. ipHash and userAgentHash are
         deliberately omitted from this projection.
       </p>
@@ -144,13 +144,13 @@ export default async function AdminUploadAuditsPage({
         />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button type="submit" style={btn}>Search</button>
-          <Link href="/admin/upload-audits" style={{ color: '#9aa0aa', fontSize: 13 }}>Reset</Link>
+          <Link href="/admin/upload-audits" style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Reset</Link>
         </div>
       </form>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
-          <tr style={{ borderBottom: '1px solid #2a2f3a', textAlign: 'left' }}>
+          <tr style={{ borderBottom: '1px solid var(--card-border)', textAlign: 'left' }}>
             <th style={th}>Received</th>
             <th style={th}>User</th>
             <th style={th}>Device</th>
@@ -163,10 +163,10 @@ export default async function AdminUploadAuditsPage({
         </thead>
         <tbody>
           {visible.map((r) => (
-            <tr key={r.id} style={{ borderBottom: '1px solid #1a1f2a' }}>
+            <tr key={r.id} style={{ borderBottom: '1px solid var(--surface-soft)' }}>
               <td style={td}>{r.receivedAt.toISOString().replace('T', ' ').slice(0, 19)}</td>
               <td style={{ ...td, fontFamily: 'monospace', fontSize: 12 }}>
-                <Link href={`/admin/users/${r.userId}`} style={{ color: '#74b9ff' }}>
+                <Link href={`/admin/users/${r.userId}`} style={{ color: 'var(--accent-border)' }}>
                   {r.userId.slice(0, 8)}…
                 </Link>
               </td>
@@ -180,9 +180,9 @@ export default async function AdminUploadAuditsPage({
               <td style={{ ...td, color: sigColor(r.signatureStatus) }}>{r.signatureStatus}</td>
               <td style={td}>
                 {r.accepted ? (
-                  <span style={{ color: '#55efc4' }}>yes</span>
+                  <span style={{ color: 'var(--success)' }}>yes</span>
                 ) : (
-                  <span style={{ color: '#ff7675' }}>no</span>
+                  <span style={{ color: 'var(--danger)' }}>no</span>
                 )}
               </td>
               <td style={td}>{r.rejectionCode ?? '—'}</td>
@@ -190,7 +190,7 @@ export default async function AdminUploadAuditsPage({
           ))}
           {visible.length === 0 && (
             <tr>
-              <td colSpan={8} style={{ ...td, color: '#9aa0aa' }}>No audit rows match.</td>
+              <td colSpan={8} style={{ ...td, color: 'var(--text-secondary)' }}>No audit rows match.</td>
             </tr>
           )}
         </tbody>
@@ -203,7 +203,7 @@ export default async function AdminUploadAuditsPage({
               pathname: '/admin/upload-audits',
               query: { ...carried, cursor: nextCursor },
             }}
-            style={{ color: '#74b9ff' }}
+            style={{ color: 'var(--accent-border)' }}
           >
             Next page →
           </Link>
@@ -215,14 +215,14 @@ export default async function AdminUploadAuditsPage({
 
 function sigColor(s: string): string {
   switch (s) {
-    case 'VALID': return '#55efc4';
+    case 'VALID': return 'var(--success)';
     case 'MISSING':
-    case 'STALE_TIMESTAMP': return '#fdcb6e';
+    case 'STALE_TIMESTAMP': return 'var(--warning)';
     case 'INVALID':
     case 'REPLAYED_NONCE':
     case 'BODY_HASH_MISMATCH':
-    case 'DEVICE_REVOKED': return '#ff7675';
-    default: return '#cdd6f4';
+    case 'DEVICE_REVOKED': return 'var(--danger)';
+    default: return 'var(--foreground)';
   }
 }
 
@@ -236,20 +236,20 @@ function fmtForInput(iso: string): string {
 
 const btn: React.CSSProperties = {
   padding: '8px 14px',
-  background: '#2a2f3a',
-  color: '#e6e6e6',
-  border: '1px solid #3a4150',
+  background: 'var(--card-border)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 6,
   cursor: 'pointer',
 };
 
 const input: React.CSSProperties = {
   padding: '8px 10px',
-  background: '#1a1f2a',
-  color: '#e6e6e6',
-  border: '1px solid #2a2f3a',
+  background: 'var(--surface-soft)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--card-border)',
   borderRadius: 6,
 };
 
-const th: React.CSSProperties = { padding: '8px 6px', fontWeight: 600, color: '#9aa0aa' };
+const th: React.CSSProperties = { padding: '8px 6px', fontWeight: 600, color: 'var(--text-secondary)' };
 const td: React.CSSProperties = { padding: '8px 6px', verticalAlign: 'top' };

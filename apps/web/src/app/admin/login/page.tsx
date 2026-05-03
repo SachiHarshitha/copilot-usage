@@ -72,7 +72,7 @@ export default function AdminLoginPage() {
           />
         </label>
         {error && (
-          <p style={{ color: '#ff8080', fontSize: 13, marginTop: 0 }}>{error}</p>
+          <p style={{ color: 'var(--danger)', fontSize: 13, marginTop: 0 }}>{error}</p>
         )}
         <button type="submit" disabled={busy} style={buttonStyle}>
           {busy ? 'Signing in…' : 'Continue'}
@@ -85,17 +85,17 @@ export default function AdminLoginPage() {
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 10px',
-  background: '#181b22',
-  color: '#e6e6e6',
-  border: '1px solid #3a4150',
+  background: 'var(--surface-elevated)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 6,
   fontSize: 14,
 };
 
 const buttonStyle: React.CSSProperties = {
   padding: '8px 14px',
-  background: '#3a86ff',
-  color: '#fff',
+  background: 'var(--accent-border)',
+  color: 'var(--on-accent)',
   border: 0,
   borderRadius: 6,
   cursor: 'pointer',

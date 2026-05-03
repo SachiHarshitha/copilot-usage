@@ -39,10 +39,10 @@ export default async function AdminMetricsPage() {
   return (
     <section>
       <div style={{ marginBottom: 12 }}>
-        <Link href="/admin" style={{ color: '#74b9ff' }}>← Dashboard</Link>
+        <Link href="/admin" style={{ color: 'var(--accent-border)' }}>← Dashboard</Link>
       </div>
       <h2 style={{ marginTop: 0 }}>Metrics</h2>
-      <p style={{ color: '#9aa0aa', fontSize: 13, marginTop: 0 }}>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 0 }}>
         Snapshot at {generatedAt}. Each load runs all six aggregations against
         Postgres; for a cached snapshot use{' '}
         <code>GET /api/admin/metrics/overview</code>.
@@ -85,12 +85,12 @@ export default async function AdminMetricsPage() {
                   style={{
                     width: '100%',
                     height: `${pct}%`,
-                    background: '#74b9ff',
+                    background: 'var(--accent-border)',
                     borderRadius: '2px 2px 0 0',
                     minHeight: p.count > 0 ? 2 : 0,
                   }}
                 />
-                <span style={{ fontSize: 9, color: '#9aa0aa' }}>{hour}</span>
+                <span style={{ fontSize: 9, color: 'var(--text-secondary)' }}>{hour}</span>
               </div>
             );
           })}
@@ -99,7 +99,7 @@ export default async function AdminMetricsPage() {
 
       <Panel title={`Signature status share (last 24h — ${sigTotal} rows)`}>
         {sigTotal === 0 ? (
-          <p style={{ color: '#9aa0aa', margin: 0 }}>No upload-audit rows in window.</p>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>No upload-audit rows in window.</p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {Object.entries(sigShare)
@@ -109,7 +109,7 @@ export default async function AdminMetricsPage() {
                 return (
                   <li key={status} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ width: 180, fontSize: 13, color: sigColor(status) }}>{status}</span>
-                    <div style={{ flex: 1, background: '#1a1f2a', borderRadius: 4, height: 12 }}>
+                    <div style={{ flex: 1, background: 'var(--surface-soft)', borderRadius: 4, height: 12 }}>
                       <div
                         style={{
                           width: `${pct}%`,
@@ -119,7 +119,7 @@ export default async function AdminMetricsPage() {
                         }}
                       />
                     </div>
-                    <span style={{ width: 80, textAlign: 'right', fontSize: 13, color: '#cdd6f4' }}>
+                    <span style={{ width: 80, textAlign: 'right', fontSize: 13, color: 'var(--foreground)' }}>
                       {count} ({pct.toFixed(1)}%)
                     </span>
                   </li>
@@ -131,7 +131,7 @@ export default async function AdminMetricsPage() {
 
       <Panel title="Open anomalies by severity">
         {Object.keys(anomalies).length === 0 ? (
-          <p style={{ color: '#55efc4', margin: 0 }}>No open anomalies.</p>
+          <p style={{ color: 'var(--success)', margin: 0 }}>No open anomalies.</p>
         ) : (
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             {(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const).map((sev) => {
@@ -169,13 +169,13 @@ function Tile({ label, value }: { label: string; value: string }) {
     <div
       style={{
         padding: 16,
-        border: '1px solid #2a2f3a',
+        border: '1px solid var(--card-border)',
         borderRadius: 8,
-        background: '#11151c',
+        background: 'var(--surface-elevated)',
       }}
     >
-      <div style={{ fontSize: 12, color: '#9aa0aa', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 28, color: '#e6e6e6', fontWeight: 600 }}>{value}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 28, color: 'var(--foreground)', fontWeight: 600 }}>{value}</div>
     </div>
   );
 }
@@ -185,13 +185,13 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
     <section
       style={{
         padding: 16,
-        border: '1px solid #2a2f3a',
+        border: '1px solid var(--card-border)',
         borderRadius: 8,
-        background: '#11151c',
+        background: 'var(--surface-elevated)',
         marginBottom: 16,
       }}
     >
-      <h3 style={{ marginTop: 0, fontSize: 14, color: '#9aa0aa' }}>{title}</h3>
+      <h3 style={{ marginTop: 0, fontSize: 14, color: 'var(--text-secondary)' }}>{title}</h3>
       {children}
     </section>
   );
@@ -199,22 +199,22 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 
 function sigColor(s: string): string {
   switch (s) {
-    case 'VALID': return '#55efc4';
+    case 'VALID': return 'var(--success)';
     case 'MISSING':
-    case 'STALE_TIMESTAMP': return '#fdcb6e';
+    case 'STALE_TIMESTAMP': return 'var(--warning)';
     case 'INVALID':
     case 'REPLAYED_NONCE':
     case 'BODY_HASH_MISMATCH':
-    case 'DEVICE_REVOKED': return '#ff7675';
-    default: return '#cdd6f4';
+    case 'DEVICE_REVOKED': return 'var(--danger)';
+    default: return 'var(--foreground)';
   }
 }
 
 function sevColor(s: string): string {
   switch (s) {
-    case 'CRITICAL': return '#ff4757';
-    case 'HIGH': return '#ff7675';
-    case 'MEDIUM': return '#fdcb6e';
-    default: return '#cdd6f4';
+    case 'CRITICAL': return 'var(--danger)';
+    case 'HIGH': return 'var(--danger)';
+    case 'MEDIUM': return 'var(--warning)';
+    default: return 'var(--foreground)';
   }
 }

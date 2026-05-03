@@ -67,7 +67,7 @@ export default async function AdminAnomaliesPage({
   return (
     <section>
       <div style={{ marginBottom: 12 }}>
-        <Link href="/admin" style={{ color: '#74b9ff' }}>← Dashboard</Link>
+        <Link href="/admin" style={{ color: 'var(--accent-border)' }}>← Dashboard</Link>
       </div>
       <h2 style={{ marginTop: 0 }}>Verification anomalies</h2>
 
@@ -96,7 +96,7 @@ export default async function AdminAnomaliesPage({
           placeholder="userId"
           style={{ ...input, minWidth: 180 }}
         />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#cdd6f4', fontSize: 13 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--foreground)', fontSize: 13 }}>
           <input
             type="checkbox"
             name="unresolved"
@@ -106,12 +106,12 @@ export default async function AdminAnomaliesPage({
           Unresolved only
         </label>
         <button type="submit" style={btn}>Filter</button>
-        <Link href="/admin/anomalies" style={{ color: '#9aa0aa', fontSize: 13 }}>Reset</Link>
+        <Link href="/admin/anomalies" style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Reset</Link>
       </form>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
-          <tr style={{ borderBottom: '1px solid #2a2f3a', textAlign: 'left' }}>
+          <tr style={{ borderBottom: '1px solid var(--card-border)', textAlign: 'left' }}>
             <th style={th}>Detected</th>
             <th style={th}>Severity</th>
             <th style={th}>Code</th>
@@ -123,25 +123,25 @@ export default async function AdminAnomaliesPage({
         </thead>
         <tbody>
           {visible.map((r) => (
-            <tr key={r.id} style={{ borderBottom: '1px solid #1a1f2a' }}>
+            <tr key={r.id} style={{ borderBottom: '1px solid var(--surface-soft)' }}>
               <td style={td}>{r.detectedAt.toISOString().replace('T', ' ').slice(0, 19)}</td>
               <td style={{ ...td, color: severityColor(r.severity) }}>{r.severity}</td>
               <td style={{ ...td, fontFamily: 'monospace' }}>{r.code}</td>
               <td style={{ ...td, fontFamily: 'monospace', fontSize: 12 }}>
-                <Link href={`/admin/users/${r.userId}`} style={{ color: '#74b9ff' }}>
+                <Link href={`/admin/users/${r.userId}`} style={{ color: 'var(--accent-border)' }}>
                   {r.userId.slice(0, 8)}…
                 </Link>
               </td>
               <td style={td}>{r.summary}</td>
               <td style={td}>
                 {r.resolvedAt ? (
-                  <span style={{ color: '#9aa0aa' }}>resolved</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>resolved</span>
                 ) : (
-                  <span style={{ color: '#fdcb6e' }}>open</span>
+                  <span style={{ color: 'var(--warning)' }}>open</span>
                 )}
               </td>
               <td style={td}>
-                <Link href={`/admin/anomalies/${r.id}`} style={{ color: '#74b9ff' }}>
+                <Link href={`/admin/anomalies/${r.id}`} style={{ color: 'var(--accent-border)' }}>
                   Open →
                 </Link>
               </td>
@@ -149,7 +149,7 @@ export default async function AdminAnomaliesPage({
           ))}
           {visible.length === 0 && (
             <tr>
-              <td colSpan={7} style={{ ...td, color: '#9aa0aa' }}>No anomalies match.</td>
+              <td colSpan={7} style={{ ...td, color: 'var(--text-secondary)' }}>No anomalies match.</td>
             </tr>
           )}
         </tbody>
@@ -162,7 +162,7 @@ export default async function AdminAnomaliesPage({
               pathname: '/admin/anomalies',
               query: { ...carried, cursor: nextCursor },
             }}
-            style={{ color: '#74b9ff' }}
+            style={{ color: 'var(--accent-border)' }}
           >
             Next page →
           </Link>
@@ -174,29 +174,29 @@ export default async function AdminAnomaliesPage({
 
 function severityColor(s: string): string {
   switch (s) {
-    case 'CRITICAL': return '#ff4757';
-    case 'HIGH': return '#ff7675';
-    case 'MEDIUM': return '#fdcb6e';
-    default: return '#cdd6f4';
+    case 'CRITICAL': return 'var(--danger)';
+    case 'HIGH': return 'var(--danger)';
+    case 'MEDIUM': return 'var(--warning)';
+    default: return 'var(--foreground)';
   }
 }
 
 const btn: React.CSSProperties = {
   padding: '8px 14px',
-  background: '#2a2f3a',
-  color: '#e6e6e6',
-  border: '1px solid #3a4150',
+  background: 'var(--card-border)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 6,
   cursor: 'pointer',
 };
 
 const input: React.CSSProperties = {
   padding: '8px 10px',
-  background: '#1a1f2a',
-  color: '#e6e6e6',
-  border: '1px solid #2a2f3a',
+  background: 'var(--surface-soft)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--card-border)',
   borderRadius: 6,
 };
 
-const th: React.CSSProperties = { padding: '8px 6px', fontWeight: 600, color: '#9aa0aa' };
+const th: React.CSSProperties = { padding: '8px 6px', fontWeight: 600, color: 'var(--text-secondary)' };
 const td: React.CSSProperties = { padding: '8px 6px', verticalAlign: 'top' };

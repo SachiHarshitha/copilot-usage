@@ -48,20 +48,20 @@ export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
         aria-expanded={isOpen}
         aria-label={dictionary.profileMenu.openAria}
         onClick={() => setIsOpen((value) => !value)}
-        className="group inline-flex items-center rounded-full border border-[#30363d] bg-[#161b22] pl-1 pr-1 py-1 text-sm shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors hover:border-[#4f5b6b]"
+        className="group inline-flex items-center rounded-full border border-[var(--card-border)] bg-[var(--surface-elevated)] pl-1 pr-1 py-1 text-sm transition-colors hover:border-[var(--accent-border)]"
       >
-        <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#30363d] text-xs font-semibold text-white">
+        <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[var(--card-border)] text-xs font-semibold text-[var(--foreground)]">
           {safeAvatarUrl ? (
             <Image src={safeAvatarUrl} alt={`@${username} avatar`} width={32} height={32} className="h-full w-full object-cover" />
           ) : (
             getProfileAvatarInitial(username)
           )}
         </span>
-        <span className="mx-2 h-5 w-px bg-[#30363d]" aria-hidden="true" />
+        <span className="mx-2 h-5 w-px bg-[var(--card-border)]" aria-hidden="true" />
         <svg
           viewBox="0 0 20 20"
           fill="currentColor"
-          className={`mr-1 h-4 w-4 text-[#8b949e] transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`mr-1 h-4 w-4 text-[var(--text-secondary)] transition-transform ${isOpen ? 'rotate-180' : ''}`}
           aria-hidden="true"
         >
           <path
@@ -76,13 +76,13 @@ export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
         <div
           role="menu"
           aria-label={dictionary.profileMenu.menuAria}
-          className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-xl border border-[#30363d] bg-[#161b22] py-1 shadow-xl"
+          className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--surface-elevated)] py-1 shadow-xl"
         >
           <Link
             href={`/u/${username}`}
             role="menuitem"
             onClick={() => setIsOpen(false)}
-            className="block px-3 py-2 text-sm text-[#c9d1d9] no-underline hover:bg-[#0d1117]"
+            className="block px-3 py-2 text-sm text-[var(--foreground)] no-underline hover:bg-[var(--surface-hover)]"
           >
             {dictionary.profileMenu.myProfile}
           </Link>
@@ -90,16 +90,16 @@ export function ProfileMenu({ username, avatarUrl }: ProfileMenuProps) {
             href="/settings"
             role="menuitem"
             onClick={() => setIsOpen(false)}
-            className="block px-3 py-2 text-sm text-[#c9d1d9] no-underline hover:bg-[#0d1117]"
+            className="block px-3 py-2 text-sm text-[var(--foreground)] no-underline hover:bg-[var(--surface-hover)]"
           >
             {dictionary.profileMenu.settings}
           </Link>
-          <div className="my-1 h-px bg-[#30363d]" />
+          <div className="my-1 h-px bg-[var(--card-border)]" />
           <Link
             href="/api/auth/signout?callbackUrl=%2F"
             role="menuitem"
             onClick={() => setIsOpen(false)}
-            className="block px-3 py-2 text-sm text-[#fca5a5] no-underline hover:bg-[#0d1117]"
+            className="block px-3 py-2 text-sm text-[var(--danger)] no-underline hover:bg-[var(--surface-hover)]"
           >
             {dictionary.profileMenu.logout}
           </Link>

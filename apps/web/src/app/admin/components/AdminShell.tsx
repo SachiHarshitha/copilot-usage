@@ -23,15 +23,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
   if (isLoginRoute(pathname)) {
     // No chrome on login / verify pages — user isn't authenticated yet.
     return (
-      <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="flex min-h-dvh items-center justify-center overflow-y-auto p-6">
         {children}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1400px] flex-col px-4 py-5 sm:px-6 lg:px-8">
-      <header className="mb-5 rounded-2xl border border-slate-700/60 bg-slate-900/80 px-5 py-4 shadow-[0_20px_60px_-35px_rgba(15,23,42,0.9)] backdrop-blur">
+    <div className="mx-auto flex h-dvh max-h-dvh w-full max-w-[1400px] flex-col overflow-hidden px-4 py-5 sm:px-6 lg:px-8">
+      <header className="mb-5 shrink-0 rounded-2xl border border-slate-700/60 bg-slate-900/80 px-5 py-4 shadow-[0_20px_60px_-35px_rgba(15,23,42,0.9)] backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-300/80">
@@ -56,12 +56,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div className="grid flex-1 gap-5 lg:grid-cols-[270px_minmax(0,1fr)]">
-        <aside className="rounded-2xl border border-slate-700/60 bg-slate-900/70 p-3 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.95)] backdrop-blur lg:sticky lg:top-5 lg:self-start">
+      <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[270px_minmax(0,1fr)]">
+        <aside className="app-content-scroll min-h-0 overflow-y-auto rounded-2xl border border-slate-700/60 bg-slate-900/70 p-3 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.95)] backdrop-blur lg:sticky lg:top-5 lg:self-start">
           <AdminSidebarNav />
         </aside>
 
-        <section className="min-w-0 rounded-2xl border border-slate-700/60 bg-slate-900/55 p-4 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.95)] backdrop-blur sm:p-6">
+        <section className="app-content-scroll min-h-0 min-w-0 overflow-y-auto rounded-2xl border border-slate-700/60 bg-slate-900/55 p-4 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.95)] backdrop-blur sm:p-6">
           {children}
         </section>
       </div>

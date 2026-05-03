@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useI18n } from '@/app/components/i18n-provider';
-import type { AppLocale } from '@/lib/i18n/types';
 
 interface PrivacySettings {
   profilePublic: boolean;
@@ -24,7 +23,6 @@ export default function SettingsPage() {
   const { dictionary, locale } = useI18n();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [privacy, setPrivacy] = useState<PrivacySettings | null>(null);
-  const [language, setLanguage] = useState<AppLocale>('en');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -34,9 +32,8 @@ export default function SettingsPage() {
     Promise.all([
       fetch('/api/settings/profile').then((r) => (r.ok ? r.json() : null)),
       fetch('/api/settings/privacy').then((r) => (r.ok ? r.json() : null)),
-      fetch('/api/settings/language').then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([profileResp, privacyResp, languageResp]) => {
+      .then(([profileResp, privacyResp]) => {
         setSettings(profileResp);
         if (privacyResp) {
           setPrivacy({
@@ -45,19 +42,16 @@ export default function SettingsPage() {
             badgesEnabled: !!privacyResp.badgesEnabled,
           });
         }
-        if (languageResp?.locale) {
-          setLanguage(languageResp.locale as AppLocale);
-        }
       })
       .catch(() => setSettings(null))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="text-[#8b949e]">{dictionary.settings.loading}</p>;
+  if (loading) return <p className="text-[var(--text-secondary)]">{dictionary.settings.loading}</p>;
   if (!settings) {
     return (
       <div className="text-center py-12">
-        <p className="text-[#8b949e] mb-4">{dictionary.settings.signInRequired}</p>
+        <p className="text-[var(--text-secondary)] mb-4">{dictionary.settings.signInRequired}</p>
         <Link
           href="/api/auth/signin"
           className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg no-underline"
@@ -91,23 +85,6 @@ export default function SettingsPage() {
       }
       setMessage(dictionary.settings.privacyUpdated);
       setBadgeCacheBuster((n) => n + 1);
-    }
-    setSaving(false);
-  }
-
-  async function updateLanguage(nextLanguage: AppLocale) {
-    setSaving(true);
-    const res = await fetch('/api/settings/language', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locale: nextLanguage }),
-    });
-    if (res.ok) {
-      setLanguage(nextLanguage);
-      setMessage(dictionary.settings.languageUpdated);
-      setTimeout(() => {
-        window.location.reload();
-      }, 150);
     }
     setSaving(false);
   }
@@ -159,16 +136,16 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-white mb-8">{dictionary.settings.title}</h1>
+      <h1 className="text-2xl font-bold text-[var(--foreground)] mb-8">{dictionary.settings.title}</h1>
 
       {settings.status === 'SUSPENDED' && (
-        <div className="flex items-start gap-3 rounded-lg border border-red-700/50 bg-red-950/40 px-4 py-3 text-sm text-red-300 mb-6">
-          <span className="mt-0.5 text-red-400">⚠</span>
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-[var(--alert-border)] bg-[var(--alert-bg)] px-4 py-3 text-sm text-[var(--alert-text)]">
+          <span className="mt-0.5 text-[var(--alert-accent)]">⚠</span>
           <div>
-            <p className="font-medium text-red-200 mb-1">{dictionary.settings.suspendedTitle}</p>
-            <p className="text-red-400">
+            <p className="mb-1 font-medium text-[var(--alert-text)]">{dictionary.settings.suspendedTitle}</p>
+            <p className="text-[var(--alert-text)]">
               {dictionary.settings.suspendedBody}{' '}
-              <Link href="/contact" className="underline text-red-300 hover:text-white">
+              <Link href="/contact" className="underline text-[var(--alert-link)] hover:text-[var(--alert-accent)]">
                 {dictionary.settings.contactSupport}
               </Link>
               .
@@ -185,8 +162,8 @@ export default function SettingsPage() {
 
       {/* Account */}
       <Section title={dictionary.settings.account}>
-        <p className="text-sm text-[#8b949e] mb-2">{dictionary.settings.displayName}: <span className="text-white">{settings.displayName}</span></p>
-        <p className="text-sm text-[#8b949e] mb-4">{dictionary.settings.username}: <span className="text-white">@{settings.username}</span></p>
+        <p className="text-sm text-[var(--text-secondary)] mb-2">{dictionary.settings.displayName}: <span className="text-[var(--foreground)]">{settings.displayName}</span></p>
+        <p className="text-sm text-[var(--text-secondary)] mb-4">{dictionary.settings.username}: <span className="text-[var(--foreground)]">@{settings.username}</span></p>
         <button
           onClick={deleteAccount}
           className="text-sm text-red-400 border border-red-800 px-3 py-1.5 rounded hover:bg-red-900/30"
@@ -195,28 +172,9 @@ export default function SettingsPage() {
         </button>
       </Section>
 
-      {/* Language */}
-      <Section title={dictionary.settings.language}>
-        <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
-          {dictionary.settings.languageLabel}
-        </label>
-        <select
-          value={language}
-          onChange={(e) => updateLanguage(e.target.value as AppLocale)}
-          disabled={saving}
-          className="w-full rounded-md bg-[#161b22] border border-[#30363d] px-3 py-2 text-sm text-white focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-        >
-          <option value="en">{dictionary.languageNames.en}</option>
-          <option value="de">{dictionary.languageNames.de}</option>
-          <option value="zh">{dictionary.languageNames.zh}</option>
-          <option value="es">{dictionary.languageNames.es}</option>
-        </select>
-        <p className="text-xs text-[#8b949e] mt-2">{dictionary.settings.languageHint}</p>
-      </Section>
-
       {/* Privacy */}
       <Section title={dictionary.settings.privacy}>
-        <p className="text-xs text-[#8b949e] mb-4">
+        <p className="text-xs text-[var(--text-secondary)] mb-4">
           {dictionary.settings.privacyIntroLine1}{' '}
           {dictionary.settings.privacyIntroLine2}
         </p>
@@ -245,25 +203,25 @@ export default function SettingsPage() {
             />
           </div>
         ) : (
-          <p className="text-sm text-[#8b949e]">{dictionary.settings.privacyUnavailable}</p>
+          <p className="text-sm text-[var(--text-secondary)]">{dictionary.settings.privacyUnavailable}</p>
         )}
       </Section>
 
       {/* Repos */}
       <Section title={dictionary.settings.repoVisibility}>
         {settings.repos.length === 0 ? (
-          <p className="text-sm text-[#8b949e]">{dictionary.settings.reposNone}</p>
+          <p className="text-sm text-[var(--text-secondary)]">{dictionary.settings.reposNone}</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#30363d] text-[#8b949e]">
+              <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
                 <th className="text-left py-2">{dictionary.settings.repoColRepo}</th>
                 <th className="text-right py-2">{dictionary.settings.repoColVisibility}</th>
               </tr>
             </thead>
             <tbody>
               {settings.repos.map((r) => (
-                <tr key={r.id} className="border-b border-[#21262d]">
+                <tr key={r.id} className="border-b border-[var(--surface-hover)]">
                   <td className="py-2">
                     {r.displayMode === 'github' && r.githubRepo ? r.githubRepo : r.aliasLabel || r.repoIdentity}
                   </td>
@@ -273,7 +231,7 @@ export default function SettingsPage() {
                       className={`text-xs px-2 py-1 rounded ${
                         r.isPublic
                           ? 'bg-green-900/30 text-green-400 border border-green-700'
-                          : 'bg-[#21262d] text-[#8b949e] border border-[#30363d]'
+                          : 'bg-[var(--surface-hover)] text-[var(--text-secondary)] border border-[var(--card-border)]'
                       }`}
                     >
                       {r.isPublic ? dictionary.settings.public : dictionary.settings.private}
@@ -289,14 +247,16 @@ export default function SettingsPage() {
       {/* Devices */}
       <Section title={dictionary.settings.devices}>
         {settings.devices.length === 0 ? (
-          <p className="text-sm text-[#8b949e]">{dictionary.settings.devicesNone}</p>
+          <p className="text-sm text-[var(--text-secondary)]">{dictionary.settings.devicesNone}</p>
         ) : (
           <div className="space-y-3">
             {settings.devices.map((d) => (
-              <div key={d.id} className="flex items-center justify-between bg-[#0d1117] border border-[#30363d] rounded p-3">
+              <div key={d.id} className="flex items-center justify-between bg-[var(--background)] border border-[var(--card-border)] rounded p-3">
                 <div>
-                  <p className="text-sm text-white">{d.name || `Device ${d.tokenId.slice(0, 8)}...`}</p>
-                  <p className="text-xs text-[#8b949e]">
+                  <p className="text-sm text-[var(--foreground)]">
+                    {d.name || `${dictionary.settings.deviceLabelPrefix} ${d.tokenId.slice(0, 8)}...`}
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">
                     {dictionary.settings.createdOn} {new Date(d.createdAt).toLocaleDateString(locale)}
                     {d.lastSeenAt && ` · ${dictionary.settings.lastSeen} ${new Date(d.lastSeenAt).toLocaleDateString(locale)}`}
                   </p>
@@ -316,7 +276,7 @@ export default function SettingsPage() {
       {/* Badge Preview */}
       <Section title={dictionary.settings.badges}>
         <div className="mb-4">
-          <p className="text-xs text-[#8b949e] mb-1">{dictionary.settings.userBadgePreview}</p>
+          <p className="text-xs text-[var(--text-secondary)] mb-1">{dictionary.settings.userBadgePreview}</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={streakBadgeUrl} alt="Streak badge preview" className="mb-2" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -330,42 +290,42 @@ export default function SettingsPage() {
         </div>
 
         <div className="mb-4">
-          <p className="text-xs text-[#8b949e] mb-1">{dictionary.settings.readmeUserSnippets}</p>
-          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+          <p className="text-xs text-[var(--text-secondary)] mb-1">{dictionary.settings.readmeUserSnippets}</p>
+          <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all mb-2">
             {`[![PromptStreak Streak](${baseUrl}${streakBadgeUrl})](${baseUrl}/u/${settings.username})`}
           </code>
-          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+          <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all mb-2">
             {`[![PromptStreak Lifetime](${baseUrl}${lifetimeBadgeUrl})](${baseUrl}/u/${settings.username})`}
           </code>
-          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+          <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all mb-2">
             {`[![PromptStreak Rank](${baseUrl}${rankBadgeUrl})](${baseUrl}/u/${settings.username})`}
           </code>
-          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+          <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all mb-2">
             {`[![PromptStreak Weekly](${baseUrl}${weeklyBadgeUrl})](${baseUrl}/u/${settings.username})`}
           </code>
-          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
+          <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all">
             {`[![PromptStreak Top Repo](${baseUrl}${repoBadgeUrl})](${baseUrl}/u/${settings.username})`}
           </code>
         </div>
 
         <div>
-          <p className="text-xs text-[#8b949e] mb-1">{dictionary.settings.legacyCard}</p>
+          <p className="text-xs text-[var(--text-secondary)] mb-1">{dictionary.settings.legacyCard}</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={cardUrl} alt="Card preview" className="mb-2 max-w-[400px]" />
-          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
+          <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all">
             {`![promptstreak.dev](${baseUrl}${cardUrl})`}
           </code>
         </div>
 
         <div className="mt-5">
-          <p className="text-xs text-[#8b949e] mb-1">{dictionary.settings.readmeRepoSnippets}</p>
-          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+          <p className="text-xs text-[var(--text-secondary)] mb-1">{dictionary.settings.readmeRepoSnippets}</p>
+          <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all mb-2">
             {`[![PromptStreak Rank](${baseUrl}/api/badges/repo/${repoOwner}/${repoName}/leaderboard.svg)](${baseUrl}/r/${settings.username}/${repoOwner}/${repoName})`}
           </code>
-          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all mb-2">
+          <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all mb-2">
             {`[![PromptStreak Tokens](${baseUrl}/api/badges/repo/${repoOwner}/${repoName}/tokens.svg)](${baseUrl}/r/${settings.username}/${repoOwner}/${repoName})`}
           </code>
-          <code className="block bg-[#0d1117] text-xs p-2 rounded border border-[#30363d] break-all">
+          <code className="block bg-[var(--background)] text-xs p-2 rounded border border-[var(--card-border)] break-all">
             {`[![PromptStreak Models](${baseUrl}/api/badges/repo/${repoOwner}/${repoName}/models.svg)](${baseUrl}/r/${settings.username}/${repoOwner}/${repoName})`}
           </code>
         </div>
@@ -377,7 +337,7 @@ export default function SettingsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-8">
-      <h2 className="text-lg font-semibold text-white mb-4 pb-2 border-b border-[#30363d]">{title}</h2>
+      <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4 pb-2 border-b border-[var(--card-border)]">{title}</h2>
       {children}
     </div>
   );
@@ -397,10 +357,10 @@ function PrivacyRow({
   onToggle: () => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 bg-[#0d1117] border border-[#30363d] rounded p-3">
+    <div className="flex items-start justify-between gap-4 bg-[var(--background)] border border-[var(--card-border)] rounded p-3">
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white">{label}</p>
-        <p className="text-xs text-[#8b949e] mt-0.5">{hint}</p>
+        <p className="text-sm text-[var(--foreground)]">{label}</p>
+        <p className="text-xs text-[var(--text-secondary)] mt-0.5">{hint}</p>
       </div>
       <button
         type="button"
@@ -410,10 +370,10 @@ function PrivacyRow({
         className={`shrink-0 text-xs px-3 py-1.5 rounded border ${
           enabled
             ? 'bg-green-900/30 text-green-400 border-green-700'
-            : 'bg-[#21262d] text-[#8b949e] border-[#30363d]'
+            : 'bg-[var(--surface-hover)] text-[var(--text-secondary)] border-[var(--card-border)]'
         } disabled:opacity-50`}
       >
-        {enabled ? 'On' : 'Off'}
+        {enabled ? dictionary.settings.toggleOn : dictionary.settings.toggleOff}
       </button>
     </div>
   );

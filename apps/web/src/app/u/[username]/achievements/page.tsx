@@ -46,18 +46,18 @@ export default async function AchievementsPage({
   return (
     <div>
       <div className="mb-6">
-        <Link href={`/u/${username}`} className="text-sm text-[#8b949e] hover:text-white no-underline">
+        <Link href={`/u/${username}`} className="text-sm text-[var(--text-secondary)] hover:text-[var(--foreground)] no-underline">
           ← {dictionary.achievements.backToProfile} @{username}
         </Link>
       </div>
 
-      <h1 className="text-2xl font-bold text-white mb-2">{dictionary.achievements.title}</h1>
-      <p className="text-sm text-[#8b949e] mb-8">
+      <h1 className="text-2xl font-bold text-[var(--foreground)] mb-2">{dictionary.achievements.title}</h1>
+      <p className="text-sm text-[var(--text-secondary)] mb-8">
         {dictionary.achievements.subtitle}
       </p>
 
       <section className="mb-10">
-        <h2 className="text-lg font-semibold text-white mb-4">{dictionary.achievements.lifetime}</h2>
+        <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">{dictionary.achievements.lifetime}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {LIFETIME_MILESTONES.map((milestone) => {
             const unlocked = unlockedLifetime.has(milestone.key);
@@ -65,11 +65,11 @@ export default async function AchievementsPage({
             return (
               <div
                 key={milestone.key}
-                className={`rounded-lg border p-3 ${unlocked ? 'border-[#30363d] bg-[#161b22]' : 'border-[#2a2f38] bg-[#11151c] opacity-70'}`}
+                className={`rounded-lg border p-3 ${unlocked ? 'border-[var(--card-border)] bg-[var(--surface-elevated)]' : 'border-[var(--card-border)] bg-[var(--surface-soft)] opacity-70'}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={src} alt={`${milestone.title} achievement`} className="w-full max-w-[380px]" />
-                <p className="text-xs mt-2 text-[#8b949e]">
+                <p className="text-xs mt-2 text-[var(--text-secondary)]">
                   {unlocked ? dictionary.achievements.unlocked : dictionary.achievements.locked} · {numberFormatter.format(milestone.threshold)} {dictionary.achievements.lifetimeTokens}
                 </p>
               </div>
@@ -79,7 +79,7 @@ export default async function AchievementsPage({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-white mb-4">{dictionary.achievements.streak}</h2>
+        <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">{dictionary.achievements.streak}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {STREAK_MILESTONES.map((milestone) => {
             const unlocked = unlockedStreak.has(milestone.key);
@@ -87,11 +87,11 @@ export default async function AchievementsPage({
             return (
               <div
                 key={milestone.key}
-                className={`rounded-lg border p-3 ${unlocked ? 'border-[#30363d] bg-[#161b22]' : 'border-[#2a2f38] bg-[#11151c] opacity-70'}`}
+                className={`rounded-lg border p-3 ${unlocked ? 'border-[var(--card-border)] bg-[var(--surface-elevated)]' : 'border-[var(--card-border)] bg-[var(--surface-soft)] opacity-70'}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={src} alt={`${milestone.title} streak achievement`} className="w-full max-w-[380px]" />
-                <p className="text-xs mt-2 text-[#8b949e]">
+                <p className="text-xs mt-2 text-[var(--text-secondary)]">
                   {unlocked ? dictionary.achievements.unlocked : dictionary.achievements.locked} · {milestone.threshold} {dictionary.achievements.dayStreak}
                 </p>
               </div>

@@ -3,12 +3,69 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: dark;
   --background: #0d1117;
   --foreground: #c9d1d9;
   --card: #161b22;
   --card-border: #30363d;
   --muted: #8b949e;
   --brand: #4c6ef5;
+  --surface-elevated: #161b22;
+  --surface-hover: #21262d;
+  --surface-soft: #1a1f2a;
+  --text-secondary: #8b949e;
+  --text-tertiary: #6e7681;
+  --border-strong: #3a4150;
+  --accent-bg: #1e2a57;
+  --accent-bg-hover: #26356f;
+  --accent-border: #4c6ef5;
+  --accent-border-hover: #6a87ff;
+  --accent-text: #d9e2ff;
+  --on-accent: #ffffff;
+  --danger: #fca5a5;
+  --success: #55efc4;
+  --warning: #fdcb6e;
+  --alert-bg: #3f0f16;
+  --alert-border: #7f1d33;
+  --alert-text: #fecdd3;
+  --alert-accent: #fb7185;
+  --alert-link: #ffe4e6;
+  --scroll-track: #0d1117;
+  --scroll-thumb: #4b5563;
+  --scroll-thumb-hover: #6b7280;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --background: #f4f8ff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-border: #d0d7e2;
+  --muted: #5f6c80;
+  --brand: #1f6feb;
+  --surface-elevated: #ffffff;
+  --surface-hover: #edf3ff;
+  --surface-soft: #e6edf8;
+  --text-secondary: #5f6c80;
+  --text-tertiary: #6f7d92;
+  --border-strong: #b7c4d8;
+  --accent-bg: #e8f0ff;
+  --accent-bg-hover: #dbe8ff;
+  --accent-border: #3b5bdb;
+  --accent-border-hover: #2f4ec7;
+  --accent-text: #1e3a8a;
+  --on-accent: #ffffff;
+  --danger: #b42318;
+  --success: #0f8f62;
+  --warning: #9a6700;
+  --alert-bg: #fff1f2;
+  --alert-border: #fecdd3;
+  --alert-text: #9f1239;
+  --alert-accent: #be123c;
+  --alert-link: #881337;
+  --scroll-track: #dbe4f0;
+  --scroll-thumb: #93a3bb;
+  --scroll-thumb-hover: #7186a5;
 }
 
 body {
@@ -26,7 +83,7 @@ a:hover {
 
 .app-content-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #4b5563 #0d1117;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
 }
 
 .app-content-scroll::-webkit-scrollbar {
@@ -34,15 +91,15 @@ a:hover {
 }
 
 .app-content-scroll::-webkit-scrollbar-track {
-  background: #0d1117;
+  background: var(--scroll-track);
 }
 
 .app-content-scroll::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border: 3px solid #0d1117;
+  background: var(--scroll-thumb);
+  border: 3px solid var(--scroll-track);
   border-radius: 9999px;
 }
 
 .app-content-scroll::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background: var(--scroll-thumb-hover);
 }

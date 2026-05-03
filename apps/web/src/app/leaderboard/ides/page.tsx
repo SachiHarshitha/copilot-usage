@@ -32,21 +32,21 @@ export default async function IdeLeaderboardPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-2">{dictionary.ideLeaderboard.title}</h1>
-      <p className="text-sm text-[#8b949e] mb-6">
+      <h1 className="text-2xl font-bold text-[var(--foreground)] mb-2">{dictionary.ideLeaderboard.title}</h1>
+      <p className="text-sm text-[var(--text-secondary)] mb-6">
         {dictionary.ideLeaderboard.subtitle}
       </p>
 
       <div className="flex gap-3 mb-6 flex-wrap">
         <Link
           href="/leaderboard"
-          className="text-sm border border-[#30363d] text-[#8b949e] px-3 py-1 rounded-md no-underline hover:border-[#8b949e] hover:text-white"
+          className="text-sm border border-[var(--card-border)] text-[var(--text-secondary)] px-3 py-1 rounded-md no-underline hover:border-[var(--text-secondary)] hover:text-[var(--foreground)]"
         >
           {dictionary.ideLeaderboard.userLeaderboard}
         </Link>
         <Link
           href="/leaderboard/repos"
-          className="text-sm border border-[#30363d] text-[#8b949e] px-3 py-1 rounded-md no-underline hover:border-[#8b949e] hover:text-white"
+          className="text-sm border border-[var(--card-border)] text-[var(--text-secondary)] px-3 py-1 rounded-md no-underline hover:border-[var(--text-secondary)] hover:text-[var(--foreground)]"
         >
           {dictionary.ideLeaderboard.repoLeaderboard}
         </Link>
@@ -61,7 +61,7 @@ export default async function IdeLeaderboardPage({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[#30363d] text-[#8b949e]">
+            <tr className="border-b border-[var(--card-border)] text-[var(--text-secondary)]">
               <th className="text-left py-3 px-2 w-12">#</th>
               <th className="text-left py-3 px-2">{dictionary.ideLeaderboard.colSurface}</th>
               <th className="text-right py-3 px-2">{dictionary.ideLeaderboard.colTotalTokens}</th>
@@ -73,15 +73,15 @@ export default async function IdeLeaderboardPage({
           <tbody>
             {entries.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-[#8b949e]">
+                <td colSpan={6} className="py-12 text-center text-[var(--text-secondary)]">
                   {dictionary.ideLeaderboard.empty}
                 </td>
               </tr>
             )}
             {entries.map((entry) => (
-              <tr key={`${entry.rank}-${entry.surface}`} className="border-b border-[#21262d] hover:bg-[#161b22]">
-                <td className="py-3 px-2 text-[#8b949e]">{entry.rank}</td>
-                <td className="py-3 px-2 text-white font-medium">{formatSurfaceLabel(entry.surface)}</td>
+              <tr key={`${entry.rank}-${entry.surface}`} className="border-b border-[var(--surface-hover)] hover:bg-[var(--surface-elevated)]">
+                <td className="py-3 px-2 text-[var(--text-secondary)]">{entry.rank}</td>
+                <td className="py-3 px-2 text-[var(--foreground)] font-medium">{formatSurfaceLabel(entry.surface)}</td>
                 <td className="py-3 px-2 text-right font-mono">{numberFormatter.format(Number(entry.totalTokens))}</td>
                 <td className="py-3 px-2 text-right font-mono">{entry.premiumRequests.toFixed(1)}</td>
                 <td className="py-3 px-2 text-right font-mono">{numberFormatter.format(entry.totalRequests)}</td>
@@ -96,7 +96,7 @@ export default async function IdeLeaderboardPage({
         {page > 1 && (
           <Link
             href={buildIdeLeaderboardHref({ page: page - 1, sort })}
-            className="text-sm border border-[#30363d] px-3 py-1.5 rounded-md no-underline hover:border-[#8b949e]"
+            className="text-sm border border-[var(--card-border)] px-3 py-1.5 rounded-md no-underline hover:border-[var(--text-secondary)]"
           >
             {dictionary.ideLeaderboard.prev}
           </Link>
@@ -104,7 +104,7 @@ export default async function IdeLeaderboardPage({
         {entries.length === IDE_LEADERBOARD_PAGE_SIZE && (
           <Link
             href={buildIdeLeaderboardHref({ page: page + 1, sort })}
-            className="text-sm border border-[#30363d] px-3 py-1.5 rounded-md no-underline hover:border-[#8b949e]"
+            className="text-sm border border-[var(--card-border)] px-3 py-1.5 rounded-md no-underline hover:border-[var(--text-secondary)]"
           >
             {dictionary.ideLeaderboard.next}
           </Link>
@@ -131,7 +131,7 @@ function FilterLink({
       className={`text-sm px-3 py-1 rounded-md no-underline ${
         sort === activeSort
           ? 'bg-brand-600 text-white'
-          : 'border border-[#30363d] text-[#8b949e] hover:border-[#8b949e] hover:text-white'
+          : 'border border-[var(--card-border)] text-[var(--text-secondary)] hover:border-[var(--text-secondary)] hover:text-[var(--foreground)]'
       }`}
     >
       {label}

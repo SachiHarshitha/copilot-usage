@@ -101,7 +101,7 @@ export default async function ImpressumPage() {
 
   return (
     <div className="max-w-2xl mx-auto w-full">
-      <div className="mb-4 flex items-center gap-3 rounded-lg border border-[#30363d] bg-[#161b22] px-3 py-2 text-sm text-[#8b949e]">
+      <div className="mb-4 flex items-center gap-3 rounded-lg border border-[var(--card-border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-secondary)]">
         <Image src="/logo_emagin8.png" alt="Emagin8 UG" width={24} height={24} className="h-6 w-6 object-contain" />
         <span>Emagin8 UG</span>
       </div>
@@ -160,14 +160,14 @@ function LegalCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[#0d1117] border border-[#30363d] rounded-xl p-8">
+    <div className="bg-[var(--background)] border border-[var(--card-border)] rounded-xl p-8">
       <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">{title}</h1>
-        <span className="text-xs text-[#484f58] bg-[#161b22] border border-[#30363d] rounded px-2 py-0.5">
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">{title}</h1>
+        <span className="text-xs text-[var(--text-tertiary)] bg-[var(--surface-elevated)] border border-[var(--card-border)] rounded px-2 py-0.5">
           Last updated: {lastUpdated}
         </span>
       </div>
-      <div className="divide-y divide-[#21262d]">{children}</div>
+      <div className="divide-y divide-[var(--surface-hover)]">{children}</div>
     </div>
   );
 }
@@ -175,8 +175,8 @@ function LegalCard({
 function Section({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
     <div className="pt-6 first:pt-0 pb-6 last:pb-0">
-      <h2 className="text-base font-semibold text-white mb-3">{heading}</h2>
-      <div className="text-sm text-[#8b949e] leading-relaxed space-y-2">{children}</div>
+      <h2 className="text-base font-semibold text-[var(--foreground)] mb-3">{heading}</h2>
+      <div className="text-sm text-[var(--text-secondary)] leading-relaxed space-y-2">{children}</div>
     </div>
   );
 }

@@ -57,14 +57,14 @@ export async function ActionLogPanel(props: PanelProps) {
       style={{
         marginTop: 24,
         padding: 16,
-        border: '1px solid #2a2f3a',
+        border: '1px solid var(--card-border)',
         borderRadius: 8,
-        background: '#11151c',
+        background: 'var(--surface-elevated)',
       }}
     >
-      <h3 style={{ marginTop: 0, fontSize: 14, color: '#9aa0aa' }}>Recent admin actions</h3>
+      <h3 style={{ marginTop: 0, fontSize: 14, color: 'var(--text-secondary)' }}>Recent admin actions</h3>
       {entries.length === 0 ? (
-        <p style={{ color: '#9aa0aa', margin: 0 }}>No actions logged.</p>
+        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>No actions logged.</p>
       ) : (
         <ul
           style={{
@@ -85,12 +85,12 @@ export async function ActionLogPanel(props: PanelProps) {
                 style={{
                   fontSize: 12,
                   fontFamily: 'monospace',
-                  color: '#cdd6f4',
-                  borderBottom: '1px solid #1a1f2a',
+                  color: 'var(--foreground)',
+                  borderBottom: '1px solid var(--surface-soft)',
                   paddingBottom: 6,
                 }}
               >
-                <span style={{ color: '#9aa0aa' }}>{e.createdAt}</span>{' '}
+                <span style={{ color: 'var(--text-secondary)' }}>{e.createdAt}</span>{' '}
                 <strong>{e.action}</strong>
                 {status && (
                   <span
@@ -98,16 +98,16 @@ export async function ActionLogPanel(props: PanelProps) {
                       marginLeft: 8,
                       color:
                         status === 'SUCCEEDED'
-                          ? '#55efc4'
+                          ? 'var(--success)'
                           : status === 'FAILED'
-                            ? '#ff7675'
-                            : '#fdcb6e',
+                            ? 'var(--danger)'
+                            : 'var(--warning)',
                     }}
                   >
                     [{status}]
                   </span>
                 )}
-                <div style={{ color: '#74b9ff' }}>by {e.adminEmailHash.slice(0, 12)}…</div>
+                <div style={{ color: 'var(--accent-border)' }}>by {e.adminEmailHash.slice(0, 12)}…</div>
               </li>
             );
           })}

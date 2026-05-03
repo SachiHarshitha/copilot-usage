@@ -30,16 +30,16 @@ interface UserActionButtonsProps {
 
 const btn: React.CSSProperties = {
   padding: '6px 12px',
-  background: '#2a2f3a',
-  color: '#e6e6e6',
-  border: '1px solid #3a4150',
+  background: 'var(--card-border)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 6,
   cursor: 'pointer',
   marginRight: 8,
 };
 
 const btnDisabled: React.CSSProperties = { ...btn, opacity: 0.4, cursor: 'not-allowed' };
-const btnDanger: React.CSSProperties = { ...btn, borderColor: '#d63031', color: '#ff7675' };
+const btnDanger: React.CSSProperties = { ...btn, borderColor: 'var(--danger)', color: 'var(--danger)' };
 
 /**
  * Confirmation-gated client controls for the user detail page. Every button
@@ -143,21 +143,21 @@ export function UserActionButtons(props: UserActionButtonsProps) {
           <h3 style={{ marginBottom: 8 }}>Devices</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #2a2f3a', textAlign: 'left' }}>
-                <th style={{ padding: '6px 6px', color: '#9aa0aa' }}>Token id</th>
-                <th style={{ padding: '6px 6px', color: '#9aa0aa' }}>Status</th>
+              <tr style={{ borderBottom: '1px solid var(--card-border)', textAlign: 'left' }}>
+                <th style={{ padding: '6px 6px', color: 'var(--text-secondary)' }}>Token id</th>
+                <th style={{ padding: '6px 6px', color: 'var(--text-secondary)' }}>Status</th>
                 <th style={{ padding: '6px 6px' }}></th>
               </tr>
             </thead>
             <tbody>
               {props.devices.map((d) => (
-                <tr key={d.id} style={{ borderBottom: '1px solid #1a1f2a' }}>
+                <tr key={d.id} style={{ borderBottom: '1px solid var(--surface-soft)' }}>
                   <td style={{ padding: '6px 6px', fontFamily: 'monospace' }}>{d.tokenId}</td>
                   <td style={{ padding: '6px 6px' }}>
                     {d.revokedAt ? (
-                      <span style={{ color: '#9aa0aa' }}>revoked</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>revoked</span>
                     ) : (
-                      <span style={{ color: '#55efc4' }}>active</span>
+                      <span style={{ color: 'var(--success)' }}>active</span>
                     )}
                   </td>
                   <td style={{ padding: '6px 6px' }}>
@@ -206,8 +206,8 @@ export function UserActionButtons(props: UserActionButtonsProps) {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#11151c',
-              border: '1px solid #2a2f3a',
+              background: 'var(--surface-elevated)',
+              border: '1px solid var(--card-border)',
               borderRadius: 8,
               padding: 24,
               maxWidth: 480,
@@ -215,8 +215,8 @@ export function UserActionButtons(props: UserActionButtonsProps) {
             }}
           >
             <h3 style={{ marginTop: 0 }}>{pending.label}</h3>
-            <p style={{ color: '#cdd6f4' }}>{pending.warning}</p>
-            <p style={{ fontSize: 13, color: '#9aa0aa' }}>
+            <p style={{ color: 'var(--foreground)' }}>{pending.warning}</p>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
               Type <code>CONFIRM</code> to proceed.
             </p>
             <input
@@ -228,15 +228,15 @@ export function UserActionButtons(props: UserActionButtonsProps) {
               style={{
                 width: '100%',
                 padding: '8px 10px',
-                background: '#1a1f2a',
-                color: '#e6e6e6',
-                border: '1px solid #2a2f3a',
+                background: 'var(--surface-soft)',
+                color: 'var(--foreground)',
+                border: '1px solid var(--card-border)',
                 borderRadius: 6,
                 fontFamily: 'monospace',
               }}
             />
             {error && (
-              <p style={{ color: '#ff7675', marginTop: 8 }}>{error}</p>
+              <p style={{ color: 'var(--danger)', marginTop: 8 }}>{error}</p>
             )}
             <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button type="button" style={btn} disabled={busy} onClick={close}>

@@ -13,14 +13,14 @@ interface Props {
 
 const btn: React.CSSProperties = {
   padding: '6px 12px',
-  background: '#2a2f3a',
-  color: '#e6e6e6',
-  border: '1px solid #3a4150',
+  background: 'var(--card-border)',
+  color: 'var(--foreground)',
+  border: '1px solid var(--border-strong)',
   borderRadius: 6,
   cursor: 'pointer',
 };
 const btnDisabled: React.CSSProperties = { ...btn, opacity: 0.4, cursor: 'not-allowed' };
-const btnPrimary: React.CSSProperties = { ...btn, borderColor: '#55efc4', color: '#55efc4' };
+const btnPrimary: React.CSSProperties = { ...btn, borderColor: 'var(--success)', color: 'var(--success)' };
 
 /**
  * Confirmation-gated client control for resolving an open anomaly. Disabled
@@ -97,8 +97,8 @@ export function ResolveAnomalyButton({ anomalyId, alreadyResolved, canModerate }
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#11151c',
-              border: '1px solid #2a2f3a',
+              background: 'var(--surface-elevated)',
+              border: '1px solid var(--card-border)',
               borderRadius: 8,
               padding: 24,
               maxWidth: 480,
@@ -106,7 +106,7 @@ export function ResolveAnomalyButton({ anomalyId, alreadyResolved, canModerate }
             }}
           >
             <h3 style={{ marginTop: 0 }}>Resolve anomaly</h3>
-            <p style={{ color: '#9aa0aa', fontSize: 13 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
               Provide a short justification (max 500 chars). Recorded in the audit log.
             </p>
             <textarea
@@ -116,18 +116,18 @@ export function ResolveAnomalyButton({ anomalyId, alreadyResolved, canModerate }
               style={{
                 width: '100%',
                 padding: 8,
-                background: '#0b0d12',
-                color: '#e6e6e6',
-                border: '1px solid #2a2f3a',
+                background: 'var(--background)',
+                color: 'var(--foreground)',
+                border: '1px solid var(--card-border)',
                 borderRadius: 6,
                 fontFamily: 'inherit',
                 resize: 'vertical',
               }}
             />
-            <div style={{ fontSize: 12, color: '#9aa0aa', textAlign: 'right' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right' }}>
               {resolution.length}/500
             </div>
-            {error && <div style={{ color: '#ff7675', marginTop: 8 }}>{error}</div>}
+            {error && <div style={{ color: 'var(--danger)', marginTop: 8 }}>{error}</div>}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
               <button type="button" style={btn} onClick={close} disabled={busy}>
                 Cancel

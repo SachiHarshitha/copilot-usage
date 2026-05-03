@@ -67,8 +67,8 @@ export default function ReportAbusePage() {
         <LegalCard title={dictionary.reportForm.title} lastUpdated="2026-04-21">
           <div className="flex flex-col items-center py-8 text-center gap-3">
             <span className="text-3xl text-green-400">✓</span>
-            <p className="text-white font-medium">{dictionary.reportForm.successTitle}</p>
-            <p className="text-sm text-[#8b949e]">
+            <p className="text-[var(--foreground)] font-medium">{dictionary.reportForm.successTitle}</p>
+            <p className="text-sm text-[var(--text-secondary)]">
               {dictionary.reportForm.successBody}
             </p>
           </div>
@@ -81,7 +81,7 @@ export default function ReportAbusePage() {
     <div className="max-w-2xl mx-auto w-full">
       <LegalCard title={dictionary.reportForm.title} lastUpdated="2026-04-21">
         <Section>
-          <p className="text-sm text-[#8b949e] leading-relaxed">
+          <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
             {dictionary.reportForm.intro}{' '}
             <a href="/terms" className="text-brand-400 hover:text-brand-300 underline">
               {dictionary.reportForm.terms}
@@ -93,7 +93,7 @@ export default function ReportAbusePage() {
         <Section>
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
                 {dictionary.reportForm.offendingUrl} <span className="text-red-400">*</span>
               </label>
               <input
@@ -104,13 +104,13 @@ export default function ReportAbusePage() {
                 placeholder={dictionary.reportForm.urlPlaceholder}
                 className={inputClass}
               />
-              <p className="mt-1 text-xs text-[#484f58]">
+              <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                 {dictionary.reportForm.urlHint}
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
                 {dictionary.reportForm.violationType} <span className="text-red-400">*</span>
               </label>
               <select
@@ -128,10 +128,10 @@ export default function ReportAbusePage() {
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-medium text-[#8b949e]">
+                <label className="block text-xs font-medium text-[var(--text-secondary)]">
                   {dictionary.reportForm.description} <span className="text-red-400">*</span>
                 </label>
-                <span className="text-xs text-[#484f58]">{description.length}/2000</span>
+                <span className="text-xs text-[var(--text-tertiary)]">{description.length}/2000</span>
               </div>
               <textarea
                 required
@@ -144,7 +144,7 @@ export default function ReportAbusePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#8b949e] mb-1.5">
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
                 {dictionary.reportForm.yourEmail} <span className="text-red-400">*</span>
               </label>
               <input
@@ -155,7 +155,7 @@ export default function ReportAbusePage() {
                 placeholder={dictionary.reportForm.emailPlaceholder}
                 className={inputClass}
               />
-              <p className="mt-1 text-xs text-[#484f58]">
+              <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                 {dictionary.reportForm.emailHint}
               </p>
             </div>
@@ -190,14 +190,14 @@ function LegalCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[#0d1117] border border-[#30363d] rounded-xl p-8">
+    <div className="bg-[var(--background)] border border-[var(--card-border)] rounded-xl p-8">
       <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">{title}</h1>
-        <span className="text-xs text-[#484f58] bg-[#161b22] border border-[#30363d] rounded px-2 py-0.5">
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">{title}</h1>
+        <span className="text-xs text-[var(--text-tertiary)] bg-[var(--surface-elevated)] border border-[var(--card-border)] rounded px-2 py-0.5">
           Last updated: {lastUpdated}
         </span>
       </div>
-      <div className="divide-y divide-[#21262d]">{children}</div>
+      <div className="divide-y divide-[var(--surface-hover)]">{children}</div>
     </div>
   );
 }
@@ -207,7 +207,7 @@ function Section({ children }: { children: React.ReactNode }) {
 }
 
 const inputClass =
-  'w-full rounded-md bg-[#161b22] border border-[#30363d] px-3 py-2 text-sm text-white placeholder-[#484f58] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  'w-full rounded-md bg-[var(--surface-elevated)] border border-[var(--card-border)] px-3 py-2 text-sm text-[var(--foreground)] placeholder-[var(--text-tertiary)] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
 const submitClass =
   'rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed';
