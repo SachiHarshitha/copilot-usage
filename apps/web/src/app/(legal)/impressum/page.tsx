@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getRequestLocale } from '@/lib/i18n/server';
 import type { AppLocale } from '@/lib/i18n/types';
 
 export const metadata: Metadata = {
-  title: 'Impressum · promptstreak.dev',
+  title: 'Impressum · Emagin8 UG · promptstreak.dev',
   description: 'Legal disclosure (Impressum) for promptstreak.dev under § 5 DDG.',
 };
 
@@ -28,7 +29,7 @@ const IMPRESSUM_COPY: Record<AppLocale, ImpressumCopy> = {
     title: 'Impressum',
     legalHeading: 'Angaben gemäß § 5 DDG',
     legalBody:
-      'Verantwortlich für den Inhalt dieser Website ist der Betreiber von promptstreak.dev. Die Kontaktdaten gemäß § 5 DDG sowie die nach § 18 Abs. 2 MStV verantwortliche Person werden vor dem öffentlichen Launch ergänzt.',
+      'Diensteanbieter und verantwortlich für diese Website ist die Emagin8 UG, Martha-Ulfert-Weg 28, 15517 Fuerstenwalde, Deutschland. E-Mail: contact@emagin8.de. Weitere rechtliche Angaben finden Sie unter https://emagin8.de/legal.',
     contactHeading: 'Kontakt',
     contactPrefix: 'Anfragen zu Datenschutz, Sicherheit und Missbrauchsmeldungen richten Sie bitte über die',
     contactLinkText: 'Kontaktseite',
@@ -45,7 +46,7 @@ const IMPRESSUM_COPY: Record<AppLocale, ImpressumCopy> = {
     title: 'Legal notice',
     legalHeading: 'Information according to § 5 DDG',
     legalBody:
-      'The operator of promptstreak.dev is responsible for this website. Contact information under § 5 DDG and the person responsible under § 18(2) MStV will be completed before public launch.',
+      'Service provider and responsible entity for this website is Emagin8 UG, Martha-Ulfert-Weg 28, 15517 Fuerstenwalde, Germany. Email: contact@emagin8.de. Additional legal details are available at https://emagin8.de/legal.',
     contactHeading: 'Contact',
     contactPrefix: 'For privacy, security, or abuse inquiries, please use the',
     contactLinkText: 'contact page',
@@ -62,7 +63,7 @@ const IMPRESSUM_COPY: Record<AppLocale, ImpressumCopy> = {
     title: '法律声明',
     legalHeading: '依据 § 5 DDG 的信息',
     legalBody:
-      'promptstreak.dev 的运营方对本网站内容负责。依据 § 5 DDG 的联系方式以及依据 § 18(2) MStV 的责任人信息将在公开上线前补充。',
+      '本网站服务提供方及责任主体为 Emagin8 UG，地址：Martha-Ulfert-Weg 28，15517 Fuerstenwalde，德国。电子邮箱：contact@emagin8.de。更多法律信息请见 https://emagin8.de/legal。',
     contactHeading: '联系',
     contactPrefix: '关于隐私、安全或滥用举报，请使用',
     contactLinkText: '联系页面',
@@ -79,7 +80,7 @@ const IMPRESSUM_COPY: Record<AppLocale, ImpressumCopy> = {
     title: 'Aviso legal',
     legalHeading: 'Informacion segun § 5 DDG',
     legalBody:
-      'El operador de promptstreak.dev es responsable del contenido de este sitio web. Los datos de contacto segun § 5 DDG y la persona responsable segun § 18(2) MStV se completaran antes del lanzamiento publico.',
+      'El proveedor del servicio y responsable de este sitio web es Emagin8 UG, Martha-Ulfert-Weg 28, 15517 Fuerstenwalde, Alemania. Correo: contact@emagin8.de. Mas datos legales en https://emagin8.de/legal.',
     contactHeading: 'Contacto',
     contactPrefix: 'Para consultas de privacidad, seguridad o abuso, usa la',
     contactLinkText: 'pagina de contacto',
@@ -100,6 +101,10 @@ export default async function ImpressumPage() {
 
   return (
     <div className="max-w-2xl mx-auto w-full">
+      <div className="mb-4 flex items-center gap-3 rounded-lg border border-[#30363d] bg-[#161b22] px-3 py-2 text-sm text-[#8b949e]">
+        <Image src="/logo_emagin8.png" alt="Emagin8 UG" width={24} height={24} className="h-6 w-6 object-contain" />
+        <span>Emagin8 UG</span>
+      </div>
       <LegalCard title={copy.title} lastUpdated="2026-04-21">
         <Section heading={copy.legalHeading}>
           <p>

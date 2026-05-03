@@ -23,3 +23,26 @@ a {
 a:hover {
   text-decoration: underline;
 }
+
+.app-content-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #0d1117;
+}
+
+.app-content-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+
+.app-content-scroll::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+
+.app-content-scroll::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border: 3px solid #0d1117;
+  border-radius: 9999px;
+}
+
+.app-content-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}

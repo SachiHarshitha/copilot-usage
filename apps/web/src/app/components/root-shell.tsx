@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -60,8 +61,19 @@ function PublicShellFrame({
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <nav className="flex items-center justify-between border-b border-[#30363d] px-6 py-3">
-        <Link href="/" className="text-lg font-semibold text-white no-underline hover:no-underline">
-          ⚡ promptstreak.dev
+        <Link href="/" className="flex items-center gap-3 text-white no-underline hover:no-underline">
+          <Image
+            src="/logo.svg"
+            alt="promptstreak.dev"
+            width={36}
+            height={36}
+            className="h-9 w-9 rounded-md border border-[#30363d] bg-[#0d1117] object-contain p-1"
+            priority
+          />
+          <span className="leading-tight">
+            <span className="block text-lg font-semibold">promptstreak.dev</span>
+            <span className="block text-xs text-[#8b949e]">by Emagin8 UG</span>
+          </span>
         </Link>
         <div className="flex items-center gap-4 text-sm">
           <Link href="/leaderboard">{dictionary.nav.leaderboard}</Link>
@@ -80,10 +92,18 @@ function PublicShellFrame({
       </nav>
 
       <NotificationBar isSuspended={isSuspended} />
-      <main className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto overscroll-contain px-6 py-8">{children}</main>
+      <main className="app-content-scroll flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto w-full max-w-5xl px-6 py-8">{children}</div>
+      </main>
 
       <footer className="space-y-2 border-t border-[#30363d] px-6 py-4 text-center text-xs text-[#484f58]">
         <div>{dictionary.footer.disclaimer}</div>
+        <div>
+          Operated by{' '}
+          <a href="https://emagin8.de/legal" className="text-[#8b949e] hover:text-white" target="_blank" rel="noopener noreferrer">
+            Emagin8 UG
+          </a>
+        </div>
         <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
           <Link href="/impressum">{dictionary.footer.impressum}</Link>
           <Link href="/privacy">{dictionary.footer.privacy}</Link>
