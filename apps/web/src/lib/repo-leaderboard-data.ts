@@ -55,22 +55,29 @@ export async function getRepoLeaderboardEntries(
 ): Promise<RepoLeaderboardEntry[]> {
   const offset = (options.page - 1) * REPO_LEADERBOARD_PAGE_SIZE;
   const orderBy = orderByClause(options.sort);
+  const rolling30Start = new Date();
+  rolling30Start.setHours(0, 0, 0, 0);
+  rolling30Start.setDate(rolling30Start.getDate() - 29);
 
   const rows = await prisma.$queryRaw<RepoLeaderboardRow[]>(
     Prisma.sql`
       WITH public_repo_stats AS (
         SELECT
-          rs."githubRepo" AS repo_slug,
-          rs."userId" AS user_id,
-          rs."totalTokens" AS total_tokens,
-          rs."tokens30d" AS tokens_30d,
-          rs."requests" AS total_requests,
-          rs."premiumReqs" AS premium_reqs
-        FROM "RepoStat" rs
-        JOIN "User" u ON u.id = rs."userId"
-        WHERE rs."isPublic" = true
-          AND rs."githubRepo" IS NOT NULL
+          SUBSTRING(mud."repoIdentity" FROM 8) AS repo_slug,
+          mud."userId" AS user_id,
+          SUM(mud."totalTokens")::bigint AS total_tokens,
+          SUM(CASE WHEN mud."date" >= ${rolling30Start} THEN mud."totalTokens" ELSE 0 END)::bigint AS tokens_30d,
+          SUM(mud."requestCount")::int AS total_requests,
+          SUM(mud."premiumRequests")::float AS premium_reqs
+        FROM "ModelUsageDaily" mud
+        JOIN "RepoVisibilitySettings" rvs
+          ON rvs."userId" = mud."userId"
+         AND rvs."repoIdentity" = mud."repoIdentity"
+        JOIN "User" u ON u.id = mud."userId"
+        WHERE mud."repoIdentity" LIKE 'github:%'
+          AND rvs."isPublic" = true
           AND ${userVisibleForFeatureSql('u', 'leaderboard')}
+        GROUP BY mud."repoIdentity", mud."userId"
       ),
       repo_totals AS (
         SELECT

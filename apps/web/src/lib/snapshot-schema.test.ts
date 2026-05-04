@@ -4,40 +4,9 @@ import test from 'node:test';
 import {
   AgentSnapshotSchema,
   FORBIDDEN_CONTENT_FIELDS,
-  SnapshotPayloadSchema,
   findForbiddenFields,
   type AgentSnapshot,
-  type SnapshotPayload,
 } from '@copilot-usage/shared-schema';
-
-const validV1Payload: SnapshotPayload = {
-  clientUploadedAt: new Date().toISOString(),
-  workspaceCount: 2,
-  sessionCount: 5,
-  dailyBuckets: [
-    {
-      date: '2026-04-21',
-      requests: 12,
-      promptTokens: 1000,
-      outputTokens: 800,
-      premiumRequests: 0,
-    },
-  ],
-  repos: [],
-  modelBreakdown: [
-    { modelId: 'copilot/gpt-4o', requests: 12, totalTokens: 1800 },
-  ],
-};
-
-test('v1 SnapshotPayloadSchema still parses legacy uploads (backward compat)', () => {
-  const parsed = SnapshotPayloadSchema.safeParse(validV1Payload);
-  assert.equal(parsed.success, true);
-});
-
-test('v1 schema rejects unknown shape', () => {
-  const parsed = SnapshotPayloadSchema.safeParse({ foo: 'bar' });
-  assert.equal(parsed.success, false);
-});
 
 const validV2Snapshot: AgentSnapshot = {
   schemaVersion: 2,
@@ -129,43 +98,47 @@ test('v2 schemaVersion must be literal 2', () => {
   assert.equal(parsed.success, false);
 });
 
-// --- Phase Q.3 strictness + denylist ---
+// --- strictness + denylist ---
 
-test('v1 strict schema rejects unknown top-level field', () => {
-  const parsed = SnapshotPayloadSchema.safeParse({
-    ...validV1Payload,
+test('v2 strict schema rejects unknown top-level field', () => {
+  const parsed = AgentSnapshotSchema.safeParse({
+    ...validV2Snapshot,
     smuggled: 'extra',
   });
   assert.equal(parsed.success, false);
 });
 
-test('v1 strict schema rejects unknown nested field on a repo entry', () => {
-  const parsed = SnapshotPayloadSchema.safeParse({
-    ...validV1Payload,
-    repos: [
+test('v2 strict schema rejects unknown nested field on model call', () => {
+  const parsed = AgentSnapshotSchema.safeParse({
+    ...validV2Snapshot,
+    runs: [
       {
-        workspaceKey: '0123456789abcdef0123456789abcdef',
-        displayMode: 'github',
-        githubRepo: 'foo/bar',
-        aliasLabel: null,
-        requests: 1,
-        promptTokens: 1,
-        outputTokens: 1,
-        premiumRequests: 0,
-        topModel: 'm',
-        sourceCode: 'console.log("leak")',
+        runId: 'run-1',
+        modelCalls: [
+          {
+            modelId: 'copilot/gpt-4o',
+            requestCount: 1,
+            sourceOfTruth: 'observed',
+            prompt: 'leak',
+          },
+        ],
       },
     ],
   });
   assert.equal(parsed.success, false);
 });
 
-test('v1 strict schema rejects unknown nested field on a daily bucket', () => {
-  const parsed = SnapshotPayloadSchema.safeParse({
-    ...validV1Payload,
+test('v2 strict schema rejects unknown nested field on a daily bucket', () => {
+  const parsed = AgentSnapshotSchema.safeParse({
+    schemaVersion: 2,
+    source: validV2Snapshot.source,
+    observedAt: validV2Snapshot.observedAt,
     dailyBuckets: [
       {
-        ...validV1Payload.dailyBuckets[0],
+        date: '2026-04-21',
+        requests: 12,
+        inputTokens: 100,
+        outputTokens: 40,
         prompts: ['leak'],
       },
     ],
@@ -173,8 +146,13 @@ test('v1 strict schema rejects unknown nested field on a daily bucket', () => {
   assert.equal(parsed.success, false);
 });
 
-test('findForbiddenFields returns empty for clean v1 payload', () => {
-  assert.deepEqual(findForbiddenFields(validV1Payload), []);
+test('findForbiddenFields returns empty for clean v2 payload with contractual allowlist', () => {
+  assert.deepEqual(
+    findForbiddenFields(validV2Snapshot, {
+      allowList: new Set(['source']),
+    }),
+    []
+  );
 });
 
 test('findForbiddenFields detects top-level forbidden field', () => {

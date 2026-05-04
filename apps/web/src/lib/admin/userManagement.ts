@@ -102,24 +102,33 @@ export async function listUsersHandler(
       username: true,
       displayName: true,
       avatarUrl: true,
-      profilePublic: true,
+      privacySettings: { select: { profilePublic: true } },
       createdAt: true,
       githubId: true,
-      userStat: { select: { totalTokens: true } },
     },
   });
 
   const hasMore = rows.length > limit;
   const trimmed = hasMore ? rows.slice(0, limit) : rows;
+  const tokenRows =
+    trimmed.length > 0
+      ? await prisma.modelUsageDaily.groupBy({
+          by: ['userId'],
+          where: { userId: { in: trimmed.map((u) => u.id) } },
+          _sum: { totalTokens: true },
+        })
+      : [];
+  const tokenMap = new Map(tokenRows.map((row) => [row.userId, row._sum.totalTokens ?? 0n] as const));
+
   const entries: UserListEntry[] = trimmed.map((u) => ({
     id: u.id,
     username: u.username,
     displayName: u.displayName,
     avatarUrl: u.avatarUrl,
-    profilePublic: u.profilePublic,
+    profilePublic: u.privacySettings?.profilePublic ?? false,
     createdAt: u.createdAt.toISOString(),
     githubId: u.githubId,
-    totalTokens: (u.userStat?.totalTokens ?? 0n).toString(),
+    totalTokens: (tokenMap.get(u.id) ?? 0n).toString(),
   }));
 
   const body: UserListResponse = {
@@ -188,7 +197,7 @@ export async function userDetailHandler(
 
   const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  const [user, deviceCount, deviceCountAll, recentUploads30d] = await Promise.all([
+  const [user, totalTokensAgg, deviceCount, deviceCountAll, recentUploads30d] = await Promise.all([
     prisma.user.findUnique({
       where: { id },
       select: {
@@ -196,11 +205,14 @@ export async function userDetailHandler(
         username: true,
         displayName: true,
         avatarUrl: true,
-        profilePublic: true,
+        privacySettings: { select: { profilePublic: true } },
         createdAt: true,
         githubId: true,
-        userStat: { select: { totalTokens: true } },
       },
+    }),
+    prisma.modelUsageDaily.aggregate({
+      where: { userId: id },
+      _sum: { totalTokens: true },
     }),
     prisma.device.count({ where: { userId: id, revokedAt: null } }),
     prisma.device.count({ where: { userId: id } }),
@@ -216,10 +228,10 @@ export async function userDetailHandler(
     username: user.username,
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
-    profilePublic: user.profilePublic,
+    profilePublic: user.privacySettings?.profilePublic ?? false,
     createdAt: user.createdAt.toISOString(),
     githubId: user.githubId,
-    totalTokens: (user.userStat?.totalTokens ?? 0n).toString(),
+    totalTokens: (totalTokensAgg._sum.totalTokens ?? 0n).toString(),
     deviceCount,
     deviceCountAll,
     recentUploads30d,
@@ -443,7 +455,20 @@ export async function deleteUserHandler(
             username: tombstoneUsername,
             displayName: null,
             avatarUrl: null,
+          },
+        }),
+        prisma.privacySettings.upsert({
+          where: { userId: target.id },
+          update: {
             profilePublic: false,
+            leaderboardOptIn: false,
+            badgesEnabled: false,
+          },
+          create: {
+            userId: target.id,
+            profilePublic: false,
+            leaderboardOptIn: false,
+            badgesEnabled: false,
           },
         }),
         prisma.device.updateMany({
@@ -581,7 +606,20 @@ export async function softDeleteUserCore(
             username: tombstoneUsername,
             displayName: null,
             avatarUrl: null,
+          },
+        }),
+        prisma.privacySettings.upsert({
+          where: { userId: target.id },
+          update: {
             profilePublic: false,
+            leaderboardOptIn: false,
+            badgesEnabled: false,
+          },
+          create: {
+            userId: target.id,
+            profilePublic: false,
+            leaderboardOptIn: false,
+            badgesEnabled: false,
           },
         }),
         prisma.device.updateMany({

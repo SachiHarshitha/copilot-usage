@@ -25,13 +25,9 @@ export type UserLifecycle = {
  * its own predicate combining lifecycle checks with the relevant flag(s) on
  * `PrivacySettings`.
  *
- * - `profile`: `PrivacySettings.profilePublic = true` (with bridge fallback
- *   to legacy `User.profilePublic` when no PrivacySettings row exists).
+ * - `profile`: requires `PrivacySettings.profilePublic = true`.
  * - `leaderboard`: requires both `profilePublic` AND `leaderboardOptIn`.
  * - `badges`: requires both `profilePublic` AND `badgesEnabled`.
- *
- * For `leaderboard` and `badges` there is NO legacy fallback — those
- * opt-ins are new in Phase 2 and default to false (privacy-first).
  */
 export type PublicFeature = 'profile' | 'leaderboard' | 'badges';
 
@@ -40,7 +36,6 @@ export type PublicFeature = 'profile' | 'leaderboard' | 'badges';
  * Use Prisma `include: { privacySettings: true }` when loading.
  */
 export type UserWithPrivacy = UserLifecycle & {
-  profilePublic: boolean;
   privacySettings: {
     profilePublic: boolean;
     leaderboardOptIn: boolean;
@@ -56,16 +51,6 @@ export function isUserActive(user: UserLifecycle): boolean {
   return user.status === 'ACTIVE' && user.deletedAt === null;
 }
 
-function effectiveProfilePublic(user: UserWithPrivacy): boolean {
-  // Bridge: while some users may not yet have a PrivacySettings row (existing
-  // accounts that have not signed in since Phase 1c), fall back to the legacy
-  // `User.profilePublic` column. Phase 2 mirrors writes both ways so the two
-  // remain in sync; backfill + bake period closes the gap before this fallback
-  // is removed.
-  if (user.privacySettings) return user.privacySettings.profilePublic === true;
-  return user.profilePublic === true;
-}
-
 /**
  * True when the user may appear on the given public surface today: lifecycle
  * checks pass AND the relevant opt-in(s) are enabled.
@@ -75,9 +60,9 @@ export function isUserVisibleForFeature(
   feature: PublicFeature
 ): boolean {
   if (!isUserActive(user)) return false;
-  if (!effectiveProfilePublic(user)) return false;
-  if (feature === 'profile') return true;
   if (!user.privacySettings) return false; // privacy-first: no row, no opt-in
+  if (user.privacySettings.profilePublic !== true) return false;
+  if (feature === 'profile') return true;
   if (feature === 'leaderboard') return user.privacySettings.leaderboardOptIn === true;
   if (feature === 'badges') return user.privacySettings.badgesEnabled === true;
   return false;
@@ -89,9 +74,13 @@ export function isUserVisibleForFeature(
  * Retained for callers still on the legacy single-flag model.
  */
 export function isUserPubliclyVisible(
-  user: UserLifecycle & { profilePublic: boolean }
+  user: UserLifecycle & {
+    privacySettings?: {
+      profilePublic: boolean;
+    } | null;
+  }
 ): boolean {
-  return isUserActive(user) && user.profilePublic === true;
+  return isUserActive(user) && user.privacySettings?.profilePublic === true;
 }
 
 /**
@@ -105,10 +94,9 @@ export function userActiveWhere() {
 /**
  * Prisma `where` clause fragment for users visible on a given public feature.
  *
- * Combines lifecycle + the relevant opt-in(s). For `profile`, falls back to
- * legacy `User.profilePublic` when no PrivacySettings row exists (bridge
- * window). For `leaderboard`/`badges`, requires an explicit PrivacySettings
- * row with both `profilePublic` AND the feature flag set to true.
+ * Combines lifecycle + the relevant opt-in(s). Requires an explicit
+ * `PrivacySettings` row with `profilePublic=true`; `leaderboard` and
+ * `badges` add their feature-specific opt-in flags.
  */
 export function userVisibleForFeatureWhere(
   feature: PublicFeature
@@ -117,10 +105,7 @@ export function userVisibleForFeatureWhere(
   if (feature === 'profile') {
     return {
       ...base,
-      OR: [
-        { privacySettings: { is: { profilePublic: true } } },
-        { privacySettings: null, profilePublic: true },
-      ],
+      privacySettings: { is: { profilePublic: true } },
     };
   }
   const flagField = feature === 'leaderboard' ? 'leaderboardOptIn' : 'badgesEnabled';
@@ -134,7 +119,10 @@ export function userVisibleForFeatureWhere(
  * @deprecated Phase 2.1 — prefer `userVisibleForFeatureWhere('profile')`.
  */
 export function userPubliclyVisibleWhere() {
-  return { ...userActiveWhere(), profilePublic: true };
+  return {
+    ...userActiveWhere(),
+    privacySettings: { is: { profilePublic: true } },
+  };
 }
 
 /**
@@ -142,8 +130,7 @@ export function userPubliclyVisibleWhere() {
  * scoped to a `User` table alias. Intended for use inside `prisma.$queryRaw`.
  *
  * Uses EXISTS subqueries against `PrivacySettings` so callers do NOT need to
- * add a JOIN. For `profile`, falls back to legacy `User.profilePublic` when
- * no PrivacySettings row exists.
+ * add a JOIN.
  *
  * Example:
  *   `WHERE ${userVisibleForFeatureSql('u', 'leaderboard')} AND ud.date >= ${since}`
@@ -156,12 +143,10 @@ export function userVisibleForFeatureSql(
   const lifecycle = Prisma.sql`${u}."status" = 'ACTIVE' AND ${u}."deletedAt" IS NULL`;
   if (feature === 'profile') {
     return Prisma.sql`${lifecycle}
-      AND (
-        EXISTS (SELECT 1 FROM "PrivacySettings" ps WHERE ps."userId" = ${u}."id" AND ps."profilePublic" = true)
-        OR (
-          NOT EXISTS (SELECT 1 FROM "PrivacySettings" ps WHERE ps."userId" = ${u}."id")
-          AND ${u}."profilePublic" = true
-        )
+      AND EXISTS (
+        SELECT 1 FROM "PrivacySettings" ps
+        WHERE ps."userId" = ${u}."id"
+          AND ps."profilePublic" = true
       )`;
   }
   const flagCol = feature === 'leaderboard' ? 'leaderboardOptIn' : 'badgesEnabled';
@@ -178,7 +163,5 @@ export function userVisibleForFeatureSql(
  * @deprecated Phase 2.1 — prefer `userVisibleForFeatureSql(alias, 'profile')`.
  */
 export function userPubliclyVisibleSql(userTableAlias: string): Prisma.Sql {
-  return Prisma.sql`${Prisma.raw(`"${userTableAlias}"."status"`)} = 'ACTIVE'
-    AND ${Prisma.raw(`"${userTableAlias}"."deletedAt"`)} IS NULL
-    AND ${Prisma.raw(`"${userTableAlias}"."profilePublic"`)} = true`;
+  return userVisibleForFeatureSql(userTableAlias, 'profile');
 }

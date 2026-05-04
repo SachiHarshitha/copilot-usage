@@ -7,6 +7,8 @@ import { leaderboardTag, repoSlugTag, userTag } from '@/lib/cache/tags';
 /**
  * PATCH /api/settings/repos — Bulk update repo visibility.
  * Body: { repos: [{ id: string, isPublic: boolean }] }
+ *
+ * `id` is the canonical repoIdentity (for example `github:owner/repo`).
  */
 export async function PATCH(request: NextRequest) {
   const sessionUser = await getSessionUser();
@@ -23,19 +25,37 @@ export async function PATCH(request: NextRequest) {
   for (const entry of body.repos) {
     if (typeof entry.id !== 'string' || typeof entry.isPublic !== 'boolean') continue;
 
-    // Only update repos that belong to this user
-    await prisma.repoStat.updateMany({
-      where: { id: entry.id, userId: sessionUser.userId },
-      data: { isPublic: entry.isPublic },
+    const repoIdentity = entry.id.trim();
+    if (!repoIdentity) continue;
+
+    const ownsRepo = await prisma.modelUsageDaily.findFirst({
+      where: {
+        userId: sessionUser.userId,
+        repoIdentity,
+      },
+      select: { id: true },
+    });
+    if (!ownsRepo) continue;
+
+    await prisma.repoVisibilitySettings.upsert({
+      where: {
+        userId_repoIdentity: {
+          userId: sessionUser.userId,
+          repoIdentity,
+        },
+      },
+      update: {
+        isPublic: entry.isPublic,
+      },
+      create: {
+        userId: sessionUser.userId,
+        repoIdentity,
+        isPublic: entry.isPublic,
+      },
     });
 
-    // Look up the slug so we can invalidate per-repo caches. We re-read
-    // because updateMany doesn't return the row.
-    const row = await prisma.repoStat.findFirst({
-      where: { id: entry.id, userId: sessionUser.userId },
-      select: { githubRepo: true },
-    });
-    if (row?.githubRepo) affectedSlugs.add(row.githubRepo);
+    const slug = repoIdentity.startsWith('github:') ? repoIdentity.slice('github:'.length) : null;
+    if (slug) affectedSlugs.add(slug);
   }
 
   // Invalidate user-level + per-slug + leaderboard fragments. Best-effort.

@@ -194,39 +194,17 @@ test('updatePrivacySettings: respects an explicit ADMIN_OVERRIDE source', async 
   });
 });
 
-test('updatePrivacySettings: mirrors profilePublic to legacy User column (bridge)', async () => {
+test('updatePrivacySettings: changing visibility flags does not mutate User lifecycle fields', async () => {
   await withTestDb(async ({ prisma }) => {
     const u = await prisma.user.create({
-      data: { githubId: 220090, username: 'p2-bridge' },
+      data: { githubId: 220091, username: 'p2-lifecycle-stable', status: 'ACTIVE' },
     });
-    assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: u.id } })).profilePublic, false);
+    const before = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
 
-    await updatePrivacySettings(prisma, u.id, { profilePublic: true });
-    assert.equal(
-      (await prisma.user.findUniqueOrThrow({ where: { id: u.id } })).profilePublic,
-      true,
-      'legacy column mirrors grant',
-    );
-
-    await updatePrivacySettings(prisma, u.id, { profilePublic: false });
-    assert.equal(
-      (await prisma.user.findUniqueOrThrow({ where: { id: u.id } })).profilePublic,
-      false,
-      'legacy column mirrors withdrawal',
-    );
-  });
-});
-
-test('updatePrivacySettings: changing only leaderboardOptIn does not touch User.profilePublic', async () => {
-  await withTestDb(async ({ prisma }) => {
-    const u = await prisma.user.create({
-      data: { githubId: 220091, username: 'p2-bridge-isolated', profilePublic: true },
-    });
     await updatePrivacySettings(prisma, u.id, { leaderboardOptIn: true });
-    assert.equal(
-      (await prisma.user.findUniqueOrThrow({ where: { id: u.id } })).profilePublic,
-      true,
-      'legacy column untouched when only leaderboardOptIn changes',
-    );
+
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+    assert.equal(after.status, before.status);
+    assert.equal(after.deletedAt, before.deletedAt);
   });
 });

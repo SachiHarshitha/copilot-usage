@@ -76,21 +76,22 @@ if (enableDevLogin) {
             update: {
               displayName: devTestAccount.displayName,
               avatarUrl: devTestAccount.avatarUrl,
-              profilePublic: devTestAccount.profilePublic,
             },
             create: {
               githubId,
               username: devTestAccount.username,
               displayName: devTestAccount.displayName,
               avatarUrl: devTestAccount.avatarUrl,
-              profilePublic: devTestAccount.profilePublic,
             },
           });
 
-          await prisma.userStat.upsert({
+          await prisma.privacySettings.upsert({
             where: { userId: user.id },
-            update: { lastSyncedAt: new Date() },
-            create: { userId: user.id },
+            update: { profilePublic: devTestAccount.profilePublic },
+            create: {
+              userId: user.id,
+              profilePublic: devTestAccount.profilePublic,
+            },
           });
         }
 

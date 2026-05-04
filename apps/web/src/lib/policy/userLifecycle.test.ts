@@ -31,23 +31,23 @@ test('isUserActive: SUSPENDED + deletedAt is not active', () => {
   );
 });
 
-test('isUserPubliclyVisible: requires lifecycle pass AND profilePublic', () => {
+test('isUserPubliclyVisible: requires lifecycle pass AND PrivacySettings.profilePublic', () => {
   assert.equal(
     isUserPubliclyVisible({
       status: 'ACTIVE',
       deletedAt: null,
-      profilePublic: true,
+      privacySettings: { profilePublic: true },
     }),
     true
   );
 });
 
-test('isUserPubliclyVisible: profilePublic=false hides active user', () => {
+test('isUserPubliclyVisible: profilePublic=false in PrivacySettings hides active user', () => {
   assert.equal(
     isUserPubliclyVisible({
       status: 'ACTIVE',
       deletedAt: null,
-      profilePublic: false,
+      privacySettings: { profilePublic: false },
     }),
     false
   );
@@ -58,7 +58,7 @@ test('isUserPubliclyVisible: deleted user with profilePublic=true is hidden', ()
     isUserPubliclyVisible({
       status: 'ACTIVE',
       deletedAt: new Date(),
-      profilePublic: true,
+      privacySettings: { profilePublic: true },
     }),
     false
   );
@@ -69,7 +69,7 @@ test('isUserPubliclyVisible: suspended user with profilePublic=true is hidden', 
     isUserPubliclyVisible({
       status: 'SUSPENDED',
       deletedAt: null,
-      profilePublic: true,
+      privacySettings: { profilePublic: true },
     }),
     false
   );
@@ -79,22 +79,24 @@ test('userActiveWhere returns lifecycle-only Prisma where fragment', () => {
   assert.deepEqual(userActiveWhere(), { status: 'ACTIVE', deletedAt: null });
 });
 
-test('userPubliclyVisibleWhere combines lifecycle + profilePublic', () => {
+test('userPubliclyVisibleWhere combines lifecycle + PrivacySettings.profilePublic', () => {
   assert.deepEqual(userPubliclyVisibleWhere(), {
     status: 'ACTIVE',
     deletedAt: null,
-    profilePublic: true,
+    privacySettings: { is: { profilePublic: true } },
   });
 });
 
-test('userPubliclyVisibleSql renders all three predicates with the given alias', () => {
+test('userPubliclyVisibleSql renders lifecycle + PrivacySettings EXISTS with the given alias', () => {
   const sql = userPubliclyVisibleSql('u');
   // Prisma.Sql exposes `.sql` (parameterized template) and `.strings`.
   // We only assert on the raw column references being present.
   const text = sql.sql;
   assert.ok(text.includes('"u"."status"'));
   assert.ok(text.includes('"u"."deletedAt"'));
-  assert.ok(text.includes('"u"."profilePublic"'));
+  assert.ok(text.includes('"PrivacySettings"'));
+  assert.ok(text.includes('"profilePublic"'));
+  assert.ok(!text.includes('"u"."profilePublic"'));
   assert.ok(text.includes("'ACTIVE'"));
   assert.ok(text.includes('IS NULL'));
 });
@@ -110,32 +112,26 @@ import {
 
 const ACTIVE = { status: 'ACTIVE' as const, deletedAt: null };
 
-test('isUserVisibleForFeature(profile): PrivacySettings row wins over legacy', () => {
-  // PS says private; legacy says public ⇒ private
+test('isUserVisibleForFeature(profile): PrivacySettings row drives visibility', () => {
   assert.equal(
     isUserVisibleForFeature(
-      { ...ACTIVE, profilePublic: true, privacySettings: { profilePublic: false, leaderboardOptIn: false, badgesEnabled: false } },
+      { ...ACTIVE, privacySettings: { profilePublic: false, leaderboardOptIn: false, badgesEnabled: false } },
       'profile'
     ),
     false
   );
-  // PS says public; legacy says private ⇒ public
   assert.equal(
     isUserVisibleForFeature(
-      { ...ACTIVE, profilePublic: false, privacySettings: { profilePublic: true, leaderboardOptIn: false, badgesEnabled: false } },
+      { ...ACTIVE, privacySettings: { profilePublic: true, leaderboardOptIn: false, badgesEnabled: false } },
       'profile'
     ),
     true
   );
 });
 
-test('isUserVisibleForFeature(profile): bridge fallback to legacy when no PS row', () => {
+test('isUserVisibleForFeature(profile): no PS row ⇒ never visible (privacy-first)', () => {
   assert.equal(
-    isUserVisibleForFeature({ ...ACTIVE, profilePublic: true, privacySettings: null }, 'profile'),
-    true
-  );
-  assert.equal(
-    isUserVisibleForFeature({ ...ACTIVE, profilePublic: false, privacySettings: null }, 'profile'),
+    isUserVisibleForFeature({ ...ACTIVE, privacySettings: null }, 'profile'),
     false
   );
 });
@@ -143,14 +139,14 @@ test('isUserVisibleForFeature(profile): bridge fallback to legacy when no PS row
 test('isUserVisibleForFeature(leaderboard): requires both profilePublic AND leaderboardOptIn', () => {
   assert.equal(
     isUserVisibleForFeature(
-      { ...ACTIVE, profilePublic: true, privacySettings: { profilePublic: true, leaderboardOptIn: true, badgesEnabled: false } },
+      { ...ACTIVE, privacySettings: { profilePublic: true, leaderboardOptIn: true, badgesEnabled: false } },
       'leaderboard'
     ),
     true
   );
   assert.equal(
     isUserVisibleForFeature(
-      { ...ACTIVE, profilePublic: true, privacySettings: { profilePublic: true, leaderboardOptIn: false, badgesEnabled: true } },
+      { ...ACTIVE, privacySettings: { profilePublic: true, leaderboardOptIn: false, badgesEnabled: true } },
       'leaderboard'
     ),
     false
@@ -159,7 +155,7 @@ test('isUserVisibleForFeature(leaderboard): requires both profilePublic AND lead
 
 test('isUserVisibleForFeature(leaderboard): no PS row ⇒ never visible (privacy-first)', () => {
   assert.equal(
-    isUserVisibleForFeature({ ...ACTIVE, profilePublic: true, privacySettings: null }, 'leaderboard'),
+    isUserVisibleForFeature({ ...ACTIVE, privacySettings: null }, 'leaderboard'),
     false
   );
 });
@@ -167,14 +163,14 @@ test('isUserVisibleForFeature(leaderboard): no PS row ⇒ never visible (privacy
 test('isUserVisibleForFeature(badges): requires both profilePublic AND badgesEnabled', () => {
   assert.equal(
     isUserVisibleForFeature(
-      { ...ACTIVE, profilePublic: true, privacySettings: { profilePublic: true, leaderboardOptIn: false, badgesEnabled: true } },
+      { ...ACTIVE, privacySettings: { profilePublic: true, leaderboardOptIn: false, badgesEnabled: true } },
       'badges'
     ),
     true
   );
   assert.equal(
     isUserVisibleForFeature(
-      { ...ACTIVE, profilePublic: true, privacySettings: { profilePublic: true, leaderboardOptIn: true, badgesEnabled: false } },
+      { ...ACTIVE, privacySettings: { profilePublic: true, leaderboardOptIn: true, badgesEnabled: false } },
       'badges'
     ),
     false
@@ -185,19 +181,21 @@ test('isUserVisibleForFeature: any feature ⇒ false when suspended or soft-dele
   const ps = { profilePublic: true, leaderboardOptIn: true, badgesEnabled: true };
   for (const feature of ['profile', 'leaderboard', 'badges'] as const) {
     assert.equal(
-      isUserVisibleForFeature({ status: 'SUSPENDED', deletedAt: null, profilePublic: true, privacySettings: ps }, feature),
+      isUserVisibleForFeature({ status: 'SUSPENDED', deletedAt: null, privacySettings: ps }, feature),
       false
     );
     assert.equal(
-      isUserVisibleForFeature({ status: 'ACTIVE', deletedAt: new Date(), profilePublic: true, privacySettings: ps }, feature),
+      isUserVisibleForFeature({ status: 'ACTIVE', deletedAt: new Date(), privacySettings: ps }, feature),
       false
     );
   }
 });
 
-test('userVisibleForFeatureWhere(profile): bridge OR clause references both PS and legacy column', () => {
-  const w = userVisibleForFeatureWhere('profile') as { OR: unknown[] };
-  assert.equal(w.OR.length, 2);
+test('userVisibleForFeatureWhere(profile): requires nested PS profilePublic=true', () => {
+  const w = userVisibleForFeatureWhere('profile') as {
+    privacySettings: { is: { profilePublic: boolean } };
+  };
+  assert.equal(w.privacySettings.is.profilePublic, true);
 });
 
 test('userVisibleForFeatureWhere(leaderboard): requires nested PS leaderboardOptIn', () => {
@@ -216,13 +214,14 @@ test('userVisibleForFeatureWhere(badges): requires nested PS badgesEnabled', () 
   assert.equal(w.privacySettings.is.badgesEnabled, true);
 });
 
-test('userVisibleForFeatureSql(profile): emits EXISTS on PrivacySettings AND legacy fallback', () => {
+test('userVisibleForFeatureSql(profile): emits EXISTS on PrivacySettings only', () => {
   const text = userVisibleForFeatureSql('u', 'profile').sql;
   assert.ok(text.includes('"u"."status"'));
   assert.ok(text.includes('"u"."deletedAt"'));
   assert.ok(text.includes('"PrivacySettings"'));
-  assert.ok(text.includes('NOT EXISTS'));
-  assert.ok(text.includes('"u"."profilePublic"'));
+  assert.ok(text.includes('"profilePublic"'));
+  assert.ok(!text.includes('NOT EXISTS'));
+  assert.ok(!text.includes('"u"."profilePublic"'));
 });
 
 test('userVisibleForFeatureSql(leaderboard): emits EXISTS with leaderboardOptIn, no legacy fallback', () => {

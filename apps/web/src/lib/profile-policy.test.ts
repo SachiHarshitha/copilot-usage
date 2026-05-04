@@ -7,7 +7,6 @@ const activeBase = {
   id: 'owner',
   status: 'ACTIVE' as const,
   deletedAt: null,
-  profilePublic: true,
   privacySettings: {
     profilePublic: true,
     leaderboardOptIn: false,
@@ -22,7 +21,6 @@ test('public profile (PrivacySettings.profilePublic=true) can be viewed by anyon
 test('private profile can be viewed by its owner', () => {
   const user = {
     ...activeBase,
-    profilePublic: false,
     privacySettings: { ...activeBase.privacySettings, profilePublic: false },
   };
   assert.equal(canViewProfile({ user, viewerUserId: 'owner' }), true);
@@ -31,15 +29,15 @@ test('private profile can be viewed by its owner', () => {
 test('private profile cannot be viewed by others', () => {
   const user = {
     ...activeBase,
-    profilePublic: false,
     privacySettings: { ...activeBase.privacySettings, profilePublic: false },
   };
   assert.equal(canViewProfile({ user, viewerUserId: 'someone-else' }), false);
 });
 
-test('legacy bridge: PrivacySettings null falls back to User.profilePublic', () => {
-  const user = { ...activeBase, profilePublic: true, privacySettings: null };
-  assert.equal(canViewProfile({ user, viewerUserId: null }), true);
+test('no PrivacySettings row is hidden publicly but still owner-viewable', () => {
+  const user = { ...activeBase, privacySettings: null };
+  assert.equal(canViewProfile({ user, viewerUserId: null }), false);
+  assert.equal(canViewProfile({ user, viewerUserId: 'owner' }), true);
 });
 
 test('suspended user is not publicly visible but owner can still view', () => {

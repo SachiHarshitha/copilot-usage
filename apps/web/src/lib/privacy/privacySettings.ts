@@ -126,19 +126,8 @@ export async function updatePrivacySettings(
     data: diff,
   });
 
-  // Bridge invariant (Phase 2 → 2.1):
-  // Public-surface readers now consult `PrivacySettings.profilePublic` via
-  // `userVisibleForFeatureWhere/Sql('profile')` (with a fallback to legacy
-  // `User.profilePublic` only when no PS row exists). The legacy column is
-  // still written by `/api/settings/profile` PATCH and read by admin paths,
-  // so we keep the mirror here to prevent divergence until that route is
-  // retired or migrated to delegate through this writer.
-  if (typeof diff.profilePublic === 'boolean') {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { profilePublic: diff.profilePublic },
-    });
-  }
+  // PrivacySettings is the single source of truth for public-surface
+  // visibility flags in first-release runtime.
 
   const source: ConsentEventSource = ctx.source ?? 'USER_SETTING';
   const changedKinds: ConsentEventKind[] = [];

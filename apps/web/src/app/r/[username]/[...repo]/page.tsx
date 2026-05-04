@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { getCanonicalRepoStatsByIdentity } from '@/lib/canonical-stats';
 import { getDictionary } from '@/lib/i18n/dictionary';
 import { getRequestLocale } from '@/lib/i18n/server';
 import { isUserVisibleForFeature } from '@/lib/policy/userLifecycle';
@@ -24,11 +25,9 @@ export default async function RepoPage({
   if (!user || !isUserVisibleForFeature(user, 'profile')) notFound();
 
   const repoIdentity = `github:${repoSlug}`;
-  const repoStat = await prisma.repoStat.findUnique({
-    where: { userId_repoIdentity: { userId: user.id, repoIdentity } },
-  });
+  const repoStats = await getCanonicalRepoStatsByIdentity(prisma, user.id, repoIdentity);
 
-  if (!repoStat || !repoStat.isPublic) notFound();
+  if (!repoStats || !repoStats.isPublic) notFound();
 
   const baseUrl = 'https://promptstreak.dev';
   const [owner, repoName] = repoSlug.split('/');
@@ -48,19 +47,20 @@ export default async function RepoPage({
       <p className="text-sm text-[var(--text-secondary)] mb-8">
         {dictionary.repoPage.by} <Link href={`/u/${username}`}>@{username}</Link>
         {' · '}
-        {dictionary.repoPage.lastSynced} {dateFormatter.format(repoStat.lastSyncedAt)}
+        {dictionary.repoPage.lastSynced}{' '}
+        {repoStats.lastSyncedAt ? dateFormatter.format(repoStats.lastSyncedAt) : dictionary.repoPage.na}
       </p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <KpiCard label={dictionary.repoPage.totalTokens} value={numberFormatter.format(Number(repoStat.totalTokens))} />
-        <KpiCard label={dictionary.repoPage.requests} value={numberFormatter.format(repoStat.requests)} />
-        <KpiCard label={dictionary.repoPage.promptTokens} value={numberFormatter.format(Number(repoStat.promptTokens))} />
-        <KpiCard label={dictionary.repoPage.outputTokens} value={numberFormatter.format(Number(repoStat.outputTokens))} />
+        <KpiCard label={dictionary.repoPage.totalTokens} value={numberFormatter.format(Number(repoStats.totalTokens))} />
+        <KpiCard label={dictionary.repoPage.requests} value={numberFormatter.format(repoStats.requests)} />
+        <KpiCard label={dictionary.repoPage.promptTokens} value={numberFormatter.format(Number(repoStats.promptTokens))} />
+        <KpiCard label={dictionary.repoPage.outputTokens} value={numberFormatter.format(Number(repoStats.outputTokens))} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <KpiCard label={dictionary.repoPage.premiumRequests} value={repoStat.premiumReqs.toFixed(1)} />
-        <KpiCard label={dictionary.repoPage.topModel} value={repoStat.topModel || dictionary.repoPage.na} />
+        <KpiCard label={dictionary.repoPage.premiumRequests} value={repoStats.premiumReqs.toFixed(1)} />
+        <KpiCard label={dictionary.repoPage.topModel} value={repoStats.topModel || dictionary.repoPage.na} />
       </div>
 
       <div className="mt-8 bg-[var(--surface-elevated)] border border-[var(--card-border)] rounded-lg p-6">

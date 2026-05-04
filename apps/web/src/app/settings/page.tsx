@@ -78,11 +78,6 @@ export default function SettingsPage() {
         leaderboardOptIn: !!data.leaderboardOptIn,
         badgesEnabled: !!data.badgesEnabled,
       });
-      // Keep the legacy `settings.profilePublic` view in sync for now (the
-      // server mirrors it during the Phase 2 → 2.1 bridge window).
-      if (field === 'profilePublic') {
-        setSettings((s) => s && { ...s, profilePublic: next });
-      }
       setMessage(dictionary.settings.privacyUpdated);
       setBadgeCacheBuster((n) => n + 1);
     }
@@ -183,6 +178,8 @@ export default function SettingsPage() {
             <PrivacyRow
               label={dictionary.settings.profilePublicLabel}
               hint={dictionary.settings.profilePublicHint}
+              onLabel={dictionary.settings.toggleOn}
+              offLabel={dictionary.settings.toggleOff}
               enabled={privacy.profilePublic}
               disabled={saving}
               onToggle={() => togglePrivacyField('profilePublic')}
@@ -190,6 +187,8 @@ export default function SettingsPage() {
             <PrivacyRow
               label={dictionary.settings.leaderboardLabel}
               hint={dictionary.settings.leaderboardHint}
+              onLabel={dictionary.settings.toggleOn}
+              offLabel={dictionary.settings.toggleOff}
               enabled={privacy.leaderboardOptIn}
               disabled={saving || !privacy.profilePublic}
               onToggle={() => togglePrivacyField('leaderboardOptIn')}
@@ -197,6 +196,8 @@ export default function SettingsPage() {
             <PrivacyRow
               label={dictionary.settings.badgesLabel}
               hint={dictionary.settings.badgesHint}
+              onLabel={dictionary.settings.toggleOn}
+              offLabel={dictionary.settings.toggleOff}
               enabled={privacy.badgesEnabled}
               disabled={saving || !privacy.profilePublic}
               onToggle={() => togglePrivacyField('badgesEnabled')}
@@ -346,12 +347,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function PrivacyRow({
   label,
   hint,
+  onLabel,
+  offLabel,
   enabled,
   disabled,
   onToggle,
 }: {
   label: string;
   hint: string;
+  onLabel: string;
+  offLabel: string;
   enabled: boolean;
   disabled?: boolean;
   onToggle: () => void;
@@ -373,7 +378,7 @@ function PrivacyRow({
             : 'bg-[var(--surface-hover)] text-[var(--text-secondary)] border-[var(--card-border)]'
         } disabled:opacity-50`}
       >
-        {enabled ? dictionary.settings.toggleOn : dictionary.settings.toggleOff}
+        {enabled ? onLabel : offLabel}
       </button>
     </div>
   );

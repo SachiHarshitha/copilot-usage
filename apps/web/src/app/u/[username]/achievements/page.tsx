@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getCanonicalUserStats } from '@/lib/canonical-stats';
 import { prisma } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 import { canViewProfile } from '@/lib/profile-policy';
@@ -25,8 +26,10 @@ export default async function AchievementsPage({
 
   const user = await prisma.user.findUnique({
     where: { username },
-    include: { userStat: true, privacySettings: true },
+    include: { privacySettings: true },
   });
+
+  const stats = user ? await getCanonicalUserStats(prisma, user.id) : null;
 
   if (
     !user ||
@@ -34,13 +37,13 @@ export default async function AchievementsPage({
       user,
       viewerUserId: sessionUser?.userId || null,
     }) ||
-    !user.userStat
+    !stats
   ) {
     notFound();
   }
 
-  const unlockedLifetime = new Set(computeUnlockedLifetime(user.userStat.totalTokens || BigInt(0)));
-  const unlockedStreak = new Set(computeUnlockedStreak(user.userStat.bestStreakDays || 0));
+  const unlockedLifetime = new Set(computeUnlockedLifetime(stats.totalTokens || BigInt(0)));
+  const unlockedStreak = new Set(computeUnlockedStreak(stats.bestStreakDays || 0));
 
   return (
     <div>

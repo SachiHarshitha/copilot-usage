@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
+import { getCanonicalRepoStatsList } from '@/lib/canonical-stats';
 import { prisma } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 import { tagsForUserChange } from '@/lib/cache/tags';
 
 /**
  * GET /api/settings/profile — Fetch full user settings.
- * PATCH /api/settings/profile — Update profile visibility / display name.
+ * PATCH /api/settings/profile — Update display name.
  */
 export async function GET() {
   const sessionUser = await getSessionUser();
@@ -17,7 +18,7 @@ export async function GET() {
   const user = await prisma.user.findUnique({
     where: { id: sessionUser.userId },
     include: {
-      repoStats: { orderBy: { totalTokens: 'desc' } },
+      privacySettings: true,
       devices: { where: { revokedAt: null }, orderBy: { createdAt: 'desc' } },
     },
   });
@@ -26,13 +27,15 @@ export async function GET() {
     return NextResponse.json({ error: 'User not found.' }, { status: 404 });
   }
 
+  const repos = await getCanonicalRepoStatsList(prisma, user.id);
+
   return NextResponse.json({
     displayName: user.displayName || user.username,
-    profilePublic: user.profilePublic,
+    profilePublic: user.privacySettings?.profilePublic ?? false,
     username: user.username,
     status: user.status,
-    repos: user.repoStats.map((r) => ({
-      id: r.id,
+    repos: repos.map((r) => ({
+      id: r.repoIdentity,
       repoIdentity: r.repoIdentity,
       displayMode: r.displayMode,
       githubRepo: r.githubRepo,
@@ -58,9 +61,6 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json();
   const update: Record<string, unknown> = {};
 
-  if (typeof body.profilePublic === 'boolean') {
-    update.profilePublic = body.profilePublic;
-  }
   if (typeof body.displayName === 'string') {
     const normalizedDisplayName = body.displayName.trim();
     if (normalizedDisplayName.length > 0 && normalizedDisplayName.length <= 100) {

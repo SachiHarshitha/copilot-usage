@@ -1,5 +1,9 @@
 import type { PrismaClient } from '@prisma/client';
 
+import {
+  getCanonicalRepoStatsList,
+  getCanonicalUserStats,
+} from '@/lib/canonical-stats';
 import { prisma as defaultPrisma } from '@/lib/db';
 import { isUserVisibleForFeature } from '@/lib/policy/userLifecycle';
 
@@ -55,44 +59,44 @@ export async function loadProfileByUsername(
 ): Promise<PublicProfileResponse | null> {
   const user = await prisma.user.findUnique({
     where: { username },
-    include: {
-      userStat: true,
-      privacySettings: true,
-      repoStats: {
-        where: { isPublic: true },
-        orderBy: { totalTokens: 'desc' },
-        take: 10,
-      },
-    },
+    include: { privacySettings: true },
   });
 
   if (!user || !isUserVisibleForFeature(user, 'profile')) {
     return null;
   }
 
+  const [stats, repos] = await Promise.all([
+    getCanonicalUserStats(prisma, user.id),
+    getCanonicalRepoStatsList(prisma, user.id, {
+      publicOnly: true,
+      take: 10,
+    }),
+  ]);
+
   return {
     username: user.username,
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
     createdAt: user.createdAt,
-    stats: user.userStat
+    stats: stats
       ? {
-          totalRequests: user.userStat.totalRequests,
-          promptTokens: user.userStat.promptTokens.toString(),
-          outputTokens: user.userStat.outputTokens.toString(),
-          totalTokens: user.userStat.totalTokens.toString(),
-          weeklyTokens: user.userStat.weeklyTokens.toString(),
-          rolling30DayTokens: user.userStat.rolling30DayTokens.toString(),
-          premiumRequests: user.userStat.premiumRequests,
-          currentStreakDays: user.userStat.currentStreakDays,
-          bestStreakDays: user.userStat.bestStreakDays,
-          workspaceCount: user.userStat.workspaceCount,
-          sessionCount: user.userStat.sessionCount,
-          topModel: user.userStat.topModel,
-          lastSyncedAt: user.userStat.lastSyncedAt,
+          totalRequests: stats.totalRequests,
+          promptTokens: stats.promptTokens.toString(),
+          outputTokens: stats.outputTokens.toString(),
+          totalTokens: stats.totalTokens.toString(),
+          weeklyTokens: stats.weeklyTokens.toString(),
+          rolling30DayTokens: stats.rolling30DayTokens.toString(),
+          premiumRequests: stats.premiumRequests,
+          currentStreakDays: stats.currentStreakDays,
+          bestStreakDays: stats.bestStreakDays,
+          workspaceCount: stats.workspaceCount,
+          sessionCount: stats.sessionCount,
+          topModel: stats.topModel,
+          lastSyncedAt: stats.lastSyncedAt,
         }
       : null,
-    repos: user.repoStats.map((r) => ({
+    repos: repos.map((r) => ({
       repoIdentity: r.repoIdentity,
       displayMode: r.displayMode,
       githubRepo: r.githubRepo,

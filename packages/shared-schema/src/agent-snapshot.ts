@@ -13,9 +13,6 @@ import {
  * This is the normalized format produced by every adapter. Adapters must
  * emit at least the `source` block and one of `runs` or `dailyBuckets` so
  * the upload route can persist meaningful canonical facts.
- *
- * The legacy `SnapshotPayloadSchema` (v1) remains supported for backward
- * compatibility during the migration window.
  */
 
 /** Permissive identifier: lowercase letters, digits, hyphen, dot, underscore. */

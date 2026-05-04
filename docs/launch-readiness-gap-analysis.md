@@ -1,5 +1,43 @@
 # PromptStreak Launch Readiness Gap Analysis
 
+## Status (verified May 2026)
+This document was re-audited against the actual code in this session. Most P0/P1 gaps below were already closed in code or have been closed during this audit pass. See [Verified Status Update](#verified-status-update-may-2026) immediately below for the authoritative current state. The original gap inventory is preserved further down for historical context.
+
+## Verified Status Update (May 2026)
+
+| # | Original Gap | Verified Status | Evidence |
+|---|---|---|---|
+| P0-1 | Upload verification telemetry not runtime-wired | ✅ Closed in code | `apps/web/src/app/api/upload/route.ts` writes `UploadAudit` on accept/reject and transaction-failure paths in the v2 runtime. Signed-upload anomaly detection is intentionally deferred (no signed-upload protocol shipped). |
+| P0-2 | Verification lifecycle endpoints missing | ⏸ Intentionally deferred | Disconnect lib + admin + user-self routes exist (`apps/web/src/lib/admin/verification.ts`, `apps/web/src/app/api/admin/verification/[userId]/disconnect/route.ts`, `apps/web/src/app/api/verification/github/route.ts`). Refresh endpoint depends on Task 3.6 GitHub-billing fetch worker; excluded from public launch claims. |
+| P0-3 | Mixed visibility enforcement paths | ✅ Closed in code | `apps/web/src/lib/profile-policy.ts` rewritten to delegate to `isUserVisibleForFeature(user, 'profile')` with owner-override and soft-delete suppression. All 4 callers (`u/[username]/page.tsx`, `u/[username]/achievements/page.tsx`, `r/[username]/[...repo]/page.tsx`, `card/[username]/route.ts`) migrated to include `privacySettings` and use the new API. Test matrix covers public/owner-private/others-private/no-privacy-row/suspended/soft-deleted. |
+| P0-4 | Public API + docs drift | 🟡 In progress | This update is part of that effort. A canonical API contract doc is still pending and tracked separately. |
+| P1-A | Abuse report persistence | ✅ Closed in code | `apps/web/src/app/api/contact/route.ts` classifies via `classifyAbuseSubject` and persists to `AbuseReport` before sending mail; persistence failure returns 500. |
+| P1-B | SMTP backend runtime path | ✅ Closed in code | `apps/web/src/lib/mail/mailService.ts` exposes lazy proxy that loads `SmtpMailService` (nodemailer) when `MAIL_BACKEND=smtp`, falls back to in-memory otherwise. |
+| P1-C | Recovery code payload mismatch | ✅ Closed in code | `apps/web/src/lib/admin/auth/routeHandlers.ts` `recoveryCodeHandler` accepts both `code` and `recoveryCode` for backward compatibility. |
+| P1-D | Audit immutability automation | ✅ Closed in code | `apps/web/package.json` adds `db:apply-triggers` (runs `scripts/applyAuditLogImmutability.ts`) and composite `db:deploy` (`db:push` + `db:apply-triggers`). `docs/admin-ops-runbook.md` bootstrap section refreshed to use `db:deploy` as the canonical post-deploy command. |
+| P2 | Spec-only verification entities | ⏸ Deferred | `VerificationAnomaly` model is a stable placeholder; auto-detection passes require the signed-upload protocol which is not yet shipped. Comment in `apps/web/src/lib/admin/userManagement.ts` corrected to reflect this. |
+
+### Test Validation
+- `pnpm --filter @promptstreak/web test`: **251 / 251 passing**.
+- No new TypeScript errors in any modified file.
+
+### Remaining Launch-Time Work
+1. **Doc canonicalization (P0-4)**: publish a single API contract doc and align verification/web docs. Not a code blocker.
+2. **Documented deferrals to call out in launch claims**:
+   - Verification *refresh* endpoint awaits GitHub-billing fetch worker (Task 3.6).
+   - Anomaly auto-detection awaits signed-upload protocol.
+3. **Operational**: ensure `pnpm --filter @promptstreak/web db:deploy` is part of the deploy pipeline so the audit-log immutability triggers are applied in every environment.
+
+### Updated Go/No-Go Posture
+- All originally-listed P0 *code* gaps are either closed or have a clear documented deferral with launch-claim boundaries.
+- Launch claims should match the [Suggested Launch Claims Boundaries](#suggested-launch-claims-boundaries) section, with the explicit caveat that "verified usage" refers to UploadAudit coverage, not signed-upload anomaly detection.
+
+---
+
+## Original Gap Inventory (historical, pre-audit)
+
+The remainder of this document is the original gap analysis as written before the May 2026 verification pass. It is retained for historical context. Where the table above contradicts text below, the table above is authoritative.
+
 ## Purpose
 This document translates the current research in [docs/reality.md](docs/reality.md) into an implementation-focused launch plan for the coming week.
 

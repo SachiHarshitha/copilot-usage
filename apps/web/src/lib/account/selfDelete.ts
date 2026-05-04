@@ -62,7 +62,20 @@ export async function softDeleteSelfCore(
             username: tombstoneUsername,
             displayName: null,
             avatarUrl: null,
+          },
+        }),
+        prisma.privacySettings.upsert({
+          where: { userId: target.id },
+          update: {
             profilePublic: false,
+            leaderboardOptIn: false,
+            badgesEnabled: false,
+          },
+          create: {
+            userId: target.id,
+            profilePublic: false,
+            leaderboardOptIn: false,
+            badgesEnabled: false,
           },
         }),
         prisma.device.updateMany({

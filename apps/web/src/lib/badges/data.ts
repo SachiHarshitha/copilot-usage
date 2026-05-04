@@ -1,5 +1,9 @@
 import { unstable_cache } from 'next/cache';
 import { Prisma } from '@prisma/client';
+import {
+  getCanonicalRepoStatsList,
+  getCanonicalUserStats,
+} from '@/lib/canonical-stats';
 import { prisma } from '@/lib/db';
 import {
   leaderboardTag,
@@ -9,7 +13,6 @@ import {
 import {
   isUserVisibleForFeature,
   userVisibleForFeatureSql,
-  userVisibleForFeatureWhere,
 } from '@/lib/policy/userLifecycle';
 import type { PublicRepoBadgeSummary, PublicUserBadgeSummary } from './types';
 
@@ -43,89 +46,92 @@ function formatRepoDisplay(repo: {
 async function fetchPublicUserBadgeSummary(username: string): Promise<PublicUserBadgeSummary | null> {
   const user = await prisma.user.findUnique({
     where: { username },
-    include: {
-      userStat: true,
-      privacySettings: true,
-      repoStats: {
-        where: { isPublic: true },
-        orderBy: { totalTokens: 'desc' },
-        take: 1,
-      },
-      _count: {
-        select: {
-          repoStats: {
-            where: { isPublic: true },
-          },
-        },
-      },
-    },
+    include: { privacySettings: true },
   });
 
-  if (!user || !isUserVisibleForFeature(user, 'badges') || !user.userStat) {
+  if (!user || !isUserVisibleForFeature(user, 'badges')) {
     return null;
   }
+
+  const [stats, publicRepos] = await Promise.all([
+    getCanonicalUserStats(prisma, user.id),
+    getCanonicalRepoStatsList(prisma, user.id, { publicOnly: true }),
+  ]);
 
   return {
     username: user.username,
     displayName: user.displayName || user.username,
-    lifetimeTokens: Number(user.userStat.totalTokens || 0),
-    totalRequests: user.userStat.totalRequests || 0,
-    premiumRequests: user.userStat.premiumRequests || 0,
-    weeklyTokens: Number(user.userStat.weeklyTokens || 0),
-    rolling30DayTokens: Number(user.userStat.rolling30DayTokens || 0),
-    currentStreakDays: user.userStat.currentStreakDays || 0,
-    bestStreakDays: user.userStat.bestStreakDays || 0,
-    topRepoName: user.repoStats[0] ? formatRepoDisplay(user.repoStats[0]) : null,
-    publicRepoCount: user._count.repoStats,
+    lifetimeTokens: Number(stats?.totalTokens ?? BigInt(0)),
+    totalRequests: stats?.totalRequests ?? 0,
+    premiumRequests: stats?.premiumRequests ?? 0,
+    weeklyTokens: Number(stats?.weeklyTokens ?? BigInt(0)),
+    rolling30DayTokens: Number(stats?.rolling30DayTokens ?? BigInt(0)),
+    currentStreakDays: stats?.currentStreakDays ?? 0,
+    bestStreakDays: stats?.bestStreakDays ?? 0,
+    topRepoName: publicRepos[0] ? formatRepoDisplay(publicRepos[0]) : null,
+    publicRepoCount: publicRepos.length,
   };
 }
 
 const getPublicRepoBadgeSummaryCached = unstable_cache(
   async (repoSlug: string): Promise<PublicRepoBadgeSummary | null> => {
-    const where = {
-      isPublic: true,
-      githubRepo: repoSlug,
-      user: userVisibleForFeatureWhere('badges'),
-    };
+    const repoIdentity = `github:${repoSlug}`;
+    const rolling30Start = new Date();
+    rolling30Start.setHours(0, 0, 0, 0);
+    rolling30Start.setDate(rolling30Start.getDate() - 29);
 
-    const aggregate = await prisma.repoStat.aggregate({
-      where,
-      _sum: {
-        totalTokens: true,
-        tokens30d: true,
-        requests: true,
-        premiumReqs: true,
-      },
-      _count: {
-        _all: true,
-      },
-    });
+    const aggregateRows = await prisma.$queryRaw<
+      Array<{
+        totalTokens: bigint | null;
+        tokens30d: bigint | null;
+        requests: number | null;
+        premiumRequests: number | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        SUM(mud."totalTokens")::bigint AS "totalTokens",
+        SUM(CASE WHEN mud."date" >= ${rolling30Start} THEN mud."totalTokens" ELSE 0 END)::bigint AS "tokens30d",
+        SUM(mud."requestCount")::int AS "requests",
+        SUM(mud."premiumRequests")::float AS "premiumRequests"
+      FROM "ModelUsageDaily" mud
+      JOIN "RepoVisibilitySettings" rvs
+        ON rvs."userId" = mud."userId"
+       AND rvs."repoIdentity" = mud."repoIdentity"
+      JOIN "User" u ON u.id = mud."userId"
+      WHERE mud."repoIdentity" = ${repoIdentity}
+        AND rvs."isPublic" = true
+        AND ${userVisibleForFeatureSql('u', 'badges')}
+    `);
 
-    if (!aggregate._count._all) {
+    const aggregate = aggregateRows[0];
+    if (!aggregate || aggregate.totalTokens === null) {
       return null;
     }
 
     const rankRows = await prisma.$queryRaw<{ repo_rank: number | bigint; repo_count: number | bigint }[]>(
       Prisma.sql`
       WITH repo_totals AS (
-        SELECT rs."githubRepo" AS "githubRepo", SUM(rs."totalTokens")::bigint AS total_tokens
-        FROM "RepoStat" rs
-        JOIN "User" u ON u.id = rs."userId"
-        WHERE rs."isPublic" = true
-          AND rs."githubRepo" IS NOT NULL
+        SELECT mud."repoIdentity" AS "repoIdentity", SUM(mud."totalTokens")::bigint AS total_tokens
+        FROM "ModelUsageDaily" mud
+        JOIN "RepoVisibilitySettings" rvs
+          ON rvs."userId" = mud."userId"
+         AND rvs."repoIdentity" = mud."repoIdentity"
+        JOIN "User" u ON u.id = mud."userId"
+        WHERE mud."repoIdentity" LIKE 'github:%'
+          AND rvs."isPublic" = true
           AND ${userVisibleForFeatureSql('u', 'badges')}
-        GROUP BY rs."githubRepo"
+        GROUP BY mud."repoIdentity"
       ),
       ranked AS (
         SELECT
-          "githubRepo",
+          "repoIdentity",
           DENSE_RANK() OVER (ORDER BY total_tokens DESC) AS repo_rank,
           COUNT(*) OVER () AS repo_count
         FROM repo_totals
       )
       SELECT repo_rank, repo_count
       FROM ranked
-      WHERE "githubRepo" = ${repoSlug}
+      WHERE "repoIdentity" = ${repoIdentity}
       LIMIT 1
     `
     );
@@ -133,35 +139,36 @@ const getPublicRepoBadgeSummaryCached = unstable_cache(
     const rank = rankRows[0]?.repo_rank ?? null;
     const repoCount = rankRows[0]?.repo_count ?? null;
 
-    const modelRows = await prisma.repoStat.findMany({
-      where,
-      select: { topModel: true },
-      distinct: ['topModel'],
-      take: 3,
-    });
-
-    const models = modelRows
-      .map((row) => row.topModel)
-      .filter((model): model is string => !!model && model.trim().length > 0);
-
-    const primaryModelRow = await prisma.repoStat.findFirst({
-      where,
-      orderBy: { totalTokens: 'desc' },
-      select: { topModel: true },
-    });
+    const modelRows = await prisma.$queryRaw<Array<{ modelId: string }>>(
+      Prisma.sql`
+        SELECT mud."modelId" AS "modelId"
+        FROM "ModelUsageDaily" mud
+        JOIN "RepoVisibilitySettings" rvs
+          ON rvs."userId" = mud."userId"
+         AND rvs."repoIdentity" = mud."repoIdentity"
+        JOIN "User" u ON u.id = mud."userId"
+        WHERE mud."repoIdentity" = ${repoIdentity}
+          AND rvs."isPublic" = true
+          AND ${userVisibleForFeatureSql('u', 'badges')}
+        GROUP BY mud."modelId"
+        ORDER BY SUM(mud."requestCount") DESC, mud."modelId" ASC
+        LIMIT 3
+      `
+    );
+    const models = modelRows.map((row) => row.modelId);
 
     const percentile = computeRankPercentile(rank, repoCount);
 
     return {
       repoSlug,
-      totalTokens: aggregate._sum.totalTokens || BigInt(0),
-      tokens30d: aggregate._sum.tokens30d || aggregate._sum.totalTokens || BigInt(0),
-      requests: aggregate._sum.requests || 0,
-      premiumRequests: aggregate._sum.premiumReqs || 0,
+      totalTokens: aggregate.totalTokens || BigInt(0),
+      tokens30d: aggregate.tokens30d || aggregate.totalTokens || BigInt(0),
+      requests: aggregate.requests || 0,
+      premiumRequests: aggregate.premiumRequests || 0,
       rank: rank === null ? null : Number(rank),
       percentile,
       models,
-      primaryModel: primaryModelRow?.topModel || null,
+      primaryModel: models[0] ?? null,
     };
   },
   ['public-repo-badge-summary-v1'],

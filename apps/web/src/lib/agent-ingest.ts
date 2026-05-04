@@ -9,12 +9,9 @@
  *   and an active Prisma transaction, upsert into the v2 tables
  *   (AgentRun, ModelUsageDaily, ActionUsageDaily, ProductStat,
  *   ProviderStat, ModelStat).
- *
- * The legacy (v1) write path in `route.ts` (UsageDaily/UserStat/RepoStat)
- * is unchanged and runs independently.
  */
 
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 import type {
   AgentModelCall,
@@ -81,6 +78,7 @@ const ZERO: RollupTotals = {
 
 function addTotals(map: Map<string, RollupTotals>, key: string, delta: RollupTotals) {
   const cur = map.get(key) ?? { ...ZERO };
+
   cur.totalRequests += delta.totalRequests;
   cur.totalTokens += delta.totalTokens;
   cur.costMicros += delta.costMicros;
@@ -452,4 +450,5 @@ export async function writeCanonical(
       },
     });
   }
+
 }

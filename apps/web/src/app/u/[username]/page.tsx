@@ -2,6 +2,10 @@ import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import {
+  getCanonicalRepoStatsList,
+  getCanonicalUserStats,
+} from '@/lib/canonical-stats';
 import { computeRank, computeUnlockedLifetime, computeUnlockedStreak } from '@/lib/badge-stats';
 import { getSessionUser } from '@/lib/auth';
 import { canViewProfile } from '@/lib/profile-policy';
@@ -24,13 +28,7 @@ export default async function ProfilePage({
   const user = await prisma.user.findUnique({
     where: { username },
     include: {
-      userStat: true,
       privacySettings: true,
-      repoStats: {
-        where: { isPublic: true },
-        orderBy: { totalTokens: 'desc' },
-        take: 10,
-      },
     },
   });
 
@@ -44,7 +42,14 @@ export default async function ProfilePage({
     notFound();
   }
 
-  const stat = user.userStat;
+  const [stat, publicRepos] = await Promise.all([
+    getCanonicalUserStats(prisma, user.id),
+    getCanonicalRepoStatsList(prisma, user.id, {
+      publicOnly: true,
+      take: 10,
+    }),
+  ]);
+
   const baseUrl = 'https://promptstreak.dev';
   const rank = stat ? computeRank(stat.rolling30DayTokens || BigInt(0)) : null;
   const unlockedLifetime = stat ? computeUnlockedLifetime(stat.totalTokens || BigInt(0)) : [];
@@ -154,7 +159,7 @@ export default async function ProfilePage({
       )}
 
       {/* Public Repos */}
-      {user.repoStats.length > 0 && (
+      {publicRepos.length > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">{dictionary.profile.publicRepos}</h2>
           <div className="overflow-x-auto">
@@ -169,7 +174,7 @@ export default async function ProfilePage({
                 </tr>
               </thead>
               <tbody>
-                {user.repoStats.map((r) => {
+                {publicRepos.map((r) => {
                   const displayName =
                     r.displayMode === 'github' && r.githubRepo
                       ? r.githubRepo

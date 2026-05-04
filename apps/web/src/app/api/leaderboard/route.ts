@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
+import { getCanonicalUserStats } from '@/lib/canonical-stats';
 import { prisma } from '@/lib/db';
 import {
   userVisibleForFeatureSql,
@@ -36,20 +37,21 @@ export async function GET(request: NextRequest) {
 
   const orderBy =
     sort === 'premium'
-      ? Prisma.raw('"premiumRequests" DESC')
-      : Prisma.raw('"totalTokens" DESC');
+      ? Prisma.raw('"premiumRequests" DESC, "totalTokens" DESC, "userId" ASC')
+      : Prisma.raw('"totalTokens" DESC, "premiumRequests" DESC, "userId" ASC');
   const rows = await prisma.$queryRaw<
     { userId: string; totalTokens: bigint; premiumRequests: number; totalRequests: number }[]
   >(Prisma.sql`
-    SELECT ud."userId",
-           SUM(ud."totalTokens")::bigint AS "totalTokens",
-           SUM(ud."premiumRequests")::float AS "premiumRequests",
-           SUM(ud."totalRequests")::int AS "totalRequests"
-    FROM "UsageDaily" ud
-    JOIN "User" u ON u.id = ud."userId"
+    SELECT u.id AS "userId",
+           COALESCE(SUM(mud."totalTokens"), 0)::bigint AS "totalTokens",
+           COALESCE(SUM(mud."premiumRequests"), 0)::float AS "premiumRequests",
+           COALESCE(SUM(mud."requestCount"), 0)::int AS "totalRequests"
+    FROM "User" u
+    LEFT JOIN "ModelUsageDaily" mud
+      ON mud."userId" = u.id
+     AND mud."date" >= ${sinceDate}
     WHERE ${userVisibleForFeatureSql('u', 'leaderboard')}
-      AND ud.date >= ${sinceDate}
-    GROUP BY ud."userId"
+    GROUP BY u.id
     ORDER BY ${orderBy}
     LIMIT ${PAGE_SIZE}
     OFFSET ${(page - 1) * PAGE_SIZE}
@@ -61,10 +63,13 @@ export async function GET(request: NextRequest) {
     select: { id: true, username: true, avatarUrl: true },
   });
   const userMap = new Map(users.map((u) => [u.id, u]));
+  const userStats = await Promise.all(rows.map((r) => getCanonicalUserStats(prisma, r.userId)));
+  const statsByUser = new Map(rows.map((r, index) => [r.userId, userStats[index]] as const));
 
   return NextResponse.json({
     entries: rows.map((r, i) => {
       const user = userMap.get(r.userId);
+      const stats = statsByUser.get(r.userId);
       return {
         rank: (page - 1) * PAGE_SIZE + i + 1,
         username: user?.username || 'unknown',
@@ -72,10 +77,10 @@ export async function GET(request: NextRequest) {
         totalTokens: r.totalTokens.toString(),
         premiumRequests: r.premiumRequests,
         totalRequests: r.totalRequests,
-        currentStreakDays: 0,
-        rolling30DayTokens: r.totalTokens.toString(),
-        topModel: null,
-        workspaceCount: 0,
+        currentStreakDays: stats?.currentStreakDays ?? 0,
+        rolling30DayTokens: (stats?.rolling30DayTokens ?? r.totalTokens).toString(),
+        topModel: stats?.topModel ?? null,
+        workspaceCount: stats?.workspaceCount ?? 0,
       };
     }),
     page,

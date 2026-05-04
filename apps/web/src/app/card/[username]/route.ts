@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getCanonicalUserStats } from '@/lib/canonical-stats';
 import { prisma } from '@/lib/db';
 import { generateCardSvg, formatNumber } from '@/lib/svg';
 import { isUserVisibleForFeature } from '@/lib/policy/userLifecycle';
@@ -15,10 +16,12 @@ export async function GET(
 
   const user = await prisma.user.findUnique({
     where: { username },
-    include: { userStat: true, privacySettings: true },
+    include: { privacySettings: true },
   });
 
-  if (!user || !isUserVisibleForFeature(user, 'profile') || !user.userStat) {
+  const stats = user ? await getCanonicalUserStats(prisma, user.id) : null;
+
+  if (!user || !isUserVisibleForFeature(user, 'profile') || !stats) {
     return new NextResponse(
       `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="50"><text x="10" y="30" fill="#8b949e" font-family="sans-serif" font-size="14">User not found or profile is private.</text></svg>`,
       {
@@ -30,14 +33,13 @@ export async function GET(
     );
   }
 
-  const s = user.userStat;
   const svg = generateCardSvg({
     username: user.displayName || user.username,
     avatarUrl: user.avatarUrl || undefined,
-    totalTokens: formatNumber(s.totalTokens),
-    totalRequests: formatNumber(s.totalRequests),
-    premiumRequests: s.premiumRequests.toFixed(1),
-    topModel: s.topModel || undefined,
+    totalTokens: formatNumber(stats.totalTokens),
+    totalRequests: formatNumber(stats.totalRequests),
+    premiumRequests: stats.premiumRequests.toFixed(1),
+    topModel: stats.topModel || undefined,
   });
 
   return new NextResponse(svg, {

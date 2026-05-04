@@ -1,10 +1,12 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { getCanonicalUserStats } from '@/lib/canonical-stats';
+import { getUserLeaderboardAllTime } from '@/lib/leaderboard/getUserLeaderboardAllTime';
 import Link from 'next/link';
 import Image from 'next/image';
 import { getAllowedAvatarUrl } from '@/lib/profile-menu';
 import {
   userVisibleForFeatureSql,
-  userVisibleForFeatureWhere,
 } from '@/lib/policy/userLifecycle';
 import { getDictionary } from '@/lib/i18n/dictionary';
 import { getRequestLocale } from '@/lib/i18n/server';
@@ -43,33 +45,27 @@ export default async function LeaderboardPage({
   }[] = [];
 
   if (!since) {
-    // All-time: read from UserStat (fast indexed)
-    const stats = await prisma.userStat.findMany({
-      where: {
-        user: userVisibleForFeatureWhere('leaderboard'),
-      },
-      include: { user: true },
-      orderBy: sort === 'premium' ? { premiumRequests: 'desc' } : { totalTokens: 'desc' },
-      take: PAGE_SIZE,
-      skip: (page - 1) * PAGE_SIZE,
-    });
-
+    const stats = await getUserLeaderboardAllTime({ sort, page }, prisma);
     entries = stats.map((s) => ({
       userId: s.userId,
-      username: s.user.username,
-      avatarUrl: s.user.avatarUrl,
-      totalTokens: s.totalTokens,
+      username: s.username,
+      avatarUrl: s.avatarUrl,
+      totalTokens: BigInt(s.totalTokens),
       premiumRequests: s.premiumRequests,
       totalRequests: s.totalRequests,
       topModel: s.topModel,
       workspaceCount: s.workspaceCount,
-        currentStreakDays: s.currentStreakDays,
+      currentStreakDays: s.currentStreakDays,
     }));
   } else {
-    // Date-filtered: aggregate UsageDaily
+    // Date-filtered: aggregate canonical ModelUsageDaily
     const days = since === '7d' ? 7 : 30;
     const sinceDate = new Date();
     sinceDate.setDate(sinceDate.getDate() - days);
+    const orderBy =
+      sort === 'premium'
+        ? Prisma.raw('"premiumRequests" DESC, "totalTokens" DESC, "userId" ASC')
+        : Prisma.raw('"totalTokens" DESC, "premiumRequests" DESC, "userId" ASC');
 
     const rows = await prisma.$queryRaw<
       {
@@ -78,30 +74,34 @@ export default async function LeaderboardPage({
         premiumRequests: number;
         totalRequests: number;
       }[]
-    >`
-      SELECT ud."userId",
-             SUM(ud."totalTokens")::bigint AS "totalTokens",
-             SUM(ud."premiumRequests")::float AS "premiumRequests",
-             SUM(ud."totalRequests")::int AS "totalRequests"
-      FROM "UsageDaily" ud
-      JOIN "User" u ON u.id = ud."userId"
+    >(Prisma.sql`
+      SELECT u.id AS "userId",
+             COALESCE(SUM(mud."totalTokens"), 0)::bigint AS "totalTokens",
+             COALESCE(SUM(mud."premiumRequests"), 0)::float AS "premiumRequests",
+             COALESCE(SUM(mud."requestCount"), 0)::int AS "totalRequests"
+      FROM "User" u
+      LEFT JOIN "ModelUsageDaily" mud
+        ON mud."userId" = u.id
+       AND mud."date" >= ${sinceDate}
       WHERE ${userVisibleForFeatureSql('u', 'leaderboard')}
-        AND ud.date >= ${sinceDate}
-      GROUP BY ud."userId"
-      ORDER BY ${sort === 'premium' ? `"premiumRequests"` : `"totalTokens"`} DESC
+      GROUP BY u.id
+      ORDER BY ${orderBy}
       LIMIT ${PAGE_SIZE}
       OFFSET ${(page - 1) * PAGE_SIZE}
-    `;
+    `);
 
     const userIds = rows.map((r) => r.userId);
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
-      include: { userStat: true },
+      select: { id: true, username: true, avatarUrl: true },
     });
     const userMap = new Map(users.map((u) => [u.id, u]));
+    const userStats = await Promise.all(rows.map((r) => getCanonicalUserStats(prisma, r.userId)));
+    const statsByUser = new Map(rows.map((r, index) => [r.userId, userStats[index]] as const));
 
     entries = rows.map((r) => {
       const user = userMap.get(r.userId);
+      const stats = statsByUser.get(r.userId);
       return {
         userId: r.userId,
         username: user?.username || 'unknown',
@@ -109,9 +109,9 @@ export default async function LeaderboardPage({
         totalTokens: r.totalTokens,
         premiumRequests: r.premiumRequests,
         totalRequests: r.totalRequests,
-        topModel: user?.userStat?.topModel || null,
-        workspaceCount: user?.userStat?.workspaceCount || 0,
-        currentStreakDays: user?.userStat?.currentStreakDays || 0,
+        topModel: stats?.topModel || null,
+        workspaceCount: stats?.workspaceCount || 0,
+        currentStreakDays: stats?.currentStreakDays || 0,
       };
     });
   }

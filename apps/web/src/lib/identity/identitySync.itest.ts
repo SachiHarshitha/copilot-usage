@@ -68,14 +68,14 @@ test('isIdentityCryptoEnabled: true only when all three env vars are set', () =>
 test('ensurePrivacySettings: idempotent + privacy-first defaults', async () => {
   await withTestDb(async ({ prisma }) => {
     const u = await prisma.user.create({
-      data: { githubId: 210001, username: 'p1c-priv', profilePublic: true },
+      data: { githubId: 210001, username: 'p1c-priv' },
     });
 
     assert.equal(await ensurePrivacySettings(prisma, u.id), true, 'creates on first call');
     assert.equal(await ensurePrivacySettings(prisma, u.id), false, 'no-op on second call');
 
     const ps = await prisma.privacySettings.findUniqueOrThrow({ where: { userId: u.id } });
-    assert.equal(ps.profilePublic, false, 'privacy-first regardless of legacy flag');
+    assert.equal(ps.profilePublic, false, 'privacy-first defaults');
     assert.equal(ps.leaderboardOptIn, false);
     assert.equal(ps.badgesEnabled, false);
   });

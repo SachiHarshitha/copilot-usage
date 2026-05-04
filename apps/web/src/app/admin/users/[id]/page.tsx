@@ -26,7 +26,7 @@ export default async function AdminUserDetailPage({
         username: true,
         displayName: true,
         avatarUrl: true,
-        profilePublic: true,
+        privacySettings: { select: { profilePublic: true } },
         createdAt: true,
         githubId: true,
         status: true,
@@ -67,7 +67,7 @@ export default async function AdminUserDetailPage({
         <dt style={dt}>display</dt>
         <dd style={{ margin: 0 }}>{user.displayName ?? '—'}</dd>
         <dt style={dt}>profile</dt>
-        <dd style={{ margin: 0 }}>{user.profilePublic ? 'public' : 'private'}</dd>
+        <dd style={{ margin: 0 }}>{user.privacySettings?.profilePublic ? 'public' : 'private'}</dd>
         <dt style={dt}>created</dt>
         <dd style={{ margin: 0 }}>{user.createdAt.toISOString()}</dd>
         <dt style={dt}>status</dt>

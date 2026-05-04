@@ -12,7 +12,6 @@ test('softDeleteSelfCore anonymizes the user, revokes devices, invalidates cache
         username: 'self-del-1',
         displayName: 'Self Del',
         avatarUrl: 'https://avatars.githubusercontent.com/x',
-        profilePublic: true,
       },
     });
     await prisma.device.create({
@@ -32,7 +31,13 @@ test('softDeleteSelfCore anonymizes the user, revokes devices, invalidates cache
     assert.equal(after.username, `deleted-${user.id}`);
     assert.equal(after.displayName, null);
     assert.equal(after.avatarUrl, null);
-    assert.equal(after.profilePublic, false);
+
+    const privacy = await prisma.privacySettings.findUniqueOrThrow({
+      where: { userId: user.id },
+    });
+    assert.equal(privacy.profilePublic, false);
+    assert.equal(privacy.leaderboardOptIn, false);
+    assert.equal(privacy.badgesEnabled, false);
 
     const dev = await prisma.device.findFirstOrThrow({ where: { userId: user.id } });
     assert.notEqual(dev.revokedAt, null);

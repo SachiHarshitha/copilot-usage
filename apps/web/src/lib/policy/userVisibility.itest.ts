@@ -8,7 +8,7 @@ import { userVisibleForFeatureWhere } from '@/lib/policy/userLifecycle';
 
 /**
  * Phase 2.1 — verifies the strict feature-specific opt-in model:
- *   - profile: bridge fallback to legacy User.profilePublic when no PS row
+ *   - profile: requires PrivacySettings.profilePublic = true
  *   - leaderboard: requires PrivacySettings.leaderboardOptIn = true
  *   - badges: requires PrivacySettings.badgesEnabled = true
  *
@@ -23,9 +23,7 @@ test('Phase 2.1: opt-in cascade — profile-public-only user is on profile but N
       data: {
         githubId: 250001,
         username: 'p21-profile-only',
-        profilePublic: true,
         status: 'ACTIVE',
-        userStat: { create: { totalTokens: 1234n, premiumRequests: 5 } },
         privacySettings: {
           create: {
             profilePublic: true,
@@ -33,6 +31,31 @@ test('Phase 2.1: opt-in cascade — profile-public-only user is on profile but N
             badgesEnabled: false,
           },
         },
+      },
+    });
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { githubId: 250001 },
+      select: { id: true },
+    });
+    const device = await prisma.device.create({
+      data: { userId: user.id, tokenId: 'p21-profile-only-dev', secretHash: 'h' },
+    });
+    await prisma.modelUsageDaily.create({
+      data: {
+        userId: user.id,
+        deviceId: device.id,
+        date: new Date(),
+        provider: 'openai',
+        product: 'copilot',
+        surface: 'vscode',
+        modelId: 'gpt-4o',
+        repoIdentity: null,
+        trustLevel: 'observed',
+        requestCount: 10,
+        inputTokens: 900n,
+        outputTokens: 334n,
+        totalTokens: 1234n,
+        premiumRequests: 5,
       },
     });
 
@@ -64,16 +87,39 @@ test('Phase 2.1: leaderboard opt-in alone is not enough when profilePublic in PS
       data: {
         githubId: 250002,
         username: 'p21-lb-without-pp',
-        profilePublic: true, // legacy says public
         status: 'ACTIVE',
-        userStat: { create: { totalTokens: 99_999n } },
         privacySettings: {
           create: {
-            profilePublic: false, // PS says private — wins over legacy
+            profilePublic: false,
             leaderboardOptIn: true,
             badgesEnabled: true,
           },
         },
+      },
+    });
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { githubId: 250002 },
+      select: { id: true },
+    });
+    const device = await prisma.device.create({
+      data: { userId: user.id, tokenId: 'p21-lb-without-pp-dev', secretHash: 'h' },
+    });
+    await prisma.modelUsageDaily.create({
+      data: {
+        userId: user.id,
+        deviceId: device.id,
+        date: new Date(),
+        provider: 'openai',
+        product: 'copilot',
+        surface: 'vscode',
+        modelId: 'gpt-4o',
+        repoIdentity: null,
+        trustLevel: 'observed',
+        requestCount: 99,
+        inputTokens: 50_000n,
+        outputTokens: 49_999n,
+        totalTokens: 99_999n,
+        premiumRequests: 0,
       },
     });
 
@@ -89,27 +135,50 @@ test('Phase 2.1: leaderboard opt-in alone is not enough when profilePublic in PS
   });
 });
 
-test('Phase 2.1: profile bridge fallback — legacy profilePublic=true with no PS row IS visible', async () => {
+test('Phase 2.1: privacy-first fallback — no PrivacySettings row is hidden from profile/leaderboard', async () => {
   await withTestDb(async ({ prisma }) => {
     await prisma.user.create({
       data: {
         githubId: 250003,
         username: 'p21-bridge',
-        profilePublic: true,
         status: 'ACTIVE',
-        userStat: { create: { totalTokens: 10n } },
         // intentionally NO privacySettings row
+      },
+    });
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { githubId: 250003 },
+      select: { id: true },
+    });
+    const device = await prisma.device.create({
+      data: { userId: user.id, tokenId: 'p21-bridge-dev', secretHash: 'h' },
+    });
+    await prisma.modelUsageDaily.create({
+      data: {
+        userId: user.id,
+        deviceId: device.id,
+        date: new Date(),
+        provider: 'openai',
+        product: 'copilot',
+        surface: 'vscode',
+        modelId: 'gpt-4o',
+        repoIdentity: null,
+        trustLevel: 'observed',
+        requestCount: 1,
+        inputTokens: 10n,
+        outputTokens: 0n,
+        totalTokens: 10n,
+        premiumRequests: 0,
       },
     });
 
     const profile = await loadProfileByUsername('p21-bridge', prisma);
-    assert.ok(profile, 'legacy-only user with profilePublic=true is still visible on profile');
+    assert.equal(profile, null, 'privacy-first: no PS row means profile is hidden');
 
     const leaderboard = await getUserLeaderboardAllTime({ sort: 'tokens', page: 1 }, prisma);
     assert.equal(
       leaderboard.find((e) => e.username === 'p21-bridge'),
       undefined,
-      'legacy-only user is NOT on leaderboard (privacy-first opt-in required)'
+      'no-PS user is NOT on leaderboard (privacy-first opt-in required)'
     );
   });
 });

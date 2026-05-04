@@ -8,11 +8,11 @@ import { getRepoLeaderboardEntries } from './repo-leaderboard-data';
  * Phase 0 baseline characterization for GET /api/leaderboard/repos.
  *
  * Locks in the privacy filter applied to the repo leaderboard:
- *   - private repos (RepoStat.isPublic=false) MUST NOT appear
+ *   - private repos (RepoVisibilitySettings.isPublic=false) MUST NOT appear
  *   - repos owned by deleted/suspended/non-public users MUST NOT appear
  *   - top contributor of each repo MUST be a public ACTIVE user
  *
- * Phase 1+ schema changes that touch User or RepoStat must keep these
+ * Phase 1+ schema changes that touch User or canonical usage tables must keep these
  * invariants green or update the tests intentionally.
  */
 
@@ -23,101 +23,181 @@ test('getRepoLeaderboardEntries hides private repos and repos owned by hidden us
       data: {
         githubId: 70001,
         username: 'rl-public-owner',
-        profilePublic: true,
         status: 'ACTIVE',
         avatarUrl: 'https://avatars/owner',
         privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
-        repoStats: {
-          create: [
-            {
-              repoIdentity: 'rl/visible',
-              displayMode: 'github',
-              githubRepo: 'rl/visible',
-              isPublic: true,
-              totalTokens: 1_000n,
-              tokens30d: 500n,
-              requests: 10,
-              premiumReqs: 1,
-            },
-            {
-              repoIdentity: 'rl/owner-private',
-              displayMode: 'github',
-              githubRepo: 'rl/owner-private',
-              isPublic: false,
-              totalTokens: 9_999n,
-              tokens30d: 9_999n,
-              requests: 99,
-              premiumReqs: 9,
-            },
-          ],
-        },
       },
+    });
+    const publicOwner = await prisma.user.findUniqueOrThrow({
+      where: { githubId: 70001 },
+      select: { id: true },
+    });
+    const publicOwnerDevice = await prisma.device.create({
+      data: { userId: publicOwner.id, tokenId: 'rl-public-owner-dev', secretHash: 'h' },
+    });
+    await prisma.repoVisibilitySettings.createMany({
+      data: [
+        { userId: publicOwner.id, repoIdentity: 'github:rl/visible', isPublic: true },
+        { userId: publicOwner.id, repoIdentity: 'github:rl/owner-private', isPublic: false },
+      ],
+    });
+    const now = new Date();
+    const oldDate = new Date();
+    oldDate.setDate(oldDate.getDate() - 40);
+    oldDate.setHours(0, 0, 0, 0);
+    await prisma.modelUsageDaily.createMany({
+      data: [
+        {
+          userId: publicOwner.id,
+          deviceId: publicOwnerDevice.id,
+          date: now,
+          provider: 'openai',
+          product: 'copilot',
+          surface: 'vscode',
+          modelId: 'gpt-4o',
+          repoIdentity: 'github:rl/visible',
+          trustLevel: 'observed',
+          requestCount: 6,
+          inputTokens: 200n,
+          outputTokens: 300n,
+          totalTokens: 500n,
+          premiumRequests: 0.6,
+        },
+        {
+          userId: publicOwner.id,
+          deviceId: publicOwnerDevice.id,
+          date: oldDate,
+          provider: 'openai',
+          product: 'copilot',
+          surface: 'vscode',
+          modelId: 'gpt-4o',
+          repoIdentity: 'github:rl/visible',
+          trustLevel: 'observed',
+          requestCount: 4,
+          inputTokens: 250n,
+          outputTokens: 250n,
+          totalTokens: 500n,
+          premiumRequests: 0.4,
+        },
+        {
+          userId: publicOwner.id,
+          deviceId: publicOwnerDevice.id,
+          date: now,
+          provider: 'openai',
+          product: 'copilot',
+          surface: 'vscode',
+          modelId: 'gpt-4o',
+          repoIdentity: 'github:rl/owner-private',
+          trustLevel: 'observed',
+          requestCount: 99,
+          inputTokens: 5_000n,
+          outputTokens: 4_999n,
+          totalTokens: 9_999n,
+          premiumRequests: 9,
+        },
+      ],
     });
 
     // Suspended user with a public repo — repo must NOT surface.
-    await prisma.user.create({
+    const suspended = await prisma.user.create({
       data: {
         githubId: 70002,
         username: 'rl-suspended-owner',
-        profilePublic: true,
         status: 'SUSPENDED',
-        repoStats: {
-          create: {
-            repoIdentity: 'rl/suspended-repo',
-            displayMode: 'github',
-            githubRepo: 'rl/suspended-repo',
-            isPublic: true,
-            totalTokens: 9_999n,
-            tokens30d: 9_999n,
-            requests: 99,
-            premiumReqs: 9,
-          },
-        },
+        privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
+      },
+    });
+    const suspendedDevice = await prisma.device.create({
+      data: { userId: suspended.id, tokenId: 'rl-suspended-dev', secretHash: 'h' },
+    });
+    await prisma.repoVisibilitySettings.create({
+      data: { userId: suspended.id, repoIdentity: 'github:rl/suspended-repo', isPublic: true },
+    });
+    await prisma.modelUsageDaily.create({
+      data: {
+        userId: suspended.id,
+        deviceId: suspendedDevice.id,
+        date: now,
+        provider: 'openai',
+        product: 'copilot',
+        surface: 'vscode',
+        modelId: 'gpt-4o',
+        repoIdentity: 'github:rl/suspended-repo',
+        trustLevel: 'observed',
+        requestCount: 99,
+        inputTokens: 5_000n,
+        outputTokens: 4_999n,
+        totalTokens: 9_999n,
+        premiumRequests: 9,
       },
     });
 
     // Soft-deleted user with a public repo — repo must NOT surface.
-    await prisma.user.create({
+    const deleted = await prisma.user.create({
       data: {
         githubId: 70003,
         username: 'rl-deleted-owner',
-        profilePublic: true,
         status: 'ACTIVE',
         deletedAt: new Date('2025-01-01T00:00:00Z'),
-        repoStats: {
-          create: {
-            repoIdentity: 'rl/deleted-repo',
-            displayMode: 'github',
-            githubRepo: 'rl/deleted-repo',
-            isPublic: true,
-            totalTokens: 9_999n,
-            tokens30d: 9_999n,
-            requests: 99,
-            premiumReqs: 9,
-          },
-        },
+        privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
+      },
+    });
+    const deletedDevice = await prisma.device.create({
+      data: { userId: deleted.id, tokenId: 'rl-deleted-dev', secretHash: 'h' },
+    });
+    await prisma.repoVisibilitySettings.create({
+      data: { userId: deleted.id, repoIdentity: 'github:rl/deleted-repo', isPublic: true },
+    });
+    await prisma.modelUsageDaily.create({
+      data: {
+        userId: deleted.id,
+        deviceId: deletedDevice.id,
+        date: now,
+        provider: 'openai',
+        product: 'copilot',
+        surface: 'vscode',
+        modelId: 'gpt-4o',
+        repoIdentity: 'github:rl/deleted-repo',
+        trustLevel: 'observed',
+        requestCount: 99,
+        inputTokens: 5_000n,
+        outputTokens: 4_999n,
+        totalTokens: 9_999n,
+        premiumRequests: 9,
       },
     });
 
     // Private profile with a public repo — repo must NOT surface (cascade).
-    await prisma.user.create({
+    const privateOwner = await prisma.user.create({
       data: {
         githubId: 70004,
         username: 'rl-private-owner',
-        profilePublic: false,
         status: 'ACTIVE',
-        repoStats: {
-          create: {
-            repoIdentity: 'rl/private-owner-repo',
-            displayMode: 'github',
-            githubRepo: 'rl/private-owner-repo',
-            isPublic: true,
-            totalTokens: 9_999n,
-            tokens30d: 9_999n,
-            requests: 99,
-            premiumReqs: 9,
-          },
-        },
+        privacySettings: { create: { profilePublic: false, leaderboardOptIn: true } },
+      },
+    });
+    const privateOwnerDevice = await prisma.device.create({
+      data: { userId: privateOwner.id, tokenId: 'rl-private-owner-dev', secretHash: 'h' },
+    });
+    await prisma.repoVisibilitySettings.create({
+      data: { userId: privateOwner.id, repoIdentity: 'github:rl/private-owner-repo', isPublic: true },
+    });
+    await prisma.modelUsageDaily.create({
+      data: {
+        userId: privateOwner.id,
+        deviceId: privateOwnerDevice.id,
+        date: now,
+        provider: 'openai',
+        product: 'copilot',
+        surface: 'vscode',
+        modelId: 'gpt-4o',
+        repoIdentity: 'github:rl/private-owner-repo',
+        trustLevel: 'observed',
+        requestCount: 99,
+        inputTokens: 5_000n,
+        outputTokens: 4_999n,
+        totalTokens: 9_999n,
+        premiumRequests: 9,
       },
     });
 
@@ -142,21 +222,33 @@ test('getRepoLeaderboardEntries entry shape is the documented contract', async (
       data: {
         githubId: 70010,
         username: 'rl-shape',
-        profilePublic: true,
         status: 'ACTIVE',
         privacySettings: { create: { profilePublic: true, leaderboardOptIn: true } },
-        repoStats: {
-          create: {
-            repoIdentity: 'rl/shape',
-            displayMode: 'github',
-            githubRepo: 'rl/shape',
-            isPublic: true,
-            totalTokens: 1n,
-            tokens30d: 1n,
-            requests: 1,
-            premiumReqs: 1,
-          },
-        },
+      },
+    });
+    const user = await prisma.user.findUniqueOrThrow({ where: { githubId: 70010 }, select: { id: true } });
+    const device = await prisma.device.create({
+      data: { userId: user.id, tokenId: 'rl-shape-dev', secretHash: 'h' },
+    });
+    await prisma.repoVisibilitySettings.create({
+      data: { userId: user.id, repoIdentity: 'github:rl/shape', isPublic: true },
+    });
+    await prisma.modelUsageDaily.create({
+      data: {
+        userId: user.id,
+        deviceId: device.id,
+        date: new Date(),
+        provider: 'openai',
+        product: 'copilot',
+        surface: 'vscode',
+        modelId: 'gpt-4o',
+        repoIdentity: 'github:rl/shape',
+        trustLevel: 'observed',
+        requestCount: 1,
+        inputTokens: 1n,
+        outputTokens: 0n,
+        totalTokens: 1n,
+        premiumRequests: 1,
       },
     });
 

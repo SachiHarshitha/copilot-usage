@@ -13,7 +13,6 @@ model User {
   username      String     @unique
   displayName   String?
   avatarUrl     String?
-  profilePublic Boolean    @default(false)
   status        UserStatus @default(ACTIVE)
   /// Soft-delete tombstone. Set when an admin runs DELETE /api/admin/users/[id].
   /// Username/displayName/avatar are anonymized at the same time so the row
@@ -23,13 +22,9 @@ model User {
   updatedAt     DateTime   @updatedAt
 
   devices    Device[]
-  usageDaily UsageDaily[]
   uploadLogs UploadLog[]
-  userStat   UserStat?
-  repoStats  RepoStat[]
 
-  // Agent-agnostic (v2) relations — additive; legacy reads remain on the
-  // tables above until the migration window closes.
+  // Agent-agnostic (v2) relations.
   agentRuns        AgentRun[]
   modelUsageDaily  ModelUsageDaily[]
   actionUsageDaily ActionUsageDaily[]
@@ -37,8 +32,7 @@ model User {
   providerStats    ProviderStat[]
   modelStats       ModelStat[]
 
-  // Phase 1a — privacy/identity foundation. Additive; legacy `githubId` and
-  // `profilePublic` columns remain as bridge until Phase 1c bake completes.
+  // Phase 1a — privacy/identity foundation.
   identity               UserIdentity?
   privacySettings        PrivacySettings?
   consentEvents          ConsentEvent[]
@@ -72,23 +66,6 @@ model Device {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model UsageDaily {
-  id              String   @id @default(cuid())
-  userId          String
-  deviceId        String
-  date            DateTime @db.Date
-  totalRequests   Int      @default(0)
-  promptTokens    BigInt   @default(0)
-  outputTokens    BigInt   @default(0)
-  totalTokens     BigInt   @default(0)
-  premiumRequests Float    @default(0)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, deviceId, date])
-  @@index([date, userId])
-}
-
 model UploadLog {
   id           String    @id @default(cuid())
   userId       String
@@ -104,59 +81,10 @@ model UploadLog {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model UserStat {
-  userId             String   @id
-  totalRequests      Int      @default(0)
-  promptTokens       BigInt   @default(0)
-  outputTokens       BigInt   @default(0)
-  totalTokens        BigInt   @default(0)
-  weeklyTokens       BigInt   @default(0)
-  rolling30DayTokens BigInt   @default(0)
-  premiumRequests    Float    @default(0)
-  currentStreakDays  Int      @default(0)
-  bestStreakDays     Int      @default(0)
-  workspaceCount     Int      @default(0)
-  sessionCount       Int      @default(0)
-  topModel           String?
-  lastSyncedAt       DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([totalTokens(sort: Desc)])
-  @@index([premiumRequests(sort: Desc)])
-}
-
-model RepoStat {
-  id           String   @id @default(cuid())
-  userId       String
-  repoIdentity String
-  displayMode  String
-  githubRepo   String?
-  aliasLabel   String?
-  isPublic     Boolean  @default(false)
-  requests     Int      @default(0)
-  promptTokens BigInt   @default(0)
-  outputTokens BigInt   @default(0)
-  totalTokens  BigInt   @default(0)
-  tokens30d    BigInt   @default(0)
-  premiumReqs  Float    @default(0)
-  topModel     String?
-  lastSyncedAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, repoIdentity])
-  @@index([isPublic, totalTokens(sort: Desc)])
-  @@index([githubRepo])
-}
-
 // ---------------------------------------------------------------------------
 // Agent-agnostic (v2) tables
 //
-// These are additive. They co-exist with UsageDaily/UserStat/RepoStat during
-// the migration window. The upload route writes both legacy and canonical
-// rows; existing read paths stay on the legacy tables until UI/API is
-// switched over (Task 6, Task 10).
+// Canonical usage facts and rollups consumed by runtime APIs/pages.
 // ---------------------------------------------------------------------------
 
 /// Registered agent adapters and their capability flags. Optional table —
@@ -605,8 +533,7 @@ enum VerificationSeverity {
 // Phase 1a — Identity & privacy schema foundation
 // (per docs/gdpr/promptstreak-complete-gdpr-mvp-implementation-prompt.md)
 //
-// All defaults privacy-first. Existing `User.githubId` and `User.profilePublic`
-// remain as bridge columns until Phase 1c bake completes.
+// All defaults privacy-first.
 // ============================================================================
 
 /// Encrypted identity row — one per User. Holds the AES-GCM ciphertext of the
@@ -639,8 +566,7 @@ model UserIdentity {
 }
 
 /// Per-user privacy toggles. ALL defaults are FALSE — users must opt-in to
-/// every public surface. Mirrors and supersedes the legacy
-/// `User.profilePublic` column during the bridge period.
+/// every public surface.
 model PrivacySettings {
   userId           String    @id
   profilePublic    Boolean   @default(false)
@@ -805,15 +731,14 @@ enum AbuseReportStatus {
   DISMISSED
 }
 
-/// Per-(user, repo) public-visibility opt-in. Decoupled from RepoStat.isPublic
+/// Per-(user, repo) public-visibility opt-in. Decoupled from usage rollups
 /// so it survives stat resets / re-aggregations and gives us a single source
 /// of truth for "did the user explicitly opt this repo into public surfaces?".
-/// Phase 2.1 cuts the public read paths over to JOIN here instead of reading
-/// RepoStat.isPublic directly.
+/// Public read paths JOIN here for visibility decisions.
 model RepoVisibilitySettings {
   id           String   @id @default(cuid())
   userId       String
-  /// Same value as RepoStat.repoIdentity for the same repo.
+  /// Repo identity in canonical form, e.g. `github:owner/name` or `alias:foo`.
   repoIdentity String
   isPublic     Boolean  @default(false)
   createdAt    DateTime @default(now())

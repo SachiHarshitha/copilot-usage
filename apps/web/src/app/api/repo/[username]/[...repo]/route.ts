@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getCanonicalRepoStatsByIdentity } from '@/lib/canonical-stats';
 import { prisma } from '@/lib/db';
 import { isUserVisibleForFeature } from '@/lib/policy/userLifecycle';
 
@@ -24,25 +25,23 @@ export async function GET(
   }
 
   const repoIdentity = `github:${repoSlug}`;
-  const repoStat = await prisma.repoStat.findUnique({
-    where: { userId_repoIdentity: { userId: user.id, repoIdentity } },
-  });
+  const repoStats = await getCanonicalRepoStatsByIdentity(prisma, user.id, repoIdentity);
 
-  if (!repoStat || !repoStat.isPublic) {
+  if (!repoStats || !repoStats.isPublic) {
     return NextResponse.json({ error: 'Repo not found or private.' }, { status: 404 });
   }
 
   return NextResponse.json({
-    repoIdentity: repoStat.repoIdentity,
-    displayMode: repoStat.displayMode,
-    githubRepo: repoStat.githubRepo,
-    aliasLabel: repoStat.aliasLabel,
-    requests: repoStat.requests,
-    promptTokens: repoStat.promptTokens.toString(),
-    outputTokens: repoStat.outputTokens.toString(),
-    totalTokens: repoStat.totalTokens.toString(),
-    premiumReqs: repoStat.premiumReqs,
-    topModel: repoStat.topModel,
-    lastSyncedAt: repoStat.lastSyncedAt,
+    repoIdentity: repoStats.repoIdentity,
+    displayMode: repoStats.displayMode,
+    githubRepo: repoStats.githubRepo,
+    aliasLabel: repoStats.aliasLabel,
+    requests: repoStats.requests,
+    promptTokens: repoStats.promptTokens.toString(),
+    outputTokens: repoStats.outputTokens.toString(),
+    totalTokens: repoStats.totalTokens.toString(),
+    premiumReqs: repoStats.premiumReqs,
+    topModel: repoStats.topModel,
+    lastSyncedAt: repoStats.lastSyncedAt,
   });
 }

@@ -225,18 +225,16 @@ test('AbuseReport: deleting the reporter sets reporterUserId to null (audit trai
   });
 });
 
-test('Phase 1a tables coexist with legacy User.profilePublic without altering it', async () => {
-  // Bridge invariant: the new PrivacySettings row is the source of truth
-  // going forward, but the legacy column must remain unchanged so Phase 1c's
-  // dual-read window works.
+test('PrivacySettings defaults remain privacy-first without mutating User lifecycle fields', async () => {
   await withTestDb(async ({ prisma }) => {
     const u = await prisma.user.create({
-      data: { githubId: 110060, username: 'p1a-bridge', profilePublic: true },
+      data: { githubId: 110060, username: 'p1a-bridge', status: 'ACTIVE' },
     });
     await prisma.privacySettings.create({ data: { userId: u.id } }); // defaults false
 
-    const legacy = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
-    assert.equal(legacy.profilePublic, true, 'legacy column untouched');
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+    assert.equal(user.status, 'ACTIVE', 'user lifecycle fields are untouched');
+    assert.equal(user.deletedAt, null, 'user remains non-deleted');
     const ps = await prisma.privacySettings.findUniqueOrThrow({ where: { userId: u.id } });
     assert.equal(ps.profilePublic, false, 'new defaults are privacy-first');
   });
