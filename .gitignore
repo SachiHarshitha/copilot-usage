@@ -61,5 +61,7 @@ badges/
 !apps/web/src/lib/badges/**
 .github/skills/
 .github/agents/
+.github/references/
+.github/hooks/
 
 .github/copilot-instructions.md
