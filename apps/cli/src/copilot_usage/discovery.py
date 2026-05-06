@@ -11,20 +11,64 @@ from loguru import logger as log
 from copilot_usage.config import VSCODE_STORAGE_ROOT
 
 
+def _uri_to_path(uri: str) -> str:
+    """Strip a VS Code URI scheme and decode percent-encoding → plain filesystem path.
+
+    Handles:
+    - ``file:///c%3A/path``            → ``c:/path``
+    - ``vscode-userdata:///Code/...``  → ``{APPDATA}/Code/...``
+    - bare string                      → decoded as-is
+    """
+    if uri.startswith("file:///"):
+        return unquote(uri[len("file:///"):])
+    if uri.startswith("vscode-userdata:///"):
+        rel = unquote(uri[len("vscode-userdata:///"):])
+        # vscode-userdata:/// is rooted at the VS Code user-data base (e.g. %APPDATA% on Windows),
+        # which is three levels above workspaceStorage: .../Code/User/workspaceStorage
+        userdata_base = VSCODE_STORAGE_ROOT.parents[2]
+        return str(userdata_base / rel)
+    return unquote(uri)
+
+
 def resolve_workspace(workspace_dir: Path) -> tuple[str, str]:
-    """Return (workspace_id, workspace_path) from a workspaceStorage subfolder."""
+    """Return (workspace_id, workspace_path) from a workspaceStorage subfolder.
+
+    For single-folder workspaces the path is the decoded project folder.
+    For multi-root workspaces the referenced ``.code-workspace`` / untitled
+    workspace file is read to extract the actual folder paths; those are
+    joined with ``"; "`` so the stored path is human-readable.
+    """
     workspace_id = workspace_dir.name
     ws_json = workspace_dir / "workspace.json"
     workspace_path = ""
     if ws_json.exists():
         try:
             data = json.loads(ws_json.read_text(encoding="utf-8"))
-            raw = data.get("folder", "") or data.get("workspace", "")
-            # Decode URI like file:///c%3A/projects/foo
-            if raw.startswith("file:///"):
-                workspace_path = unquote(raw[len("file:///"):])
-            else:
-                workspace_path = unquote(raw)
+            folder_uri = data.get("folder", "")
+            workspace_uri = data.get("workspace", "")
+            raw = folder_uri or workspace_uri
+            if raw:
+                resolved = _uri_to_path(raw)
+                if workspace_uri:
+                    # Multi-root workspace: try to read the referenced workspace file
+                    # and extract the actual folder paths for a readable workspace_path.
+                    ws_file = Path(resolved)
+                    if ws_file.exists():
+                        try:
+                            ws_data = json.loads(ws_file.read_text(encoding="utf-8"))
+                            folder_paths = [
+                                _uri_to_path(f.get("uri", "") or f.get("path", ""))
+                                for f in ws_data.get("folders", [])
+                                if isinstance(f, dict)
+                            ]
+                            folder_paths = [fp for fp in folder_paths if fp]
+                            workspace_path = "; ".join(folder_paths) if folder_paths else resolved
+                        except (json.JSONDecodeError, OSError):
+                            workspace_path = resolved
+                    else:
+                        workspace_path = resolved
+                else:
+                    workspace_path = resolved
         except (json.JSONDecodeError, OSError):
             pass
     return workspace_id, workspace_path

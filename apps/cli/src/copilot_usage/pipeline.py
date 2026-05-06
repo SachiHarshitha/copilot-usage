@@ -73,6 +73,7 @@ def run_scan(
 
     def _parse_one(item):
         ws_id, ws_path, path = item
+        log.info("  Parsing {}…", path.name)
         if path.suffix == ".json":
             return parse_legacy_json(path, ws_id, ws_path)
         return parse_jsonl(path, ws_id, ws_path)
@@ -86,8 +87,14 @@ def run_scan(
             for i, fut in enumerate(as_completed(futures)):
                 pct = 25 + ((i + 1) / n_files) * 40  # 25% → 65%
                 ws_id, ws_path, path = futures[fut]
+                try:
+                    result = fut.result()
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("Failed to parse {}: {}", path.name, exc)
+                    result = None
                 _emit(f"Parsed [{i + 1}/{n_files}] {path.name}", pct)
-                parsed_files.append((ws_id, path, fut.result()))
+                if result is not None:
+                    parsed_files.append((ws_id, path, result))
 
         _emit("Ingesting events…", 68)
         for ws_id, path, pf in parsed_files:

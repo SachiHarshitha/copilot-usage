@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import re
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FuturesTimeout
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -11,12 +13,47 @@ from loguru import logger as log
 
 @lru_cache(maxsize=1)
 def _get_tokenizer():
-    """Lazy-load tiktoken cl100k_base encoder (used by GPT-4 / Copilot models)."""
+    """Lazy-load tiktoken cl100k_base encoder (used by GPT-4 / Copilot models).
+
+    The first call downloads the BPE vocabulary file from the internet and
+    caches it in ``~/.tiktoken``.  We impose a 15-second timeout so a slow
+    or offline connection doesn't block parsing indefinitely.
+    """
     try:
-        import tiktoken
-        return tiktoken.get_encoding("cl100k_base")
-    except Exception:
+        import tiktoken  # noqa: PLC0415
+
+        with ThreadPoolExecutor(max_workers=1) as _ex:
+            _fut = _ex.submit(tiktoken.get_encoding, "cl100k_base")
+            try:
+                return _fut.result(timeout=15)
+            except _FuturesTimeout:
+                log.warning(
+                    "tiktoken encoder load timed out (>15 s); "
+                    "falling back to char-count heuristic"
+                )
+                return None
+    except Exception:  # noqa: BLE001
         return None
+
+
+# Maximum characters passed to tiktoken.  Larger blobs fall back to the fast
+# heuristic so a single enormous context attachment can't stall the scan.
+_MAX_TIKTOKEN_CHARS = 500_000
+
+
+def _normalise_resolved_model(raw: str) -> str | None:
+    """Convert a ``resolvedModel`` string to a canonical ``copilot/X.Y`` form.
+
+    VS Code records the resolved model without a prefix and with the minor
+    version separated by a dash, e.g. ``"claude-opus-4-7"``.
+    This normalises it to ``"copilot/claude-opus-4.7"``.
+    """
+    if not raw:
+        return None
+    # Replace the trailing ``-<digits>`` with ``.<digits>`` only when it is
+    # preceded by another ``-<digits>`` group (e.g. ``-4-7`` → ``-4.7``).
+    normalised = re.sub(r'(-\d+)-(\d+)$', r'\1.\2', raw)
+    return "copilot/" + normalised
 
 
 def estimate_tokens(text: str) -> int:
@@ -27,9 +64,11 @@ def estimate_tokens(text: str) -> int:
     """
     if not text:
         return 0
-    enc = _get_tokenizer()
-    if enc is not None:
-        return len(enc.encode(text))
+    # Skip tiktoken for very large blobs to avoid stalling on huge attachments.
+    if len(text) <= _MAX_TIKTOKEN_CHARS:
+        enc = _get_tokenizer()
+        if enc is not None:
+            return len(enc.encode(text))
     # Fallback: ~4 chars per token for English/code mix
     return max(1, len(text) // 4)
 
@@ -362,15 +401,24 @@ def _handle_result(pf: ParsedFile, v: dict, request_index: int) -> None:
     # Fallback: use the request-append timestamp
     if not timestamp_ms:
         timestamp_ms = pf._request_timestamps.get(request_index)
+    # Final fallback: use the session creation date so events are never dropped
+    # by date-range filters (newer VS Code omits per-request timings entirely).
+    if not timestamp_ms and pf.anchor:
+        timestamp_ms = pf.anchor.creation_date
 
     chat_session_id = ""
     if pf.anchor:
         chat_session_id = pf.anchor.chat_session_id
 
+    # resolvedModel carries the per-request model when modelId is absent.
+    # It uses dashes instead of dots for the version, e.g. "claude-opus-4-7".
+    raw_resolved = md.get("resolvedModel", "") if isinstance(md, dict) else ""
+    resolved_model = _normalise_resolved_model(raw_resolved) if raw_resolved else None
+
     event = RequestEvent(
         chat_session_id=chat_session_id,
         request_index=request_index,
-        model_id=md.get("modelId"),  # often None; back-filled later
+        model_id=md.get("modelId") or resolved_model,  # often None; back-filled later
         timestamp_ms=timestamp_ms,
         prompt_tokens=prompt_tokens,
         output_tokens=output_tokens,
