@@ -61,7 +61,9 @@ a = Analysis(
         "copilot_usage.dashboard.pages.explorer",
         "copilot_usage.dashboard.pages.pipeline",
         "copilot_usage.dashboard.pages.badges",
+        "copilot_usage.dashboard.pages.cost",
         "copilot_usage.dashboard.pages.settings",
+        "copilot_usage.pricing",
         # Dash internals
         "dash",
         "dash.dash",

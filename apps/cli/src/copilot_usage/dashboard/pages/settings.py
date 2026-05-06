@@ -137,7 +137,7 @@ _settings_content = html.Div([
                     dbc.Input(
                         id="settings-erase-confirm-input",
                         placeholder="Type ERASE",
-                        className="mt-2 bg-dark text-light border-secondary",
+                        className="mt-2 theme-input",
                         autoFocus=True,
                     ),
                 ]),
@@ -209,7 +209,7 @@ _logs_content = html.Div([
                     ],
                     value="500",
                     style={"width": "180px", "display": "inline-block"},
-                    className="bg-dark text-light border-secondary me-2",
+                    className="theme-input me-2",
                     size="sm",
                 ),
                 dbc.Button(

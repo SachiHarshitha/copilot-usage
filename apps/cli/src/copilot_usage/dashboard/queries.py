@@ -376,3 +376,76 @@ def explorer_events(
         })
 
     return total, result
+
+
+# ---------------------------------------------------------------------------
+# Cost estimator queries
+# ---------------------------------------------------------------------------
+
+@_ttl_cache
+def cost_by_model(days: int = 30) -> list[dict]:
+    """Return per-model token totals for the given trailing window.
+
+    ``days_observed`` in the result tells the caller how many calendar days
+    are actually represented in the data (may be less than *days*).
+    """
+    con = _con()
+    rows = con.execute(f"""
+        SELECT
+            COALESCE(model_id, 'unknown') AS model_id,
+            SUM(prompt_tokens)            AS prompt_tokens,
+            SUM(output_tokens)            AS output_tokens,
+            COUNT(DISTINCT agg_date)      AS days_with_data
+        FROM agg_daily
+        WHERE agg_date >= (CURRENT_DATE - INTERVAL '{int(days)} days')
+        GROUP BY model_id
+        ORDER BY SUM(prompt_tokens) + SUM(output_tokens) DESC
+    """).fetchall()
+    return [
+        {
+            "model_id": r[0],
+            "prompt_tokens": int(r[1] or 0),
+            "output_tokens": int(r[2] or 0),
+            "days_with_data": int(r[3] or 0),
+        }
+        for r in rows
+    ]
+
+
+@_ttl_cache
+def token_totals_windows() -> dict:
+    """Return total tokens for last 30 and last 90 days (for trend calculation)."""
+    con = _con()
+    row = con.execute("""
+        SELECT
+            SUM(CASE WHEN agg_date >= CURRENT_DATE - INTERVAL '30 days'
+                     THEN prompt_tokens + output_tokens ELSE 0 END) AS last_30d,
+            SUM(CASE WHEN agg_date >= CURRENT_DATE - INTERVAL '90 days'
+                     THEN prompt_tokens + output_tokens ELSE 0 END) AS last_90d,
+            COUNT(DISTINCT CASE WHEN agg_date >= CURRENT_DATE - INTERVAL '30 days'
+                                THEN agg_date END) AS days_30,
+            COUNT(DISTINCT CASE WHEN agg_date >= CURRENT_DATE - INTERVAL '90 days'
+                                THEN agg_date END) AS days_90
+        FROM agg_daily
+    """).fetchone()
+    return {
+        "last_30d": int(row[0] or 0),
+        "last_90d": int(row[1] or 0),
+        "days_30": int(row[2] or 0),
+        "days_90": int(row[3] or 0),
+    }
+
+
+def get_cost_setting(key: str, default: str) -> str:
+    """Read a cost-estimator setting from app_settings."""
+    from copilot_usage.db import get_setting
+    con = _con()
+    return get_setting(con, key, default) or default
+
+
+def save_cost_setting(key: str, value: str) -> None:
+    """Persist a cost-estimator setting to app_settings."""
+    from copilot_usage.db import set_setting
+    con = _con()
+    set_setting(con, key, value)
+    invalidate_cache()

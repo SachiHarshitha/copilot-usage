@@ -8,7 +8,7 @@ import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, dcc, html
 
 from copilot_usage.config import BADGE_DIR
-from copilot_usage.dashboard import queries
+import copilot_usage.dashboard.queries as queries
 from copilot_usage.dashboard.app import fmt_number, short_path
 
 dash.register_page(__name__, path="/badges", name="Badges", order=3)
@@ -51,7 +51,7 @@ layout = html.Div([
                 dbc.Col([
                     html.Label("Label", className="form-label badge-label"),
                     dbc.Input(id="bg-label", value="Copilot Tokens",
-                              className="bg-dark text-light border-secondary"),
+                              className="theme-input"),
                 ], md=3),
                 dbc.Col([
                     html.Label("Color", className="form-label badge-label"),
@@ -67,7 +67,7 @@ layout = html.Div([
                         ],
                         value="blue",
                         clearable=False,
-                        className="dash-dark-dropdown",
+                        className="theme-dropdown",
                     ),
                 ], md=2),
                 dbc.Col([
@@ -83,7 +83,7 @@ layout = html.Div([
                         ],
                         value="total_tokens",
                         clearable=False,
-                        className="dash-dark-dropdown",
+                        className="theme-dropdown",
                     ),
                 ], md=3),
                 dbc.Col([
@@ -91,7 +91,7 @@ layout = html.Div([
                     dcc.Dropdown(
                         id="bg-workspace",
                         placeholder="All (summary)",
-                        className="dash-dark-dropdown",
+                        className="theme-dropdown",
                     ),
                 ], md=4),
             ], className="g-3 mb-3"),

@@ -6,9 +6,11 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from dash import Input, Output, callback, dcc, html
+import time
 
-from copilot_usage.dashboard import queries
+from dash import Input, Output, State, callback, ctx, dcc, html
+
+import copilot_usage.dashboard.queries as queries
 from copilot_usage.dashboard.app import empty_fig, fmt_number, kpi_card, short_path
 
 dash.register_page(__name__, path="/", name="Overview", order=0)
@@ -18,6 +20,23 @@ dash.register_page(__name__, path="/", name="Overview", order=0)
 # ---------------------------------------------------------------------------
 
 layout = html.Div([
+    # Hidden trigger store + controls row
+    dcc.Store(id="ov-trigger"),
+    dcc.Interval(id="ov-init",    interval=300,    max_intervals=1),
+    dcc.Interval(id="ov-refresh", interval=30_000),
+    dbc.Row(
+        dbc.Col(
+            html.Div(
+                dbc.Button(
+                    [html.I(className="bi bi-arrow-clockwise me-1"), "Refresh"],
+                    id="ov-refresh-btn",
+                    color="secondary", outline=True, size="sm",
+                ),
+                className="d-flex justify-content-end mb-2",
+            )
+        )
+    ),
+
     # KPI row
     dbc.Row(id="ov-kpi-row", className="g-3 mb-4"),
 
@@ -75,8 +94,6 @@ layout = html.Div([
         ),
     ], className="g-3 mb-4"),
 
-    # Trigger initial load
-    dcc.Interval(id="ov-init", interval=300, max_intervals=1),
 ])
 
 
@@ -84,7 +101,18 @@ layout = html.Div([
 # Callbacks
 # ---------------------------------------------------------------------------
 
-@callback(Output("ov-kpi-row", "children"), Input("ov-init", "n_intervals"))
+@callback(
+    Output("ov-trigger", "data"),
+    Input("ov-init",        "n_intervals"),
+    Input("ov-refresh",     "n_intervals"),
+    Input("ov-refresh-btn", "n_clicks"),
+)
+def _update_trigger(*_):
+    """Fire whenever any refresh source triggers; downstream callbacks read this."""
+    return {"ts": time.monotonic()}
+
+
+@callback(Output("ov-kpi-row", "children"), Input("ov-trigger", "data"))
 def _kpis(_):
     kpi = queries.kpi_totals()
     legacy = kpi.get("legacy_events", 0) or 0
@@ -128,7 +156,7 @@ def _kpis(_):
     return cards + [source_bar]
 
 
-@callback(Output("ov-timeline", "figure"), Input("ov-init", "n_intervals"))
+@callback(Output("ov-timeline", "figure"), Input("ov-trigger", "data"))
 def _timeline(_):
     rows = queries.daily_timeseries()
     if not rows:
@@ -153,7 +181,7 @@ def _timeline(_):
     return fig
 
 
-@callback(Output("ov-source-chart", "figure"), Input("ov-init", "n_intervals"))
+@callback(Output("ov-source-chart", "figure"), Input("ov-trigger", "data"))
 def _source_chart(_):
     rows = queries.daily_by_source()
     if not rows:
@@ -183,7 +211,7 @@ def _source_chart(_):
     return fig
 
 
-@callback(Output("ov-model-pie", "figure"), Input("ov-init", "n_intervals"))
+@callback(Output("ov-model-pie", "figure"), Input("ov-trigger", "data"))
 def _model_pie(_):
     rows = queries.model_mix()
     if not rows:
@@ -205,7 +233,7 @@ def _model_pie(_):
     return fig
 
 
-@callback(Output("ov-workspace-table", "children"), Input("ov-init", "n_intervals"))
+@callback(Output("ov-workspace-table", "children"), Input("ov-trigger", "data"))
 def _ws_table(_):
     rows = queries.workspace_table()
     if not rows:
@@ -228,7 +256,7 @@ def _ws_table(_):
                      color="dark", className="mb-0")
 
 
-@callback(Output("ov-session-table", "children"), Input("ov-init", "n_intervals"))
+@callback(Output("ov-session-table", "children"), Input("ov-trigger", "data"))
 def _sess_table(_):
     rows = queries.session_list(limit=50)
     if not rows:

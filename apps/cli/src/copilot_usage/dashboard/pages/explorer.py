@@ -7,7 +7,7 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, ctx, dash_table, dcc, html
 
-from copilot_usage.dashboard import queries
+import copilot_usage.dashboard.queries as queries
 from copilot_usage.dashboard.app import short_path
 
 dash.register_page(__name__, path="/explorer", name="Explorer", order=1)
@@ -28,7 +28,7 @@ layout = html.Div([
                     id="ex-search", type="text",
                     placeholder="Session ID, workspace, or model…",
                     debounce=True,
-                    className="bg-dark text-light border-secondary",
+                    className="theme-input",
                 ),
             ], md=4),
             dbc.Col([
@@ -36,7 +36,7 @@ layout = html.Div([
                 dcc.Dropdown(
                     id="ex-workspace", multi=True,
                     placeholder="All workspaces",
-                    className="dash-dark-dropdown",
+                    className="theme-dropdown",
                 ),
             ], md=3),
             dbc.Col([
@@ -44,7 +44,7 @@ layout = html.Div([
                 dcc.Dropdown(
                     id="ex-model", multi=True,
                     placeholder="All models",
-                    className="dash-dark-dropdown",
+                    className="theme-dropdown",
                 ),
             ], md=3),
             dbc.Col([
@@ -52,7 +52,7 @@ layout = html.Div([
                 dbc.Input(
                     id="ex-min-tokens", type="number",
                     placeholder="0", min=0,
-                    className="bg-dark text-light border-secondary",
+                    className="theme-input",
                 ),
             ], md=2),
         ], className="g-3"),
@@ -62,7 +62,7 @@ layout = html.Div([
                 dcc.DatePickerRange(
                     id="ex-dates",
                     display_format="YYYY-MM-DD",
-                    className="d-block",
+                    className="d-block theme-date",
                 ),
             ], md=4),
             dbc.Col([

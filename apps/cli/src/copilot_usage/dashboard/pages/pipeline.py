@@ -95,7 +95,7 @@ layout = html.Div([
                             type="text",
                             value=str(VSCODE_STORAGE_ROOT),
                             placeholder="Auto-detected path…",
-                            className="bg-dark text-light border-secondary",
+                            className="theme-input",
                         ),
                         dbc.Button(
                             "📂 Default",

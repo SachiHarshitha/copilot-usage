@@ -47,18 +47,163 @@ body { background: #0d1117; font-family: -apple-system, BlinkMacSystemFont, 'Seg
 }
 .filter-bar label { color: #8b949e; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
 
-/* Dark dropdowns */
-.dash-dark-dropdown .Select-control { background: #0d1117 !important; border-color: #30363d !important; }
-.dash-dark-dropdown .Select-value-label { color: #c9d1d9 !important; }
-.dash-dark-dropdown .Select-placeholder { color: #8b949e !important; }
-.dash-dark-dropdown .Select-menu-outer { background: #161b22 !important; border-color: #30363d !important; }
-.dash-dark-dropdown .VirtualizedSelectOption { color: #c9d1d9; }
-.dash-dark-dropdown .VirtualizedSelectFocusedOption { background: rgba(31,111,235,.3); }
+/* Theme-aware form controls */
+.theme-input,
+.theme-input.form-control,
+.theme-input.form-select {
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border-color: var(--bs-border-color) !important;
+}
 
-/* Date picker dark mode */
-.DateInput_input { background: #0d1117 !important; color: #c9d1d9 !important; border-color: #30363d !important; font-size: 0.88rem; }
-.DateRangePickerInput { background: #0d1117 !important; border: 1px solid #30363d !important; border-radius: 6px; }
-.DateRangePickerInput_arrow_svg { fill: #8b949e; }
+.theme-input::placeholder {
+    color: var(--bs-secondary-color) !important;
+    opacity: 1;
+}
+
+.theme-input:focus,
+.theme-input.form-control:focus,
+.theme-input.form-select:focus {
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border-color: rgba(var(--bs-primary-rgb), 0.55) !important;
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25) !important;
+}
+
+/* Theme-aware dropdowns (Dash v4 button/dialog dropdowns) */
+.dash-dropdown,
+.dash-dropdown.dash-dark-dropdown {
+    background-color: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border: 1px solid var(--bs-border-color) !important;
+}
+
+.dash-dropdown:focus,
+.dash-dropdown[aria-expanded="true"] {
+    border-color: rgba(var(--bs-primary-rgb), 0.55) !important;
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25) !important;
+}
+
+.dash-dropdown .dash-dropdown-value,
+.dash-dropdown .dash-dropdown-value .dash-dropdown-value-item,
+.dash-dropdown .dash-dropdown-value span {
+    color: var(--bs-body-color) !important;
+    font-weight: 600;
+}
+
+.dash-dropdown .dash-dropdown-value.dash-dropdown-placeholder,
+.dash-dropdown .dash-dropdown-value.dash-dropdown-placeholder span {
+    color: var(--bs-secondary-color) !important;
+    font-weight: 500;
+}
+
+.dash-dropdown .dash-dropdown-trigger-icon,
+.dash-dropdown .dash-dropdown-trigger-icon path {
+    color: var(--bs-secondary-color) !important;
+    fill: currentColor !important;
+}
+
+.dash-dropdown-content {
+    background: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border: 1px solid var(--bs-border-color) !important;
+}
+
+.dash-dropdown-search {
+    background: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border: 1px solid var(--bs-border-color) !important;
+}
+
+.dash-dropdown-search::placeholder {
+    color: var(--bs-secondary-color) !important;
+}
+
+.dash-dropdown-option {
+    background: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+}
+
+.dash-dropdown-option:hover,
+.dash-dropdown-option:focus,
+.dash-dropdown-option.focused {
+    background: rgba(var(--bs-primary-rgb), 0.15) !important;
+    color: var(--bs-body-color) !important;
+}
+
+.dash-dropdown-option.selected {
+    background: rgba(var(--bs-primary-rgb), 0.22) !important;
+    color: var(--bs-body-color) !important;
+    font-weight: 600;
+}
+
+/* Theme-aware dropdowns (legacy Dash React Select) */
+.theme-dropdown .Select-control {
+    background: var(--bs-body-bg) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+.theme-dropdown .Select-value,
+.theme-dropdown .Select-value-label {
+    color: var(--bs-body-color) !important;
+    font-weight: 600;
+}
+
+.theme-dropdown .Select--single > .Select-control .Select-value {
+    color: var(--bs-body-color) !important;
+}
+
+.theme-dropdown .Select.has-value.Select--single > .Select-control .Select-value .Select-value-label {
+    color: var(--bs-body-color) !important;
+}
+
+.theme-dropdown .Select-placeholder {
+    color: var(--bs-secondary-color) !important;
+}
+
+.theme-dropdown .Select-menu-outer {
+    background: var(--bs-body-bg) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+.theme-dropdown .VirtualizedSelectOption {
+    color: var(--bs-body-color) !important;
+    background: var(--bs-body-bg) !important;
+}
+
+.theme-dropdown .VirtualizedSelectFocusedOption {
+    background: rgba(var(--bs-primary-rgb), 0.15) !important;
+    color: var(--bs-body-color) !important;
+}
+
+.theme-dropdown .VirtualizedSelectSelectedOption {
+    background: rgba(var(--bs-primary-rgb), 0.22) !important;
+    color: var(--bs-body-color) !important;
+    font-weight: 600;
+}
+
+.theme-dropdown .Select-arrow-zone,
+.theme-dropdown .Select-clear-zone {
+    color: var(--bs-secondary-color) !important;
+}
+
+/* Date picker theme support */
+.DateInput_input {
+    background: var(--bs-body-bg) !important;
+    color: var(--bs-body-color) !important;
+    border-color: var(--bs-border-color) !important;
+    font-size: 0.88rem;
+}
+
+.DateRangePickerInput {
+    background: var(--bs-body-bg) !important;
+    border: 1px solid var(--bs-border-color) !important;
+    border-radius: 6px;
+}
+
+.DateRangePickerInput_arrow_svg {
+    fill: var(--bs-secondary-color);
+}
 
 /* ---- Nav buttons ---- */
 .nav-pills .nav-link.nav-btn {

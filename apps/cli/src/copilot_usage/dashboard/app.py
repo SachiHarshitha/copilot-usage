@@ -85,6 +85,10 @@ def create_app() -> dash.Dash:
                             href="/badges", active="exact", className="nav-btn",
                         )),
                         dbc.NavItem(dbc.NavLink(
+                            [html.I(className="bi bi-currency-dollar me-1"), "Cost"],
+                            href="/cost", active="exact", className="nav-btn",
+                        )),
+                        dbc.NavItem(dbc.NavLink(
                             html.I(className="bi bi-gear"),
                             href="/settings", active="exact",
                             className="nav-btn nav-btn-icon ms-2",
@@ -145,7 +149,7 @@ def short_path(p: str) -> str:
     return "/".join(parts[-2:]) if len(parts) >= 2 else p
 
 
-def empty_fig(msg: str):
+def empty_fig(msg: str = "No data"):
     """Return a dark-themed empty figure with a centered message."""
     import plotly.graph_objects as go
     fig = go.Figure()

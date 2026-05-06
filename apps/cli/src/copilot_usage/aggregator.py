@@ -56,30 +56,61 @@ def _rebuild_daily(con: duckdb.DuckDBPyConnection, workspace_ids: set[str] | Non
 
 
 def _rebuild_session(con: duckdb.DuckDBPyConnection, workspace_ids: set[str] | None) -> None:
-    filt, params = _ws_filter("events", workspace_ids)
     if workspace_ids:
         placeholders = ", ".join("?" for _ in workspace_ids)
-        con.execute(f"DELETE FROM agg_session WHERE workspace_id IN ({placeholders})", list(workspace_ids))
+        # Delete sessions whose events touch any refreshed workspace.
+        # A session may span multiple workspace storage dirs (multi-root), so we
+        # must key the delete on session ID, not workspace_id, to avoid leaving
+        # stale partial rows that would cause a PK violation on re-insert.
+        con.execute(f"""
+            DELETE FROM agg_session
+            WHERE chat_session_id IN (
+                SELECT DISTINCT chat_session_id FROM events
+                WHERE workspace_id IN ({placeholders})
+            )
+        """, list(workspace_ids))
+        # Re-aggregate ALL events for those sessions (they may span multiple
+        # workspace dirs) so the per-session counts are correct.
+        con.execute(f"""
+            INSERT INTO agg_session (chat_session_id, workspace_id, model_id,
+                                      request_count, prompt_tokens, output_tokens,
+                                      premium_estimate, first_ts, last_ts)
+            SELECT
+                chat_session_id,
+                MODE(workspace_id)  AS workspace_id,
+                MODE(model_id)      AS model_id,
+                COUNT(*)            AS request_count,
+                SUM(prompt_tokens)  AS prompt_tokens,
+                SUM(output_tokens)  AS output_tokens,
+                SUM(premium_estimate) AS premium_estimate,
+                MIN(timestamp_ms)   AS first_ts,
+                MAX(timestamp_ms)   AS last_ts
+            FROM events
+            WHERE chat_session_id IN (
+                SELECT DISTINCT chat_session_id FROM events
+                WHERE workspace_id IN ({placeholders})
+            )
+            GROUP BY chat_session_id
+        """, list(workspace_ids))
     else:
         con.execute("DELETE FROM agg_session")
-    con.execute(f"""
-        INSERT INTO agg_session (chat_session_id, workspace_id, model_id,
-                                  request_count, prompt_tokens, output_tokens,
-                                  premium_estimate, first_ts, last_ts)
-        SELECT
-            chat_session_id,
-            workspace_id,
-            MODE(model_id)      AS model_id,
-            COUNT(*)            AS request_count,
-            SUM(prompt_tokens)  AS prompt_tokens,
-            SUM(output_tokens)  AS output_tokens,
-            SUM(premium_estimate) AS premium_estimate,
-            MIN(timestamp_ms)   AS first_ts,
-            MAX(timestamp_ms)   AS last_ts
-        FROM events
-        WHERE TRUE {filt}
-        GROUP BY chat_session_id, workspace_id
-    """, params)
+        con.execute("""
+            INSERT INTO agg_session (chat_session_id, workspace_id, model_id,
+                                      request_count, prompt_tokens, output_tokens,
+                                      premium_estimate, first_ts, last_ts)
+            SELECT
+                chat_session_id,
+                MODE(workspace_id)  AS workspace_id,
+                MODE(model_id)      AS model_id,
+                COUNT(*)            AS request_count,
+                SUM(prompt_tokens)  AS prompt_tokens,
+                SUM(output_tokens)  AS output_tokens,
+                SUM(premium_estimate) AS premium_estimate,
+                MIN(timestamp_ms)   AS first_ts,
+                MAX(timestamp_ms)   AS last_ts
+            FROM events
+            GROUP BY chat_session_id
+        """)
 
 
 def _rebuild_badges(con: duckdb.DuckDBPyConnection, workspace_ids: set[str] | None) -> None:

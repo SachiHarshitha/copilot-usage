@@ -99,6 +99,12 @@ CREATE TABLE IF NOT EXISTS badge_metrics (
     top_model         TEXT,
     updated_at        TIMESTAMP NOT NULL DEFAULT now()
 );
+
+-- Persistent application settings (key/value store)
+CREATE TABLE IF NOT EXISTS app_settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 _INDEXES = """
@@ -143,3 +149,22 @@ def _ensure_schema(con: duckdb.DuckDBPyConnection) -> None:
         # Backfill: rows with estimated tokens came from legacy JSON files
         con.execute("UPDATE events SET data_source = 'legacy_json' WHERE tokens_estimated = TRUE")
     _schema_ready = True
+
+
+# ---------------------------------------------------------------------------
+# Settings helpers
+# ---------------------------------------------------------------------------
+
+def get_setting(con: duckdb.DuckDBPyConnection, key: str, default: str | None = None) -> str | None:
+    """Return the stored value for *key*, or *default* if not found."""
+    row = con.execute("SELECT value FROM app_settings WHERE key = ?", [key]).fetchone()
+    return row[0] if row else default
+
+
+def set_setting(con: duckdb.DuckDBPyConnection, key: str, value: str) -> None:
+    """Upsert *value* for *key* in app_settings."""
+    con.execute(
+        "INSERT INTO app_settings (key, value) VALUES (?, ?)"
+        " ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+        [key, value],
+    )
