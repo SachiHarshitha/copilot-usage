@@ -13,6 +13,8 @@ interface ParseState {
   requestModels: Map<number, string>;
   requestIds: Map<number, string>;
   requestTimestamps: Map<number, number>;
+  requestPromptTokens: Map<number, number>;
+  requestCompletionTokens: Map<number, number>;
   nextRequestIndex: number;
 }
 
@@ -28,6 +30,8 @@ export async function parseJsonl(
     requestModels: new Map(),
     requestIds: new Map(),
     requestTimestamps: new Map(),
+    requestPromptTokens: new Map(),
+    requestCompletionTokens: new Map(),
     nextRequestIndex: 0,
   };
 
@@ -62,6 +66,8 @@ export async function parseLegacyJson(
     requestModels: new Map(),
     requestIds: new Map(),
     requestTimestamps: new Map(),
+    requestPromptTokens: new Map(),
+    requestCompletionTokens: new Map(),
     nextRequestIndex: 0,
   };
 
@@ -163,11 +169,35 @@ function processLine(state: ParseState, obj: Record<string, unknown>): void {
     return;
   }
 
-  if (kind === 1 && Array.isArray(k) && k.length === 3 && k[0] === 'requests' && k[2] === 'result') {
+  if (kind === 1 && Array.isArray(k) && k.length === 3 && k[0] === 'requests') {
     const requestIndex = k[1];
-    if (typeof requestIndex === 'number' && typeof v === 'object' && v !== null) {
+    const field = k[2];
+    if (typeof requestIndex !== 'number') { return; }
+
+    if (field === 'result' && typeof v === 'object' && v !== null) {
       handleResult(state, v as Record<string, unknown>, requestIndex);
+      return;
     }
+
+    if (field === 'promptTokens' || field === 'completionTokens') {
+      handleRequestTokenUpdate(state, requestIndex, field, v);
+    }
+  }
+}
+
+function handleRequestTokenUpdate(
+  state: ParseState,
+  requestIndex: number,
+  field: 'promptTokens' | 'completionTokens',
+  value: unknown,
+): void {
+  const tokenCount = num(value);
+  if (tokenCount === undefined) { return; }
+
+  if (field === 'promptTokens') {
+    state.requestPromptTokens.set(requestIndex, tokenCount);
+  } else {
+    state.requestCompletionTokens.set(requestIndex, tokenCount);
   }
 }
 
@@ -212,8 +242,15 @@ function handleResult(state: ParseState, v: Record<string, unknown>, requestInde
   const md = safeObj(v.metadata) ?? {};
   const usage = safeObj(v.usage) ?? {};
 
-  const promptTokens = num(md.promptTokens) || num(usage.promptTokens) || 0;
-  const outputTokens = num(md.outputTokens) || num(usage.completionTokens) || 0;
+  let promptTokens = num(md.promptTokens) || num(usage.promptTokens) || 0;
+  let outputTokens = num(md.outputTokens) || num(usage.completionTokens) || 0;
+
+  if (!promptTokens) {
+    promptTokens = state.requestPromptTokens.get(requestIndex) || 0;
+  }
+  if (!outputTokens) {
+    outputTokens = state.requestCompletionTokens.get(requestIndex) || 0;
+  }
 
   const tcr = Array.isArray(md.toolCallRounds) ? md.toolCallRounds : [];
   const toolRounds = tcr.length;
@@ -279,6 +316,12 @@ function finalize(
     if (!req.modelId) { req.modelId = state.requestModels.get(req.requestIndex); }
     if (!req.modelId && state.anchor) { req.modelId = state.anchor.modelId; }
     if (!req.requestId) { req.requestId = state.requestIds.get(req.requestIndex); }
+    if (!req.promptTokens) {
+      req.promptTokens = state.requestPromptTokens.get(req.requestIndex) || 0;
+    }
+    if (!req.outputTokens) {
+      req.outputTokens = state.requestCompletionTokens.get(req.requestIndex) || 0;
+    }
   }
 
   return makeParsedFile(filePath, workspaceId, workspacePath, dataSource, state);

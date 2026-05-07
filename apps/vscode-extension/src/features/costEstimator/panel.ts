@@ -10,6 +10,9 @@ import { buildUsageEstimate } from './calc/usage';
 import { estimateModelCost } from './calc/cost';
 import { computePlanImpact } from './calc/plan';
 import { computeTrendInsight } from './calc/trend';
+import { buildProviderEstimates } from './calc/providers';
+import { buildProviderModelCostContext } from './calc/modelMix';
+import { buildProviderDecisionSurface } from './calc/providerPortfolio';
 import { filterEventsByCostRange, pickMostUsedModelId } from './calc/modelSelection';
 import { MODEL_PRICING, MODEL_PRICING_LIST } from './pricing/models';
 import { getCostEstimatorHtml, loadingPage, CostEstimatorViewState } from './html';
@@ -136,6 +139,16 @@ export class CostEstimatorPanel {
     const comparisonCosts = MODEL_PRICING_LIST.map(m => estimateModelCost(usage, m));
     const planImpact = computePlanImpact(selectedCost, this.settings);
     const trend = computeTrendInsight(events);
+    const providerModelContext = buildProviderModelCostContext(events, this.settings.defaultRange);
+    const providerBaselineUsd = providerModelContext?.monthlyUsd && providerModelContext.monthlyUsd > 0
+      ? providerModelContext.monthlyUsd
+      : selectedCost.estimatedMonthlyUsd;
+    const providerEstimates = buildProviderEstimates(usage, this.settings, selectedCost, providerModelContext);
+    const providerDecisionSurface = buildProviderDecisionSurface(
+      providerEstimates,
+      providerModelContext?.modelMonthlyUsage ?? [],
+      providerBaselineUsd,
+    );
 
     const state: CostEstimatorViewState = {
       settings: this.settings,
@@ -144,6 +157,7 @@ export class CostEstimatorPanel {
       comparisonCosts,
       planImpact,
       trend,
+      providerDecisionSurface,
       hasAnyData: events.length > 0,
     };
 

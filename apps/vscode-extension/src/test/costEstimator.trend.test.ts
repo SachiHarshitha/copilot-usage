@@ -27,7 +27,8 @@ suite('Cost Estimator: computeTrendInsight', () => {
     const t = computeTrendInsight(events, NOW);
     assert.ok(t);
     assert.ok(t!.label.includes('higher'));
-    assert.ok(t!.deltaPct > 30 && t!.deltaPct < 60);
+    // Current trend formula compares recent 30d against (last90 / 3), rounded.
+    assert.strictEqual(t!.deltaPct, 26);
   });
 
   test('Recent 30d below 3-month average → "lower" label', () => {
