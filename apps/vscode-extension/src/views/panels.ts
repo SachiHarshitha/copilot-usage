@@ -22,6 +22,9 @@ export class WorkspacePanel {
         if (msg.command === 'openCostEstimator' && enableCostEstimator) {
           await vscode.commands.executeCommand('copilot-usage.costEstimator');
         }
+        if (msg.command === 'openPromptstreakShare') {
+          await vscode.commands.executeCommand('copilot-usage.promptstreakShare');
+        }
         if (msg.command === 'openGitHub') { vscode.env.openExternal(vscode.Uri.parse('https://github.com/SachiHarshitha/copilot-usage')); }
         if (msg.command === 'openSettings') {
           await vscode.commands.executeCommand('workbench.action.openSettings', 'copilot-usage');
@@ -314,6 +317,7 @@ ${commonStyles()}
   <div class="header-actions">
     <button class="btn btn-star" onclick="starGitHub()" title="Star on GitHub">⭐</button>
     <button class="btn btn-secondary" onclick="openWorkspace()" title="Open Workspace View">📂</button>
+    <button class="btn btn-secondary" onclick="openPromptstreakShare()" title="Share my stats to Promptstreak.dev">⤴</button>
     ${enableCostEstimator ? `<button class="btn btn-secondary" onclick="openCostEstimator()" title="Open Cost Estimator (Preview)">💵</button>` : ''}
     <button class="btn" onclick="refresh()" title="Refresh data">↻</button>
     <button class="btn btn-secondary" onclick="openSettings()" title="Settings">⚙</button>
@@ -353,6 +357,7 @@ ${commonStyles()}
 const vscode = acquireVsCodeApi();
 function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openWorkspace() { vscode.postMessage({ command: 'openWorkspace' }); }
+function openPromptstreakShare() { vscode.postMessage({ command: 'openPromptstreakShare' }); }
 function openCostEstimator() { vscode.postMessage({ command: 'openCostEstimator' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 function openSettings() { vscode.postMessage({ command: 'openSettings' }); }

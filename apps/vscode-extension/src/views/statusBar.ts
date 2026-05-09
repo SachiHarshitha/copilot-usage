@@ -9,6 +9,7 @@ type StatusBarDuration = 'daily' | 'monthly' | 'all-time';
 
 export class StatusBarManager implements vscode.Disposable {
   private item: vscode.StatusBarItem;
+  private shareItem: vscode.StatusBarItem;
   private disposables: vscode.Disposable[] = [];
 
   constructor() {
@@ -16,6 +17,12 @@ export class StatusBarManager implements vscode.Disposable {
     this.item.command = 'copilot-usage.workspaceAnalysis';
     this.item.text = '$(copilot) …';
     this.item.show();
+
+    this.shareItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 49);
+    this.shareItem.command = 'copilot-usage.promptstreakShare';
+    this.shareItem.text = '$(share)';
+    this.shareItem.tooltip = 'Share my stats to Promptstreak.dev';
+    this.shareItem.show();
 
     this.disposables.push(
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()),
@@ -72,6 +79,7 @@ export class StatusBarManager implements vscode.Disposable {
 
   dispose(): void {
     this.item.dispose();
+    this.shareItem.dispose();
     for (const d of this.disposables) { d.dispose(); }
   }
 }
