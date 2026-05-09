@@ -25,13 +25,11 @@ export class StatusBarManager implements vscode.Disposable {
     this.shareItem.text = '$(share)';
     this.shareItem.tooltip = 'Share my stats to Promptstreak.dev';
     this.shareItem.show();
-
     this.debugLogItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 48);
     this.debugLogItem.command = 'copilot-usage.openDebugLogSettings';
     this.debugLogItem.text = '$(warning) Enable Copilot debug logs';
     this.debugLogItem.tooltip =
       'Copilot Usage: Enable GitHub Copilot Chat agent debug file logging for full token visibility across VS Code versions. Click to open the setting.';
-
     this.disposables.push(
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()),
       vscode.workspace.onDidChangeConfiguration(e => {
