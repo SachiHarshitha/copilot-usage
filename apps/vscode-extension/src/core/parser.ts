@@ -13,6 +13,7 @@ interface ParseState {
   requestModels: Map<number, string>;
   requestIds: Map<number, string>;
   requestTimestamps: Map<number, number>;
+  requestPromptTexts: Map<number, string>;
   requestPromptTokens: Map<number, number>;
   requestCompletionTokens: Map<number, number>;
   nextRequestIndex: number;
@@ -30,6 +31,7 @@ export async function parseJsonl(
     requestModels: new Map(),
     requestIds: new Map(),
     requestTimestamps: new Map(),
+    requestPromptTexts: new Map(),
     requestPromptTokens: new Map(),
     requestCompletionTokens: new Map(),
     nextRequestIndex: 0,
@@ -66,6 +68,7 @@ export async function parseLegacyJson(
     requestModels: new Map(),
     requestIds: new Map(),
     requestTimestamps: new Map(),
+    requestPromptTexts: new Map(),
     requestPromptTokens: new Map(),
     requestCompletionTokens: new Map(),
     nextRequestIndex: 0,
@@ -109,8 +112,12 @@ export async function parseLegacyJson(
     const md = safeObj(result?.metadata);
     const usage = safeObj(result?.usage);
 
-    let promptTokens = num(md?.promptTokens) || num(usage?.promptTokens) || 0;
-    let outputTokens = num(md?.outputTokens) || num(usage?.completionTokens) || 0;
+    let promptTokens = readPromptTokenAliases(md, usage);
+    let outputTokens = readOutputTokenAliases(md, usage);
+
+    const summaryTokens = extractSummaryUsageTokens(md);
+    if (!promptTokens) { promptTokens = summaryTokens.promptTokens; }
+    if (!outputTokens) { outputTokens = summaryTokens.outputTokens; }
 
     let estimated = false;
     if (!promptTokens || !outputTokens) {
@@ -179,7 +186,12 @@ function processLine(state: ParseState, obj: Record<string, unknown>): void {
       return;
     }
 
-    if (field === 'promptTokens' || field === 'completionTokens') {
+    if (
+      field === 'promptTokens'
+      || field === 'completionTokens'
+      || field === 'inputTokens'
+      || field === 'outputTokens'
+    ) {
       handleRequestTokenUpdate(state, requestIndex, field, v);
     }
   }
@@ -188,13 +200,13 @@ function processLine(state: ParseState, obj: Record<string, unknown>): void {
 function handleRequestTokenUpdate(
   state: ParseState,
   requestIndex: number,
-  field: 'promptTokens' | 'completionTokens',
+  field: 'promptTokens' | 'completionTokens' | 'inputTokens' | 'outputTokens',
   value: unknown,
 ): void {
   const tokenCount = num(value);
   if (tokenCount === undefined) { return; }
 
-  if (field === 'promptTokens') {
+  if (field === 'promptTokens' || field === 'inputTokens') {
     state.requestPromptTokens.set(requestIndex, tokenCount);
   } else {
     state.requestCompletionTokens.set(requestIndex, tokenCount);
@@ -232,9 +244,11 @@ function handleNewRequests(state: ParseState, v: unknown[]): void {
     const modelId = str(obj.modelId);
     const requestId = str(obj.requestId);
     const timestamp = num(obj.timestamp);
+    const promptText = extractJsonlPromptText(obj);
     if (modelId) { state.requestModels.set(idx, modelId); }
     if (requestId) { state.requestIds.set(idx, requestId); }
     if (timestamp) { state.requestTimestamps.set(idx, timestamp); }
+    if (promptText) { state.requestPromptTexts.set(idx, promptText); }
   }
 }
 
@@ -242,8 +256,12 @@ function handleResult(state: ParseState, v: Record<string, unknown>, requestInde
   const md = safeObj(v.metadata) ?? {};
   const usage = safeObj(v.usage) ?? {};
 
-  let promptTokens = num(md.promptTokens) || num(usage.promptTokens) || 0;
-  let outputTokens = num(md.outputTokens) || num(usage.completionTokens) || 0;
+  let promptTokens = readPromptTokenAliases(md, usage);
+  let outputTokens = readOutputTokenAliases(md, usage);
+
+  const summaryTokens = extractSummaryUsageTokens(md);
+  if (!promptTokens) { promptTokens = summaryTokens.promptTokens; }
+  if (!outputTokens) { outputTokens = summaryTokens.outputTokens; }
 
   if (!promptTokens) {
     promptTokens = state.requestPromptTokens.get(requestIndex) || 0;
@@ -322,6 +340,15 @@ function finalize(
     if (!req.outputTokens) {
       req.outputTokens = state.requestCompletionTokens.get(req.requestIndex) || 0;
     }
+    if (!req.promptTokens) {
+      const promptText = state.requestPromptTexts.get(req.requestIndex);
+      if (promptText) {
+        req.promptTokens = estimateTokens(promptText);
+        if (req.promptTokens > 0) {
+          req.tokensEstimated = true;
+        }
+      }
+    }
   }
 
   return makeParsedFile(filePath, workspaceId, workspacePath, dataSource, state);
@@ -345,6 +372,104 @@ function makeParsedFile(
 }
 
 // ── Legacy text extraction ──────────────────────────────────────────────
+
+function extractJsonlPromptText(req: Record<string, unknown>): string | undefined {
+  const promptParts: string[] = [];
+
+  const msg = safeObj(req.message);
+  if (msg) {
+    const text = str(msg.text);
+    if (text) { promptParts.push(text); }
+
+    if (Array.isArray(msg.parts)) {
+      for (const part of msg.parts) {
+        if (typeof part !== 'object' || part === null) { continue; }
+        const partText = str((part as Record<string, unknown>).text);
+        if (partText) { promptParts.push(partText); }
+      }
+    }
+  }
+
+  const vd = safeObj(req.variableData);
+  if (vd && Array.isArray(vd.variables)) {
+    for (const variable of vd.variables) {
+      if (typeof variable !== 'object' || variable === null) { continue; }
+      const value = (variable as Record<string, unknown>).value;
+      if (typeof value === 'string' && value) { promptParts.push(value); }
+    }
+  }
+
+  const promptText = promptParts.join('\n').trim();
+  return promptText || undefined;
+}
+
+function readPromptTokenAliases(
+  md?: Record<string, unknown>,
+  usage?: Record<string, unknown>,
+): number {
+  return firstNumber(
+    md?.promptTokens,
+    md?.inputTokens,
+    md?.promptTokenCount,
+    md?.inputTokenCount,
+    md?.prompt_tokens,
+    md?.input_tokens,
+    md?.prompt_token_count,
+    md?.input_token_count,
+    usage?.promptTokens,
+    usage?.inputTokens,
+    usage?.promptTokenCount,
+    usage?.inputTokenCount,
+    usage?.prompt_tokens,
+    usage?.input_tokens,
+    usage?.prompt_token_count,
+    usage?.input_token_count,
+  ) || 0;
+}
+
+function readOutputTokenAliases(
+  md?: Record<string, unknown>,
+  usage?: Record<string, unknown>,
+): number {
+  return firstNumber(
+    md?.outputTokens,
+    md?.completionTokens,
+    md?.completionTokenCount,
+    md?.outputTokenCount,
+    md?.output_tokens,
+    md?.completion_tokens,
+    md?.completion_token_count,
+    md?.output_token_count,
+    usage?.outputTokens,
+    usage?.completionTokens,
+    usage?.completionTokenCount,
+    usage?.outputTokenCount,
+    usage?.output_tokens,
+    usage?.completion_tokens,
+    usage?.completion_token_count,
+    usage?.output_token_count,
+  ) || 0;
+}
+
+function extractSummaryUsageTokens(md?: Record<string, unknown>): { promptTokens: number; outputTokens: number } {
+  if (!md || !Array.isArray(md.summaries)) {
+    return { promptTokens: 0, outputTokens: 0 };
+  }
+
+  let promptTokens = 0;
+  let outputTokens = 0;
+
+  for (const summary of md.summaries) {
+    if (typeof summary !== 'object' || summary === null) { continue; }
+    const usage = safeObj((summary as Record<string, unknown>).usage);
+    if (!usage) { continue; }
+
+    promptTokens += readPromptTokenAliases(undefined, usage);
+    outputTokens += readOutputTokenAliases(undefined, usage);
+  }
+
+  return { promptTokens, outputTokens };
+}
 
 function extractLegacyText(req: Record<string, unknown>): [string, string] {
   const promptParts: string[] = [];
@@ -403,4 +528,13 @@ function str(v: unknown): string | undefined {
 
 function num(v: unknown): number | undefined {
   return typeof v === 'number' ? v : undefined;
+}
+
+function firstNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (typeof value === 'number') {
+      return value;
+    }
+  }
+  return undefined;
 }

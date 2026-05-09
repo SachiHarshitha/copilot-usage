@@ -4,7 +4,7 @@
   "publisher": "emagin8",
   "author": "Sachith Liyanagama, liyanagama@outlook.de",
   "description": "A **local-first** analytics dashboard that parses your VS Code Copilot chat session data and visualises token usage, premium request estimates, and model distribution — all without sending any data externally.",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.100.0"
@@ -40,6 +40,11 @@
         "command": "copilot-usage.promptstreakShare",
         "title": "Copilot Usage: Share my stats to Promptstreak.dev",
         "icon": "$(share)"
+      },
+      {
+        "command": "copilot-usage.openDebugLogSettings",
+        "title": "Copilot Usage: Open Copilot Debug Log Setting",
+        "icon": "$(settings-gear)"
       }
     ],
     "configuration": {
