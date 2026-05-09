@@ -68,7 +68,7 @@
             "This year (YTD)",
             "All time"
           ],
-          "default": "30d",
+          "default": "all",
           "description": "Default date range for the Workspace Analysis panel."
         },
         "copilot-usage.workspaceAnalysis.autoRefreshSeconds": {
@@ -96,7 +96,7 @@
             "This year (YTD)",
             "All time"
           ],
-          "default": "30d",
+          "default": "all",
           "description": "Default date range for the Global Dashboard panel."
         },
         "copilot-usage.dashboard.autoRefreshSeconds": {

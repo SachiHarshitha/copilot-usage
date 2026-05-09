@@ -82,7 +82,7 @@ export class WorkspacePanel {
 
   private async loadData(): Promise<void> {
     const cfg = vscode.workspace.getConfiguration('copilot-usage');
-    const dateRange = normalizeDateRange(cfg.get<string>('workspaceAnalysis.dateRange', '30d'));
+    const dateRange = normalizeDateRange(cfg.get<string>('workspaceAnalysis.dateRange', 'all'));
     const autoRefreshSeconds = cfg.get<number>('workspaceAnalysis.autoRefreshSeconds', 0);
     const showDebugLogBanner = !isCopilotDebugLogEnabled();
 
@@ -196,7 +196,7 @@ export class DashboardPanel {
 
   private async loadData(): Promise<void> {
     const cfg = vscode.workspace.getConfiguration('copilot-usage');
-    const dateRange = normalizeDateRange(cfg.get<string>('dashboard.dateRange', '30d'));
+    const dateRange = normalizeDateRange(cfg.get<string>('dashboard.dateRange', 'all'));
     const autoRefreshSeconds = cfg.get<number>('dashboard.autoRefreshSeconds', 0);
     const showDebugLogBanner = !isCopilotDebugLogEnabled();
 
