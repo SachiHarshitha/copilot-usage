@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import { findCurrentWorkspace, discoverWorkspaces } from '../core/discovery';
 import { parseAllFiles, flattenEvents, computeKpis, computeModelStats, computeDailyStats, computeWorkspaceStats } from '../core/aggregator';
+import { computeRepoAttributionStats, discoverRepoDescriptors, RepoAttributionStats } from '../core/repoAttribution';
 import { enableCostEstimator } from '../features/costEstimator/flags';
 import {
   didAffectCopilotDebugLogSetting,
@@ -113,8 +114,10 @@ export class WorkspacePanel {
     const kpis = computeKpis(parsed, events);
     const models = computeModelStats(events);
     const daily = computeDailyStats(events);
+    const repos = await discoverRepoDescriptors([ws]);
+    const repoStats = computeRepoAttributionStats(events, repos);
 
-    this.setHtml(getWorkspaceHtml(kpis, models, daily, ws.workspacePath, undefined, false, autoRefreshSeconds, monthsCovered(dateRange, events), showDebugLogBanner));
+    this.setHtml(getWorkspaceHtml(kpis, models, daily, ws.workspacePath, undefined, false, autoRefreshSeconds, monthsCovered(dateRange, events), showDebugLogBanner, repoStats));
   }
 
   private dispose(): void {
@@ -217,8 +220,10 @@ export class DashboardPanel {
     const daily = computeDailyStats(events);
 
     const wsStats = computeWorkspaceStats(parsed, events);
+    const repos = await discoverRepoDescriptors(workspaces);
+    const repoStats = computeRepoAttributionStats(events, repos);
 
-    this.setHtml(getDashboardHtml(kpis, models, daily, wsStats, undefined, autoRefreshSeconds, monthsCovered(dateRange, events), showDebugLogBanner));
+    this.setHtml(getDashboardHtml(kpis, models, daily, wsStats, undefined, autoRefreshSeconds, monthsCovered(dateRange, events), showDebugLogBanner, repoStats));
   }
 
   private dispose(): void {
@@ -297,6 +302,7 @@ function getDashboardHtml(
   autoRefreshSeconds = 0,
   months = 0,
   showDebugLogBanner = false,
+  repoStats?: RepoAttributionStats,
 ): string {
   if (error || !kpis) {
     return errorPage(error || 'No data', false, showDebugLogBanner);
@@ -310,6 +316,14 @@ function getDashboardHtml(
     const display = shortPath(w.workspacePath || w.workspaceId);
     return `<tr><td title="${esc(w.workspacePath)}">${esc(display)}</td><td>${fmt(w.requests)}</td><td>${fmt(w.promptTokens)}</td><td>${fmt(w.outputTokens)}</td><td>${w.premium.toFixed(1)}×</td><td>${esc(shortModel(w.topModel))}</td></tr>`;
   }).join('');
+
+  const totalTokens = Math.max(0, kpis.totalPromptTokens + kpis.totalOutputTokens);
+  const repoRows = (repoStats?.rows || []).map(row => {
+    const rowTotal = row.promptTokens + row.outputTokens;
+    const share = totalTokens > 0 ? `${((rowTotal / totalTokens) * 100).toFixed(1)}%` : '0.0%';
+    return `<tr><td>${esc(row.displayName)}</td><td>${fmtDecimal(row.requests, 1)}</td><td>${fmtDecimal(row.promptTokens, 1)}</td><td>${fmtDecimal(row.outputTokens, 1)}</td><td>${share}</td><td>${esc(shortModel(row.topModel))}</td></tr>`;
+  }).join('');
+  const repoRowsHtml = repoRows || '<tr><td colspan="6">No repository attribution signals detected.</td></tr>';
 
   const dailyLabels = JSON.stringify((daily || []).map(d => d.date));
   const dailyPrompt = JSON.stringify((daily || []).map(d => d.promptTokens));
@@ -365,6 +379,11 @@ ${debugLogBanner(showDebugLogBanner)}
     <h3>Workspaces</h3>
     <table><thead><tr><th>Workspace</th><th>Requests</th><th>Prompt</th><th>Output</th><th>Premium</th><th>Top Model</th></tr></thead>
     <tbody>${wsRows}</tbody></table>
+  </div>
+  <div class="table-box" style="flex:2">
+    <h3>Repositories</h3>
+    <table><thead><tr><th>Repository</th><th>Requests</th><th>Prompt</th><th>Output</th><th>Share</th><th>Top Model</th></tr></thead>
+    <tbody>${repoRowsHtml}</tbody></table>
   </div>
 </div>
 
@@ -523,6 +542,16 @@ function fmt(n: number): string {
   return n.toLocaleString('en-US');
 }
 
+function fmtDecimal(n: number, digits: number): string {
+  if (Number.isInteger(n)) {
+    return fmt(n);
+  }
+  return n.toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -554,6 +583,7 @@ function getWorkspaceHtml(
   autoRefreshSeconds = 0,
   months = 0,
   showDebugLogBanner = false,
+  repoStats?: RepoAttributionStats,
 ): string {
   if (error || !kpis) {
     return errorPage(error || 'No data', showDashboardButton, showDebugLogBanner);
@@ -568,6 +598,14 @@ function getWorkspaceHtml(
   const dailyOutput = JSON.stringify((daily || []).map(d => d.outputTokens));
   const modelLabels = JSON.stringify((models || []).map(m => shortModel(m.modelId)));
   const modelData = JSON.stringify((models || []).map(m => m.requests));
+
+  const totalTokens = Math.max(0, kpis.totalPromptTokens + kpis.totalOutputTokens);
+  const repoRows = (repoStats?.rows || []).map(row => {
+    const rowTotal = row.promptTokens + row.outputTokens;
+    const share = totalTokens > 0 ? `${((rowTotal / totalTokens) * 100).toFixed(1)}%` : '0.0%';
+    return `<tr><td>${esc(row.displayName)}</td><td>${fmtDecimal(row.requests, 1)}</td><td>${fmtDecimal(row.promptTokens, 1)}</td><td>${fmtDecimal(row.outputTokens, 1)}</td><td>${share}</td><td>${esc(shortModel(row.topModel))}</td></tr>`;
+  }).join('');
+  const repoRowsHtml = repoRows || '<tr><td colspan="6">No repository attribution signals detected.</td></tr>';
 
   const title = wsPath ? shortPath(wsPath) : 'Current Workspace';
 
@@ -612,6 +650,11 @@ ${debugLogBanner(showDebugLogBanner)}
     <h3>Models</h3>
     <table><thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Premium</th></tr></thead>
     <tbody>${modelRows}</tbody></table>
+  </div>
+  <div class="table-box" style="flex:2">
+    <h3>Repositories</h3>
+    <table><thead><tr><th>Repository</th><th>Requests</th><th>Prompt</th><th>Output</th><th>Share</th><th>Top Model</th></tr></thead>
+    <tbody>${repoRowsHtml}</tbody></table>
   </div>
 </div>
 
