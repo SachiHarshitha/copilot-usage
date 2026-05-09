@@ -116,6 +116,58 @@ export async function discoverWorkspaces(
   return results;
 }
 
+/**
+ * Compute a lightweight signature of tracked chat session files.
+ *
+ * Used as a polling fallback when file watchers miss events. The signature
+ * changes when the number of tracked files changes, file sizes change, or
+ * newest modification time changes.
+ */
+export async function computeChatSessionsSignature(storageRoot?: string): Promise<string> {
+  const root = storageRoot || getWorkspaceStorageRoot();
+
+  let dirs: string[];
+  try {
+    dirs = await fs.readdir(root);
+  } catch {
+    return '0:0:0';
+  }
+
+  let fileCount = 0;
+  let totalBytes = 0;
+  let newestMtimeMs = 0;
+
+  for (const dirName of dirs) {
+    const sessionsDir = path.join(root, dirName, 'chatSessions');
+
+    let files: string[];
+    try {
+      files = await fs.readdir(sessionsDir);
+    } catch {
+      continue;
+    }
+
+    for (const fileName of files) {
+      const ext = path.extname(fileName).toLowerCase();
+      if (ext !== '.jsonl' && ext !== '.json') { continue; }
+
+      try {
+        const stat = await fs.stat(path.join(sessionsDir, fileName));
+        if (!stat.isFile()) { continue; }
+
+        fileCount++;
+        totalBytes += stat.size;
+        const mtimeMs = Number(stat.mtimeMs) || 0;
+        if (mtimeMs > newestMtimeMs) { newestMtimeMs = mtimeMs; }
+      } catch {
+        // File may disappear during scan; safe to ignore.
+      }
+    }
+  }
+
+  return `${fileCount}:${totalBytes}:${Math.floor(newestMtimeMs)}`;
+}
+
 /** Find workspace info for a specific workspace folder path. */
 export async function findWorkspaceByPath(
   folderPath: string,
@@ -172,7 +224,10 @@ export async function findCurrentWorkspace(
   // a multi-root storage entry's workspacePath points to a workspace.json file, not a
   // folder, but an old single-folder entry for the same folder path would wrongly match
   // first if we checked workspacePath equality before checking referencedFolders.
-  if (workspaceFileUri) {
+  //
+  // When VS Code does not provide workspaceFileUri (some untitled multi-root flows),
+  // still prioritize referenced-folder matching if more than one folder is open.
+  if (workspaceFileUri || folderPaths.length > 1) {
     for (const fp of folderPaths) {
       const normFolder = normalizePath(fp);
       const match = workspaces.find(

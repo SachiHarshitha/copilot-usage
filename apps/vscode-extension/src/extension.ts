@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { WorkspacePanel, DashboardPanel } from './views/panels';
 import { StatusBarManager } from './views/statusBar';
-import { getWorkspaceStorageRoot } from './core/discovery';
+import { getWorkspaceStorageRoot, computeChatSessionsSignature } from './core/discovery';
+import { openCopilotDebugLogSettings } from './core/copilotDebugLog';
 import { CostEstimatorPanel, enableCostEstimator } from './features/costEstimator';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -23,18 +24,86 @@ export function activate(context: vscode.ExtensionContext) {
 		await Promise.all(tasks);
 	};
 
-	// Watch the actual VS Code workspaceStorage directory for JSONL changes.
+	const storageRoot = getWorkspaceStorageRoot();
+	let lastSignature: string | undefined;
+	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+	const updateSignature = async () => {
+		try {
+			lastSignature = await computeChatSessionsSignature(storageRoot);
+		} catch {
+			// Ignore transient IO errors; next scan will retry.
+		}
+	};
+
+	const refreshAllAndTrack = async () => {
+		await refreshAll();
+		await updateSignature();
+	};
+
+	// Coalesce rapid file-change bursts from streaming token updates.
+	const scheduleRefresh = () => {
+		if (refreshTimer) {
+			clearTimeout(refreshTimer);
+		}
+		refreshTimer = setTimeout(() => {
+			refreshTimer = undefined;
+			void refreshAllAndTrack();
+		}, 250);
+	};
+
+	context.subscriptions.push(new vscode.Disposable(() => {
+		if (refreshTimer) {
+			clearTimeout(refreshTimer);
+			refreshTimer = undefined;
+		}
+	}));
+
+	// Watch the actual VS Code workspaceStorage directory for chat session changes.
 	// createFileSystemWatcher with RelativePattern(absolute path) works outside
 	// the current workspace — this is the correct way to watch AppData files.
-	const storageRoot = getWorkspaceStorageRoot();
-	const watcher = vscode.workspace.createFileSystemWatcher(
+	const watcherJsonl = vscode.workspace.createFileSystemWatcher(
 		new vscode.RelativePattern(vscode.Uri.file(storageRoot), '**/chatSessions/*.jsonl'),
 	);
-	context.subscriptions.push(
-		watcher,
-		watcher.onDidCreate(() => refreshAll()),
-		watcher.onDidChange(() => refreshAll()),
+	const watcherJson = vscode.workspace.createFileSystemWatcher(
+		new vscode.RelativePattern(vscode.Uri.file(storageRoot), '**/chatSessions/*.json'),
 	);
+	const onSessionFilesChanged = () => scheduleRefresh();
+
+	context.subscriptions.push(
+		watcherJsonl,
+		watcherJson,
+		watcherJsonl.onDidCreate(onSessionFilesChanged),
+		watcherJsonl.onDidChange(onSessionFilesChanged),
+		watcherJsonl.onDidDelete(onSessionFilesChanged),
+		watcherJson.onDidCreate(onSessionFilesChanged),
+		watcherJson.onDidChange(onSessionFilesChanged),
+		watcherJson.onDidDelete(onSessionFilesChanged),
+	);
+
+	// Fallback polling closes gaps on platforms/setups where external watcher
+	// notifications are delayed or dropped.
+	const pollForMissedChanges = async () => {
+		try {
+			const nextSignature = await computeChatSessionsSignature(storageRoot);
+			if (lastSignature === undefined) {
+				lastSignature = nextSignature;
+				return;
+			}
+			if (nextSignature !== lastSignature) {
+				lastSignature = nextSignature;
+				scheduleRefresh();
+			}
+		} catch {
+			// Ignore transient IO errors; next poll will retry.
+		}
+	};
+
+	void updateSignature();
+	const poller = setInterval(() => {
+		void pollForMissedChanges();
+	}, 15000);
+	context.subscriptions.push(new vscode.Disposable(() => clearInterval(poller)));
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('copilot-usage.workspaceAnalysis', () =>
@@ -44,9 +113,14 @@ export function activate(context: vscode.ExtensionContext) {
 			DashboardPanel.createOrShow(context.extensionUri),
 		),
 		vscode.commands.registerCommand('copilot-usage.refresh', () =>
-			refreshAll(),
+			refreshAllAndTrack(),
+		),
+		vscode.commands.registerCommand('copilot-usage.openDebugLogSettings', () =>
+			openCopilotDebugLogSettings(),
 		),
 	);
+
+	void refreshAllAndTrack();
 
 	if (enableCostEstimator) {
 		context.subscriptions.push(

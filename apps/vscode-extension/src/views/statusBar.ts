@@ -4,11 +4,13 @@ import * as vscode from 'vscode';
 import { findCurrentWorkspace } from '../core/discovery';
 import { parseAllFiles, flattenEvents } from '../core/aggregator';
 import { RequestEvent } from '../core/types';
+import { didAffectCopilotDebugLogSetting, isCopilotDebugLogEnabled } from '../core/copilotDebugLog';
 
 type StatusBarDuration = 'daily' | 'monthly' | 'all-time';
 
 export class StatusBarManager implements vscode.Disposable {
   private item: vscode.StatusBarItem;
+  private debugLogItem: vscode.StatusBarItem;
   private disposables: vscode.Disposable[] = [];
 
   constructor() {
@@ -17,10 +19,15 @@ export class StatusBarManager implements vscode.Disposable {
     this.item.text = '$(copilot) …';
     this.item.show();
 
+    this.debugLogItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 48);
+    this.debugLogItem.command = 'copilot-usage.openDebugLogSettings';
+    this.debugLogItem.text = '$(warning) Enable Copilot debug logs';
+    this.debugLogItem.tooltip =
+      'Copilot Usage: Enable GitHub Copilot Chat agent debug file logging for full token visibility across VS Code versions. Click to open the setting.';
     this.disposables.push(
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()),
       vscode.workspace.onDidChangeConfiguration(e => {
-        if (e.affectsConfiguration('copilot-usage')) { this.refresh(); }
+        if (e.affectsConfiguration('copilot-usage') || didAffectCopilotDebugLogSetting(e)) { this.refresh(); }
       }),
     );
 
@@ -28,6 +35,12 @@ export class StatusBarManager implements vscode.Disposable {
   }
 
   async refresh(): Promise<void> {
+    if (isCopilotDebugLogEnabled()) {
+      this.debugLogItem.hide();
+    } else {
+      this.debugLogItem.show();
+    }
+
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
       this.item.text = '$(copilot) No workspace';
@@ -72,6 +85,7 @@ export class StatusBarManager implements vscode.Disposable {
 
   dispose(): void {
     this.item.dispose();
+    this.debugLogItem.dispose();
     for (const d of this.disposables) { d.dispose(); }
   }
 }

@@ -4,6 +4,11 @@ import * as vscode from 'vscode';
 import { findCurrentWorkspace, discoverWorkspaces } from '../core/discovery';
 import { parseAllFiles, flattenEvents, computeKpis, computeModelStats, computeDailyStats, computeWorkspaceStats } from '../core/aggregator';
 import { enableCostEstimator } from '../features/costEstimator/flags';
+import {
+  didAffectCopilotDebugLogSetting,
+  isCopilotDebugLogEnabled,
+  openCopilotDebugLogSettings,
+} from '../core/copilotDebugLog';
 
 export class WorkspacePanel {
   public static currentPanel: WorkspacePanel | undefined;
@@ -26,13 +31,16 @@ export class WorkspacePanel {
         if (msg.command === 'openSettings') {
           await vscode.commands.executeCommand('workbench.action.openSettings', 'copilot-usage');
         }
+        if (msg.command === 'openDebugLogSettings') {
+          await openCopilotDebugLogSettings();
+        }
       },
       null,
       this.disposables,
     );
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration(e => {
-        if (e.affectsConfiguration('copilot-usage')) { this.loadData(); }
+        if (e.affectsConfiguration('copilot-usage') || didAffectCopilotDebugLogSetting(e)) { this.loadData(); }
       }),
     );
   }
@@ -76,10 +84,11 @@ export class WorkspacePanel {
     const cfg = vscode.workspace.getConfiguration('copilot-usage');
     const dateRange = normalizeDateRange(cfg.get<string>('workspaceAnalysis.dateRange', '30d'));
     const autoRefreshSeconds = cfg.get<number>('workspaceAnalysis.autoRefreshSeconds', 0);
+    const showDebugLogBanner = !isCopilotDebugLogEnabled();
 
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
-      this.setHtml(getWorkspaceHtml(undefined, undefined, undefined, undefined, 'No workspace folder open.', true, autoRefreshSeconds));
+      this.setHtml(getWorkspaceHtml(undefined, undefined, undefined, undefined, 'No workspace folder open.', true, autoRefreshSeconds, 0, showDebugLogBanner));
       return;
     }
 
@@ -91,7 +100,7 @@ export class WorkspacePanel {
         ? `workspace file: ${vscode.workspace.workspaceFile!.fsPath}`
         : folderPaths.join(', ');
       this.setHtml(getWorkspaceHtml(undefined, undefined, undefined, undefined,
-        `No Copilot session data found for this workspace.\n\nLooked for: ${searched}`, true, autoRefreshSeconds));
+        `No Copilot session data found for this workspace.\n\nLooked for: ${searched}`, true, autoRefreshSeconds, 0, showDebugLogBanner));
       return;
     }
 
@@ -102,7 +111,7 @@ export class WorkspacePanel {
     const models = computeModelStats(events);
     const daily = computeDailyStats(events);
 
-    this.setHtml(getWorkspaceHtml(kpis, models, daily, ws.workspacePath, undefined, false, autoRefreshSeconds, monthsCovered(dateRange, events)));
+    this.setHtml(getWorkspaceHtml(kpis, models, daily, ws.workspacePath, undefined, false, autoRefreshSeconds, monthsCovered(dateRange, events), showDebugLogBanner));
   }
 
   private dispose(): void {
@@ -136,13 +145,16 @@ export class DashboardPanel {
         if (msg.command === 'openSettings') {
           await vscode.commands.executeCommand('workbench.action.openSettings', 'copilot-usage');
         }
+        if (msg.command === 'openDebugLogSettings') {
+          await openCopilotDebugLogSettings();
+        }
       },
       null,
       this.disposables,
     );
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration(e => {
-        if (e.affectsConfiguration('copilot-usage')) { this.loadData(); }
+        if (e.affectsConfiguration('copilot-usage') || didAffectCopilotDebugLogSetting(e)) { this.loadData(); }
       }),
     );
   }
@@ -186,10 +198,11 @@ export class DashboardPanel {
     const cfg = vscode.workspace.getConfiguration('copilot-usage');
     const dateRange = normalizeDateRange(cfg.get<string>('dashboard.dateRange', '30d'));
     const autoRefreshSeconds = cfg.get<number>('dashboard.autoRefreshSeconds', 0);
+    const showDebugLogBanner = !isCopilotDebugLogEnabled();
 
     const workspaces = await discoverWorkspaces();
     if (workspaces.length === 0) {
-      this.setHtml(getDashboardHtml(undefined, undefined, undefined, undefined, 'No Copilot session data found.', autoRefreshSeconds));
+      this.setHtml(getDashboardHtml(undefined, undefined, undefined, undefined, 'No Copilot session data found.', autoRefreshSeconds, 0, showDebugLogBanner));
       return;
     }
 
@@ -202,7 +215,7 @@ export class DashboardPanel {
 
     const wsStats = computeWorkspaceStats(parsed, events);
 
-    this.setHtml(getDashboardHtml(kpis, models, daily, wsStats, undefined, autoRefreshSeconds, monthsCovered(dateRange, events)));
+    this.setHtml(getDashboardHtml(kpis, models, daily, wsStats, undefined, autoRefreshSeconds, monthsCovered(dateRange, events), showDebugLogBanner));
   }
 
   private dispose(): void {
@@ -280,9 +293,10 @@ function getDashboardHtml(
   error?: string,
   autoRefreshSeconds = 0,
   months = 0,
+  showDebugLogBanner = false,
 ): string {
   if (error || !kpis) {
-    return errorPage(error || 'No data');
+    return errorPage(error || 'No data', false, showDebugLogBanner);
   }
 
   const modelRows = (models || []).map(m =>
@@ -320,6 +334,8 @@ ${commonStyles()}
   </div>
 </div>
 
+${debugLogBanner(showDebugLogBanner)}
+
 <div class="kpi-row">
   ${kpiCard('Requests', fmt(kpis.totalRequests), perMonth(kpis.totalRequests, months))}
   ${kpiCard('Prompt Tokens', fmt(kpis.totalPromptTokens), perMonth(kpis.totalPromptTokens, months))}
@@ -356,6 +372,7 @@ function openWorkspace() { vscode.postMessage({ command: 'openWorkspace' }); }
 function openCostEstimator() { vscode.postMessage({ command: 'openCostEstimator' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 function openSettings() { vscode.postMessage({ command: 'openSettings' }); }
+function openDebugLogSettings() { vscode.postMessage({ command: 'openDebugLogSettings' }); }
 ${autoRefreshScript(autoRefreshSeconds)}
 ${chartsScript(dailyLabels, dailyPrompt, dailyOutput, modelLabels, modelData)}
 </script>
@@ -391,6 +408,10 @@ function commonStyles(): string {
   .tables-row { display: flex; gap: 12px; flex-wrap: wrap; }
   .table-box { flex: 1; min-width: 280px; background: var(--vscode-editorWidget-background, #1e293b); border-radius: 8px; padding: 12px; border: 1px solid var(--vscode-editorWidget-border, #334155); overflow-x: auto; }
   .table-box table { min-width: 500px; }
+  .notice-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: color-mix(in srgb, var(--vscode-inputValidation-warningBackground, #7c2d12) 75%, transparent); border: 1px solid var(--vscode-inputValidation-warningBorder, #f59e0b); color: var(--vscode-inputValidation-warningForeground, #fde68a); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 0.85em; }
+  .notice-banner strong { color: inherit; }
+  .notice-banner .banner-btn { background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 4px; padding: 4px 10px; font-size: 0.85em; cursor: pointer; white-space: nowrap; }
+  .notice-banner .banner-btn:hover { opacity: 0.85; }
   .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; }
   .spinner { width: 40px; height: 40px; border: 4px solid var(--vscode-editorWidget-border, #334155); border-top-color: var(--vscode-textLink-foreground, #38bdf8); border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -467,12 +488,26 @@ function autoRefreshScript(seconds: number): string {
 `;
 }
 
-function errorPage(msg: string, showDashboardButton = false): string {
+function debugLogBanner(show: boolean): string {
+  if (!show) { return ''; }
+  return `<div class="notice-banner">
+    <div><strong>Limited token visibility detected.</strong> Enable Copilot Chat agent debug file logging for best cross-version parsing (legacy JSON, JSONL, and recent schema changes).</div>
+    <button class="banner-btn" onclick="openDebugLogSettings()">Open Setting</button>
+  </div>`;
+}
+
+function errorPage(msg: string, showDashboardButton = false, showDebugLogBanner = false): string {
   const dashBtn = showDashboardButton
-    ? `<br><br><button class="btn" onclick="openDashboard()" style="font-size:1em;padding:10px 24px;">🌐 Open Global Dashboard</button>
-       <script>const vscode = acquireVsCodeApi(); function openDashboard() { vscode.postMessage({ command: 'openDashboard' }); }</script>`
+    ? `<br><br><button class="btn" onclick="openDashboard()" style="font-size:1em;padding:10px 24px;">🌐 Open Global Dashboard</button>`
     : '';
-  return `<!DOCTYPE html><html><head>${commonStyles()}</head><body><div class="error"><h2>No Data</h2><p>${esc(msg)}</p>${dashBtn}</div></body></html>`;
+  const script = (showDashboardButton || showDebugLogBanner)
+    ? `<script>
+         const vscode = acquireVsCodeApi();
+         function openDashboard() { vscode.postMessage({ command: 'openDashboard' }); }
+         function openDebugLogSettings() { vscode.postMessage({ command: 'openDebugLogSettings' }); }
+       </script>`
+    : '';
+  return `<!DOCTYPE html><html><head>${commonStyles()}</head><body>${debugLogBanner(showDebugLogBanner)}<div class="error"><h2>No Data</h2><p>${esc(msg)}</p>${dashBtn}</div>${script}</body></html>`;
 }
 
 function loadingPage(): string {
@@ -513,9 +548,10 @@ function getWorkspaceHtml(
   showDashboardButton = false,
   autoRefreshSeconds = 0,
   months = 0,
+  showDebugLogBanner = false,
 ): string {
   if (error || !kpis) {
-    return errorPage(error || 'No data', showDashboardButton);
+    return errorPage(error || 'No data', showDashboardButton, showDebugLogBanner);
   }
 
   const modelRows = (models || []).map(m =>
@@ -550,6 +586,8 @@ ${commonStyles()}
   </div>
 </div>
 
+${debugLogBanner(showDebugLogBanner)}
+
 <div class="kpi-row">
   ${kpiCard('Requests', fmt(kpis.totalRequests), perMonth(kpis.totalRequests, months))}
   ${kpiCard('Prompt Tokens', fmt(kpis.totalPromptTokens), perMonth(kpis.totalPromptTokens, months))}
@@ -580,6 +618,7 @@ function openDashboard() { vscode.postMessage({ command: 'openDashboard' }); }
 function openCostEstimator() { vscode.postMessage({ command: 'openCostEstimator' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 function openSettings() { vscode.postMessage({ command: 'openSettings' }); }
+function openDebugLogSettings() { vscode.postMessage({ command: 'openDebugLogSettings' }); }
 ${autoRefreshScript(autoRefreshSeconds)}
 ${chartsScript(dailyLabels, dailyPrompt, dailyOutput, modelLabels, modelData)}
 </script>
