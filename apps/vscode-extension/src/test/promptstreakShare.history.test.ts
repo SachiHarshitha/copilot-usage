@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { appendShareHistory, clearShareHistory } from '../features/promptstreakShare/history';
+import { appendShareHistory, clearShareHistory, paginateShareHistory } from '../features/promptstreakShare/history';
 import { ShareHistoryEntry } from '../features/promptstreakShare/types';
 
 function makeEntry(i: number): ShareHistoryEntry {
@@ -29,5 +29,34 @@ suite('PromptStreak Share: history', () => {
     const existing = [makeEntry(1), makeEntry(2)];
     const cleared = clearShareHistory(existing);
     assert.deepStrictEqual(cleared, []);
+  });
+
+  test('paginateShareHistory returns first page with 20 rows', () => {
+    const existing: ShareHistoryEntry[] = [];
+    for (let i = 1; i <= 45; i += 1) {
+      existing.push(makeEntry(i));
+    }
+
+    const page = paginateShareHistory(existing, 1, 20);
+    assert.strictEqual(page.entries.length, 20);
+    assert.strictEqual(page.currentPage, 1);
+    assert.strictEqual(page.totalPages, 3);
+    assert.strictEqual(page.totalEntries, 45);
+    assert.strictEqual(page.startEntry, 1);
+    assert.strictEqual(page.endEntry, 20);
+  });
+
+  test('paginateShareHistory clamps page bounds and returns last page rows', () => {
+    const existing: ShareHistoryEntry[] = [];
+    for (let i = 1; i <= 45; i += 1) {
+      existing.push(makeEntry(i));
+    }
+
+    const page = paginateShareHistory(existing, 999, 20);
+    assert.strictEqual(page.entries.length, 5);
+    assert.strictEqual(page.currentPage, 3);
+    assert.strictEqual(page.totalPages, 3);
+    assert.strictEqual(page.startEntry, 41);
+    assert.strictEqual(page.endEntry, 45);
   });
 });

@@ -34,6 +34,7 @@ export const DEFAULT_SHARE_SETTINGS: PromptstreakShareSettings = {
   autoSyncMinutes: 60,
   historyLimit: 100,
   promptstreakBaseUrl: LOCAL_PROMPTSTREAK_BASE_URL,
+  deviceAlias: '',
 };
 
 function mergeFields(raw?: Partial<ShareFieldConfig>): ShareFieldConfig {
@@ -69,8 +70,10 @@ export async function saveShareSettings(
   ctx: ExtensionContext,
   settings: PromptstreakShareSettings,
 ): Promise<void> {
+  const normalizedAlias = (settings.deviceAlias || '').trim();
   await ctx.globalState.update(KEY, {
     ...settings,
+    deviceAlias: normalizedAlias,
     promptstreakBaseUrl: LOCAL_PROMPTSTREAK_BASE_URL,
   });
 }

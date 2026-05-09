@@ -73,6 +73,10 @@ function classifyTransient(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
+function isAuthFailure(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
 function modelInputsFromEvents(events: RequestEvent[]): ShareModelInput[] {
   const map = new Map<string, ShareModelInput>();
   for (const event of events) {
@@ -116,6 +120,12 @@ interface SendOutcome {
 
 export interface UnlinkDeviceResult {
   remoteRevoked: boolean;
+  detail?: string;
+}
+
+export interface UpdateDeviceAliasResult {
+  updated: boolean;
+  alias?: string | null;
   detail?: string;
 }
 
@@ -185,6 +195,64 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
     return { remoteRevoked, detail };
   }
 
+  async updateLinkedDeviceAlias(
+    baseUrl: string,
+    alias: string | null,
+  ): Promise<UpdateDeviceAliasResult> {
+    const token = await getDeviceToken(this.context);
+    if (!token) {
+      return {
+        updated: false,
+        detail: 'Device is not linked yet.',
+      };
+    }
+
+    try {
+      const response = await fetch(`${normalizeBaseUrl(baseUrl)}/api/connect/device`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: alias ?? '' }),
+      });
+
+      if (!response.ok) {
+        if (isAuthFailure(response.status)) {
+          const settings = loadShareSettings(this.context);
+          settings.linkedAtIso = undefined;
+          settings.lastSyncStatus = 'auth_required';
+          await saveShareSettings(this.context, settings);
+          await clearDeviceToken(this.context);
+          this.notify();
+          return {
+            updated: false,
+            detail: 'PromptStreak link expired or was revoked. Please link this device again.',
+          };
+        }
+
+        const errorText = await response.text().catch(() => '');
+        const trimmed = errorText.length > 120 ? `${errorText.slice(0, 120)}...` : errorText;
+        return {
+          updated: false,
+          detail: `Alias update failed (HTTP ${response.status})${trimmed ? `: ${trimmed}` : ''}`,
+        };
+      }
+
+      const payload = (await response.json().catch(() => ({}))) as { name?: unknown };
+      const aliasValue = typeof payload.name === 'string' ? payload.name : null;
+      return {
+        updated: true,
+        alias: aliasValue,
+      };
+    } catch (error) {
+      return {
+        updated: false,
+        detail: `Alias update failed: ${String(error)}`,
+      };
+    }
+  }
+
   async linkDeviceTokenFromClipboard(): Promise<boolean> {
     const token = (await vscode.env.clipboard.readText()).trim();
     const valid = /^[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{24,}$/.test(token);
@@ -199,6 +267,7 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
   async setLinkedToken(token: string): Promise<void> {
     const settings = loadShareSettings(this.context);
     settings.linkedAtIso = new Date().toISOString();
+    settings.lastSyncStatus = 'linked';
     await saveShareSettings(this.context, settings);
     await setDeviceToken(this.context, token);
     this.notify();
@@ -281,6 +350,9 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
       const settings = loadShareSettings(this.context);
       const token = await getDeviceToken(this.context);
       if (!token) {
+        settings.linkedAtIso = undefined;
+        settings.lastSyncStatus = 'auth_required';
+        await saveShareSettings(this.context, settings);
         return this.appendHistory('failed', 'Device is not linked yet. Sign in and link before sharing.', false);
       }
 
@@ -332,6 +404,11 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
       });
 
       if (!signatureHeaders) {
+        settings.linkedAtIso = undefined;
+        settings.lastSyncStatus = 'auth_required';
+        await saveShareSettings(this.context, settings);
+        await clearDeviceToken(this.context);
+        this.notify();
         return this.appendHistory('failed', 'Linked device token is malformed.', false);
       }
 
@@ -355,6 +432,24 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
       const retryAfter = parseRetryAfterSeconds(response.headers.get('Retry-After'));
       const responseBody = await response.text();
       const trimmed = responseBody.length > 120 ? `${responseBody.slice(0, 120)}...` : responseBody;
+
+      if (isAuthFailure(response.status)) {
+        settings.linkedAtIso = undefined;
+        settings.lastSyncStatus = 'auth_required';
+        await saveShareSettings(this.context, settings);
+        await clearDeviceToken(this.context);
+        this.notify();
+
+        return this.appendHistory(
+          'failed',
+          `PromptStreak link expired or was revoked (HTTP ${response.status}). Sign in and link this device again.`,
+          false,
+          response.status,
+          payloadBytes,
+          retryAfter,
+        );
+      }
+
       settings.lastSyncStatus = `failed:${response.status}`;
       await saveShareSettings(this.context, settings);
       return this.appendHistory(

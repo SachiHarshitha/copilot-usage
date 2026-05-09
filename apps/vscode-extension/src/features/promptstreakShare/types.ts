@@ -16,6 +16,7 @@ export interface PromptstreakShareSettings {
   autoSyncMinutes: number;
   historyLimit: number;
   promptstreakBaseUrl: string;
+  deviceAlias?: string;
   linkedAtIso?: string;
   lastSuccessfulSyncIso?: string;
   lastSyncStatus?: string;
