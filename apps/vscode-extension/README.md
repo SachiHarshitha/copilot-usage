@@ -67,6 +67,20 @@ Always-visible token count in the status bar. Click to open the workspace analys
 | `Copilot Usage: Cost Estimator (Preview)` | Open monthly AI Credits cost estimator |
 | `Copilot Usage: Refresh Data` | Manually refresh status bar data |
 
+## Troubleshooting: Numbers Not Showing
+
+If token numbers are missing, stuck at `0`, or much lower than expected:
+
+1. Open VS Code Settings and search for `github.copilot.chat.agentDebugLog.fileLogging.enabled`.
+2. Enable **GitHub › Copilot › Chat › Agent Debug Log › File Logging**.
+3. Reload VS Code (the setting requires reload to fully apply).
+4. Run **Copilot Usage: Refresh Data**.
+5. Trigger at least one new Copilot Chat request in the target workspace and refresh again.
+
+![Enable Copilot debug file logging](https://raw.githubusercontent.com/SachiHarshitha/copilot-usage/master/docs/images/vscode_setting.png)
+
+If needed, run **Copilot Usage: Open Copilot Debug Log Setting** to jump directly to the correct setting.
+
 ## How It Works
 
 Parses JSONL and legacy JSON chat session files from VS Code's workspace storage directory (`workspaceStorage/{hash}/chatSessions/`). Extracts prompt tokens, output tokens, model identifiers, tool-call rounds, and timestamps — then aggregates everything into interactive dashboards.

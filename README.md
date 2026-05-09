@@ -236,6 +236,23 @@ npx @vscode/vsce package --allow-missing-repository --skip-license
 
 Then install the generated `.vsix` via **Extensions → ··· → Install from VSIX**.
 
+### Troubleshooting: Numbers Not Showing
+
+If the status bar or dashboards show `No data`, `0`, or unexpectedly low numbers:
+
+1. Open the setting `github.copilot.chat.agentDebugLog.fileLogging.enabled`.
+2. Enable **GitHub › Copilot › Chat › Agent Debug Log › File Logging**.
+3. Reload VS Code (required for the setting to fully take effect).
+4. Run **Copilot Usage: Refresh Data**.
+5. Send at least one Copilot Chat request in the workspace, then refresh again.
+
+![Enable Copilot debug file logging](docs/images/vscode_setting.png)
+
+Notes:
+
+- The extension includes compatibility parsing for JSONL and legacy JSON sessions, but requests without token metadata may still be estimated from text.
+- If a legacy setting was previously enabled, use the command **Copilot Usage: Open Copilot Debug Log Setting** to verify the canonical setting shown above.
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
