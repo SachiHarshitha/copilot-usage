@@ -14,6 +14,7 @@ interface ParseState {
   requestIds: Map<number, string>;
   requestTimestamps: Map<number, number>;
   requestPromptTexts: Map<number, string>;
+  requestEvidencePaths: Map<number, string[]>;
   requestPromptTokens: Map<number, number>;
   requestCompletionTokens: Map<number, number>;
   nextRequestIndex: number;
@@ -32,6 +33,7 @@ export async function parseJsonl(
     requestIds: new Map(),
     requestTimestamps: new Map(),
     requestPromptTexts: new Map(),
+    requestEvidencePaths: new Map(),
     requestPromptTokens: new Map(),
     requestCompletionTokens: new Map(),
     nextRequestIndex: 0,
@@ -69,6 +71,7 @@ export async function parseLegacyJson(
     requestIds: new Map(),
     requestTimestamps: new Map(),
     requestPromptTexts: new Map(),
+    requestEvidencePaths: new Map(),
     requestPromptTokens: new Map(),
     requestCompletionTokens: new Map(),
     nextRequestIndex: 0,
@@ -119,9 +122,14 @@ export async function parseLegacyJson(
     if (!promptTokens) { promptTokens = summaryTokens.promptTokens; }
     if (!outputTokens) { outputTokens = summaryTokens.outputTokens; }
 
+    const [promptText, respText] = extractLegacyText(req);
+    const evidencePaths = uniquePaths([
+      ...extractEvidencePathsFromText(promptText),
+      ...extractEvidencePathsFromText(respText),
+    ]);
+
     let estimated = false;
     if (!promptTokens || !outputTokens) {
-      const [promptText, respText] = extractLegacyText(req);
       if (!promptTokens && promptText) {
         promptTokens = estimateTokens(promptText);
         estimated = true;
@@ -153,6 +161,9 @@ export async function parseLegacyJson(
       outputTokens,
       toolCallRounds: toolRounds,
       tokensEstimated: estimated,
+      workspaceId,
+      workspacePath,
+      evidencePaths: evidencePaths.length > 0 ? evidencePaths : undefined,
     });
   }
 
@@ -245,10 +256,15 @@ function handleNewRequests(state: ParseState, v: unknown[]): void {
     const requestId = str(obj.requestId);
     const timestamp = num(obj.timestamp);
     const promptText = extractJsonlPromptText(obj);
+    const evidencePaths = uniquePaths([
+      ...extractEvidencePathsFromObject(obj),
+      ...extractEvidencePathsFromText(promptText || ''),
+    ]);
     if (modelId) { state.requestModels.set(idx, modelId); }
     if (requestId) { state.requestIds.set(idx, requestId); }
     if (timestamp) { state.requestTimestamps.set(idx, timestamp); }
     if (promptText) { state.requestPromptTexts.set(idx, promptText); }
+    if (evidencePaths.length > 0) { state.requestEvidencePaths.set(idx, evidencePaths); }
   }
 }
 
@@ -298,6 +314,14 @@ function handleResult(state: ParseState, v: Record<string, unknown>, requestInde
     ? 'copilot/' + rawResolved.replace(/(?<=-\d+)-(\d+)$/, '.$1')  // only last -minor patch: dash → dot
     : undefined;
 
+  const evidencePaths = uniquePaths([
+    ...(state.requestEvidencePaths.get(requestIndex) || []),
+    ...extractEvidencePathsFromObject(v),
+  ]);
+  if (evidencePaths.length > 0) {
+    state.requestEvidencePaths.set(requestIndex, evidencePaths);
+  }
+
   state.requests.push({
     chatSessionId,
     requestIndex,
@@ -308,6 +332,7 @@ function handleResult(state: ParseState, v: Record<string, unknown>, requestInde
     outputTokens,
     toolCallRounds: toolRounds,
     tokensEstimated: false,
+    evidencePaths: evidencePaths.length > 0 ? evidencePaths : undefined,
   });
 }
 
@@ -331,6 +356,8 @@ function finalize(
   // Back-fill model_id from request-append lines
   for (const req of state.requests) {
     if (!req.chatSessionId) { req.chatSessionId = state.anchor.chatSessionId; }
+    req.workspaceId = workspaceId;
+    req.workspacePath = workspacePath;
     if (!req.modelId) { req.modelId = state.requestModels.get(req.requestIndex); }
     if (!req.modelId && state.anchor) { req.modelId = state.anchor.modelId; }
     if (!req.requestId) { req.requestId = state.requestIds.get(req.requestIndex); }
@@ -348,6 +375,14 @@ function finalize(
           req.tokensEstimated = true;
         }
       }
+    }
+
+    const evidencePaths = uniquePaths([
+      ...(req.evidencePaths || []),
+      ...(state.requestEvidencePaths.get(req.requestIndex) || []),
+    ]);
+    if (evidencePaths.length > 0) {
+      req.evidencePaths = evidencePaths;
     }
   }
 
@@ -401,6 +436,111 @@ function extractJsonlPromptText(req: Record<string, unknown>): string | undefine
 
   const promptText = promptParts.join('\n').trim();
   return promptText || undefined;
+}
+
+const FILE_URI_RE = /file:\/\/\/[^\s"'`<>\])]+/gi;
+const WINDOWS_PATH_RE = /[A-Za-z]:[\\/][^\s"'`<>\])]+/g;
+
+function extractEvidencePathsFromText(text: string): string[] {
+  if (!text) {
+    return [];
+  }
+
+  const rawMatches: string[] = [];
+  for (const match of text.match(FILE_URI_RE) || []) {
+    rawMatches.push(match);
+  }
+  for (const match of text.match(WINDOWS_PATH_RE) || []) {
+    rawMatches.push(match);
+  }
+
+  return uniquePaths(rawMatches.map(value => normalizeEvidencePath(value)).filter((v): v is string => Boolean(v)));
+}
+
+function extractEvidencePathsFromObject(value: unknown, maxDepth = 4, maxNodes = 200): string[] {
+  const out: string[] = [];
+  let visited = 0;
+
+  const walk = (node: unknown, depth: number): void => {
+    if (visited >= maxNodes || depth > maxDepth) {
+      return;
+    }
+    visited++;
+
+    if (typeof node === 'string') {
+      out.push(...extractEvidencePathsFromText(node));
+      return;
+    }
+
+    if (!node || typeof node !== 'object') {
+      return;
+    }
+
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        walk(item, depth + 1);
+      }
+      return;
+    }
+
+    const obj = node as Record<string, unknown>;
+    for (const val of Object.values(obj)) {
+      walk(val, depth + 1);
+    }
+  };
+
+  walk(value, 0);
+  return uniquePaths(out);
+}
+
+function normalizeEvidencePath(raw: string): string | undefined {
+  const trimmed = raw.trim().replace(/[),.;\]]+$/g, '');
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (/^file:\/\//i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      if (url.protocol !== 'file:') {
+        return undefined;
+      }
+      let p = decodeURIComponent(url.pathname);
+      if (/^\/[A-Za-z]:/.test(p)) {
+        p = p.slice(1);
+      }
+      return normalizePath(p);
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (/^[A-Za-z]:[\\/]/.test(trimmed) || trimmed.startsWith('/')) {
+    return normalizePath(trimmed);
+  }
+
+  return undefined;
+}
+
+function normalizePath(p: string): string {
+  let out = p.replace(/\\/g, '/').replace(/\/+$/, '');
+  if (/^[A-Za-z]:/.test(out)) {
+    out = out[0].toLowerCase() + out.slice(1);
+  }
+  return out;
+}
+
+function uniquePaths(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
 }
 
 function readPromptTokenAliases(

@@ -18,6 +18,9 @@ export interface RequestEvent {
   outputTokens: number;
   toolCallRounds: number;
   tokensEstimated: boolean;
+  workspaceId?: string;
+  workspacePath?: string;
+  evidencePaths?: string[];
 }
 
 export interface ParsedFile {

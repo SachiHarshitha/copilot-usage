@@ -7,7 +7,7 @@
 ## Features
 
 - **Workspace Analysis** — Token usage, model distribution, and daily trends for the current workspace
-- **Global Dashboard** — Aggregated stats across all workspaces: KPIs, daily chart, model breakdown, and workspace comparison
+- **Global Dashboard** — Aggregated stats across all workspaces: KPIs, daily chart, model breakdown, workspace comparison, and repository-level breakdown
 - **Cost Estimator (Preview)** — Estimate monthly Copilot AI Credits usage and compare model costs
 - **Capability-aware Provider Comparison** — Compare provider options using model family and tier coverage, capability risk labels, grouped recommendations, and savings-vs-baseline signals with a near-current buffer
 - **Status Bar** — Live token count for the current workspace; click to open analysis
@@ -18,7 +18,7 @@
 
 ### Global Dashboard
 
-KPIs, daily token usage chart, model distribution, and per-workspace breakdown across all your projects.
+KPIs, daily token usage chart, model distribution, per-workspace breakdown, and repository-level breakdown across all your projects.
 
 ![Global Dashboard](https://raw.githubusercontent.com/SachiHarshitha/copilot-usage/master/docs/images/vscode_global.png)
 
