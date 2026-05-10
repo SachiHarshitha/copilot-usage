@@ -39,6 +39,7 @@ export interface ShareTotalsInput {
   totalRequests: number;
   totalPromptTokens: number;
   totalOutputTokens: number;
+  totalPremiumRequests?: number;
 }
 
 export interface ShareModelInput {
@@ -46,6 +47,7 @@ export interface ShareModelInput {
   requestCount: number;
   inputTokens: number;
   outputTokens: number;
+  premiumRequests?: number;
 }
 
 export type ShareActionType =
@@ -66,6 +68,29 @@ export interface ShareDailyBucketInput {
   requests: number;
   inputTokens: number;
   outputTokens: number;
+  premiumRequests?: number;
+}
+
+export type ShareRepoRefInput =
+  | {
+    mode: 'github';
+    githubRepo: string;
+  }
+  | {
+    mode: 'alias';
+    aliasLabel: string;
+  }
+  | {
+    mode: 'redacted';
+  };
+
+export interface ShareRepoRunInput {
+  repoRef: ShareRepoRefInput;
+  totalRequests: number;
+  totalPromptTokens: number;
+  totalOutputTokens: number;
+  totalPremiumRequests?: number;
+  topModel?: string;
 }
 
 export interface SharePayloadInput {
@@ -77,5 +102,6 @@ export interface SharePayloadInput {
   models: ShareModelInput[];
   actions: ShareActionInput[];
   dailyBuckets: ShareDailyBucketInput[];
-  githubRepo?: string;
+  repoRef?: ShareRepoRefInput;
+  repoRuns?: ShareRepoRunInput[];
 }

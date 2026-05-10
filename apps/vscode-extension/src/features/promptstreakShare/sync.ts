@@ -9,11 +9,16 @@ import {
   discoverWorkspaces,
 } from '../../core/discovery';
 import {
+  computeRepoAttributionStats,
+  discoverRepoDescriptors,
+} from '../../core/repoAttribution';
+import {
   computeDailyStats,
   computeKpis,
   parseAllFiles,
   flattenEvents,
 } from '../../core/aggregator';
+import { getMultiplier } from '../../core/config';
 import { RequestEvent } from '../../core/types';
 import {
   appendShareHistory,
@@ -21,6 +26,10 @@ import {
 import {
   buildShareSnapshot,
 } from './payload';
+import {
+  resolveShareRepoRuns,
+  resolveShareRepoRef,
+} from './repoRef';
 import {
   buildSignedUploadHeaders,
 } from './uploadSigning';
@@ -54,6 +63,13 @@ function toNonNegativeInt(value: number): number {
   return Math.floor(value);
 }
 
+function toNonNegativePremium(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return Math.round(value * 1000) / 1000;
+}
+
 function normalizeBaseUrl(raw: string): string {
   return raw.replace(/\/+$/, '');
 }
@@ -81,11 +97,14 @@ function modelInputsFromEvents(events: RequestEvent[]): ShareModelInput[] {
   const map = new Map<string, ShareModelInput>();
   for (const event of events) {
     const id = event.modelId || 'unknown';
+    const hasTokenUsage = event.promptTokens > 0 || event.outputTokens > 0;
+    const premium = hasTokenUsage ? getMultiplier(id) : 0;
     const existing = map.get(id);
     if (existing) {
       existing.requestCount += 1;
       existing.inputTokens += toNonNegativeInt(event.promptTokens);
       existing.outputTokens += toNonNegativeInt(event.outputTokens);
+      existing.premiumRequests = toNonNegativePremium((existing.premiumRequests || 0) + premium);
       continue;
     }
 
@@ -94,9 +113,31 @@ function modelInputsFromEvents(events: RequestEvent[]): ShareModelInput[] {
       requestCount: 1,
       inputTokens: toNonNegativeInt(event.promptTokens),
       outputTokens: toNonNegativeInt(event.outputTokens),
+      premiumRequests: toNonNegativePremium(premium),
     });
   }
   return [...map.values()].sort((a, b) => b.requestCount - a.requestCount);
+}
+
+function dailyPremiumByDate(events: RequestEvent[]): Map<string, number> {
+  const map = new Map<string, number>();
+
+  for (const event of events) {
+    if (!event.timestampMs) {
+      continue;
+    }
+    const hasTokenUsage = event.promptTokens > 0 || event.outputTokens > 0;
+    if (!hasTokenUsage) {
+      continue;
+    }
+
+    const date = new Date(event.timestampMs);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const premium = getMultiplier(event.modelId || 'unknown');
+    map.set(key, toNonNegativePremium((map.get(key) || 0) + premium));
+  }
+
+  return map;
 }
 
 function actionInputsFromEvents(events: RequestEvent[]): ShareActionInput[] {
@@ -361,6 +402,7 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
       const events = flattenEvents(parsed);
       const kpis = computeKpis(parsed, events);
       const daily = computeDailyStats(events);
+      const dailyPremium = dailyPremiumByDate(events);
       const modelInputs = modelInputsFromEvents(events);
       const actionInputs = actionInputsFromEvents(events);
       const dailyBuckets: ShareDailyBucketInput[] = daily.map(d => ({
@@ -368,7 +410,20 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
         requests: toNonNegativeInt(d.requests),
         inputTokens: toNonNegativeInt(d.promptTokens),
         outputTokens: toNonNegativeInt(d.outputTokens),
+        premiumRequests: toNonNegativePremium(dailyPremium.get(d.date) || 0),
       }));
+      const repoRows = settings.fields.includeRepoAttribution
+        ? computeRepoAttributionStats(
+          events,
+          await discoverRepoDescriptors(workspaces),
+        ).rows
+        : [];
+      const repoRuns = settings.fields.includeRepoAttribution
+        ? await resolveShareRepoRuns(repoRows)
+        : [];
+      const repoRef = settings.fields.includeRepoAttribution
+        ? (repoRuns.length > 0 ? repoRuns[0].repoRef : await resolveShareRepoRef(repoRows))
+        : undefined;
 
       const snapshot = buildShareSnapshot({
         adapterVersion: this.adapterVersion,
@@ -379,10 +434,13 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
           totalRequests: toNonNegativeInt(kpis.totalRequests),
           totalPromptTokens: toNonNegativeInt(kpis.totalPromptTokens),
           totalOutputTokens: toNonNegativeInt(kpis.totalOutputTokens),
+          totalPremiumRequests: toNonNegativePremium(kpis.totalPremium),
         },
         models: modelInputs,
         actions: actionInputs,
         dailyBuckets,
+        repoRef,
+        repoRuns,
       });
 
       const forbidden = findForbiddenFields(snapshot, { allowList: new Set(['source']) });
@@ -423,10 +481,15 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
       });
 
       if (response.ok) {
+        const successPayload = (await response.json().catch(() => ({}))) as { deduplicated?: unknown };
+        const deduplicated = successPayload?.deduplicated === true;
         settings.lastSuccessfulSyncIso = new Date().toISOString();
         settings.lastSyncStatus = 'success';
         await saveShareSettings(this.context, settings);
-        return this.appendHistory('success', `Shared successfully (${reason}).`, false, undefined, payloadBytes);
+        const detail = deduplicated
+          ? `Shared successfully (${reason}) — deduplicated (no new metrics).`
+          : `Shared successfully (${reason}).`;
+        return this.appendHistory('success', detail, false, undefined, payloadBytes);
       }
 
       const retryAfter = parseRetryAfterSeconds(response.headers.get('Retry-After'));
