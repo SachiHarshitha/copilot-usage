@@ -56,6 +56,59 @@ async function withTempStorage(run: (storageRoot: string, folderA: string, folde
 }
 
 suite('Discovery: current workspace matching', () => {
+  test('resolves relative multi-root folder paths for referenced-folder matching', async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-usage-discovery-relative-'));
+    try {
+      const storageRoot = path.join(tempRoot, 'workspaceStorage');
+      await fs.mkdir(storageRoot, { recursive: true });
+
+      const folderA = path.join(tempRoot, 'repo-a');
+      const folderB = path.join(tempRoot, 'repo-b');
+      await fs.mkdir(folderA, { recursive: true });
+      await fs.mkdir(folderB, { recursive: true });
+
+      const wsFilePath = path.join(tempRoot, 'multi-relative.code-workspace');
+      await fs.writeFile(
+        wsFilePath,
+        JSON.stringify({
+          folders: [
+            { path: 'repo-a' },
+            { path: 'repo-b' },
+          ],
+        }),
+        'utf-8',
+      );
+
+      const singleId = 'single-folder-workspace-id';
+      const multiId = 'multi-root-workspace-id';
+
+      const singleDir = path.join(storageRoot, singleId);
+      await fs.mkdir(path.join(singleDir, 'chatSessions'), { recursive: true });
+      await fs.writeFile(
+        path.join(singleDir, 'workspace.json'),
+        JSON.stringify({ folder: pathToFileURL(folderA).toString() }),
+        'utf-8',
+      );
+      await fs.writeFile(path.join(singleDir, 'chatSessions', 'single.jsonl'), '{"kind":0,"v":{"sessionId":"single"}}\n', 'utf-8');
+
+      const multiDir = path.join(storageRoot, multiId);
+      await fs.mkdir(path.join(multiDir, 'chatSessions'), { recursive: true });
+      await fs.writeFile(
+        path.join(multiDir, 'workspace.json'),
+        JSON.stringify({ workspace: pathToFileURL(wsFilePath).toString() }),
+        'utf-8',
+      );
+      await fs.writeFile(path.join(multiDir, 'chatSessions', 'multi.jsonl'), '{"kind":0,"v":{"sessionId":"multi"}}\n', 'utf-8');
+
+      const match = await findCurrentWorkspace(undefined, [folderA, folderB], storageRoot);
+      assert.ok(match);
+      assert.strictEqual(match!.workspaceId, 'multi-root-workspace-id');
+      assert.deepStrictEqual(match!.referencedFolders?.map(p => p.toLowerCase()).sort(), [folderA.toLowerCase(), folderB.toLowerCase()].sort());
+    } finally {
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('prefers multi-root storage entry by referenced folders when workspaceFileUri is unavailable', async () => {
     await withTempStorage(async (storageRoot, folderA, folderB) => {
       const match = await findCurrentWorkspace(undefined, [folderA, folderB], storageRoot);
