@@ -2,6 +2,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import { RequestEvent, WorkspaceInfo } from './types';
+import { getMultiplier } from './config';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,6 +26,7 @@ export interface RepoAttributionRow {
   requests: number;
   promptTokens: number;
   outputTokens: number;
+  premiumRequests: number;
   topModel: string;
 }
 
@@ -286,6 +288,7 @@ export function computeRepoAttributionStats(
       requests: 0,
       promptTokens: 0,
       outputTokens: 0,
+      premiumRequests: 0,
       topModel: '–',
     };
     rowsById.set(repo.id, next);
@@ -298,6 +301,7 @@ export function computeRepoAttributionStats(
     requests: 0,
     promptTokens: 0,
     outputTokens: 0,
+    premiumRequests: 0,
     topModel: '–',
   };
 
@@ -309,12 +313,15 @@ export function computeRepoAttributionStats(
     totalRequests += 1;
     totalPromptTokens += event.promptTokens;
     totalOutputTokens += event.outputTokens;
+    const hasTokenUsage = event.promptTokens > 0 || event.outputTokens > 0;
+    const premiumRequests = hasTokenUsage ? getMultiplier(event.modelId || '') : 0;
 
     const weights = resolveRepoWeights(event, repos);
     if (weights.length === 0) {
       unattributed.requests += 1;
       unattributed.promptTokens += event.promptTokens;
       unattributed.outputTokens += event.outputTokens;
+      unattributed.premiumRequests += premiumRequests;
       addModelAttribution(unattributed.id, event, 1);
       continue;
     }
@@ -329,6 +336,7 @@ export function computeRepoAttributionStats(
       row.requests += weight.weight;
       row.promptTokens += event.promptTokens * weight.weight;
       row.outputTokens += event.outputTokens * weight.weight;
+      row.premiumRequests += premiumRequests * weight.weight;
       addModelAttribution(repo.id, event, weight.weight);
     }
   }

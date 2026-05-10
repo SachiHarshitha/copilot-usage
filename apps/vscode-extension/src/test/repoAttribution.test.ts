@@ -102,19 +102,24 @@ suite('Repo attribution', () => {
 
     assert.strictEqual(Math.round((repoA?.promptTokens || 0) * 1000) / 1000, 130);
     assert.strictEqual(Math.round((repoA?.outputTokens || 0) * 1000) / 1000, 35);
+    assert.strictEqual(Math.round((repoA?.premiumRequests || 0) * 1000) / 1000, 1);
     assert.strictEqual(repoA?.topModel, 'copilot/gpt-5.3-codex');
 
     assert.strictEqual(Math.round((repoB?.promptTokens || 0) * 1000) / 1000, 30);
     assert.strictEqual(Math.round((repoB?.outputTokens || 0) * 1000) / 1000, 15);
+    assert.strictEqual(Math.round((repoB?.premiumRequests || 0) * 1000) / 1000, 0);
     assert.strictEqual(repoB?.topModel, 'copilot/gpt-4.1');
 
     assert.strictEqual(unattributed?.promptTokens, 40);
     assert.strictEqual(unattributed?.outputTokens, 10);
+    assert.strictEqual(Math.round((unattributed?.premiumRequests || 0) * 1000) / 1000, 1);
     assert.strictEqual(unattributed?.topModel, 'copilot/claude-sonnet-4');
 
     const summedPrompt = stats.rows.reduce((sum, row) => sum + row.promptTokens, 0);
     const summedOutput = stats.rows.reduce((sum, row) => sum + row.outputTokens, 0);
+    const summedPremium = stats.rows.reduce((sum, row) => sum + row.premiumRequests, 0);
     assert.strictEqual(Math.round(summedPrompt * 1000) / 1000, 200);
     assert.strictEqual(Math.round(summedOutput * 1000) / 1000, 60);
+    assert.strictEqual(Math.round(summedPremium * 1000) / 1000, 2);
   });
 });

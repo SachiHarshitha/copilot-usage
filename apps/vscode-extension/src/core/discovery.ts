@@ -32,6 +32,17 @@ function uriToPath(uri: string): string {
   return decodeURIComponent(uri);
 }
 
+function resolveWorkspaceFolderPath(folderPath: string, workspaceFilePath: string): string {
+  const trimmed = folderPath.trim();
+  if (!trimmed) {
+    return '';
+  }
+  if (path.isAbsolute(trimmed)) {
+    return trimmed;
+  }
+  return path.resolve(path.dirname(workspaceFilePath), trimmed);
+}
+
 /** Resolve workspace.json → human-readable workspace path + any referenced folder paths. */
 async function resolveWorkspace(workspaceDir: string): Promise<{ id: string; path: string; referencedFolders: string[] }> {
   const id = path.basename(workspaceDir);
@@ -52,7 +63,9 @@ async function resolveWorkspace(workspaceDir: string): Promise<{ id: string; pat
         const wsData = JSON.parse(wsRaw);
         if (Array.isArray(wsData.folders)) {
           for (const f of wsData.folders) {
-            const folderPath: string = f.uri ? uriToPath(f.uri) : f.path || '';
+            const folderPath: string = f.uri
+              ? uriToPath(f.uri)
+              : resolveWorkspaceFolderPath(f.path || '', wsPath);
             if (folderPath) { referencedFolders.push(folderPath); }
           }
         }
