@@ -9,7 +9,7 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, ctx, dcc, html
 
-from copilot_usage.config import VSCODE_STORAGE_ROOT, VSCODE_STORAGE_ROOTS
+from copilot_usage.config import VSCODE_STORAGE_ROOTS
 
 dash.register_page(__name__, path="/pipeline", name="Pipeline", order=2)
 

@@ -16,7 +16,6 @@ authors = [
 maintainers = [
   { name = "Sachith Liyanagama", email = "liyanagama@outlook.de" },
 ]
-readme = "../../README.md"
 license = "Apache-2.0"
 keywords = ["copilot", "github", "vs-code" ,"usage", "tokens", "analytics", "dashboard", "observability", "local-first", "privacy-focused"]
 classifiers = [
