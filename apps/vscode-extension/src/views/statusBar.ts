@@ -31,8 +31,6 @@ export class StatusBarManager implements vscode.Disposable {
         if (e.affectsConfiguration('copilot-usage') || didAffectCopilotDebugLogSetting(e)) { this.refresh(); }
       }),
     );
-
-    this.refresh();
   }
 
   async refresh(storageRoots?: string[]): Promise<void> {
