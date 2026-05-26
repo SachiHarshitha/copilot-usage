@@ -13,6 +13,7 @@ import {
 
 export class WorkspacePanel {
   public static currentPanel: WorkspacePanel | undefined;
+  private static storageRoots?: string[];
   private readonly panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
   private disposed = false;
@@ -46,7 +47,8 @@ export class WorkspacePanel {
     );
   }
 
-  public static async refresh(): Promise<void> {
+  public static async refresh(storageRoots?: string[]): Promise<void> {
+    WorkspacePanel.storageRoots = storageRoots ?? WorkspacePanel.storageRoots;
     if (WorkspacePanel.currentPanel) {
       await WorkspacePanel.currentPanel.loadData();
     }
@@ -95,7 +97,7 @@ export class WorkspacePanel {
 
     const wsFileUri = vscode.workspace.workspaceFile?.toString();
     const folderPaths = folders.map(f => f.uri.fsPath);
-    const ws = await findCurrentWorkspace(wsFileUri, folderPaths);
+    const ws = await findCurrentWorkspace(wsFileUri, folderPaths, WorkspacePanel.storageRoots);
     if (!ws) {
       const searched = wsFileUri
         ? `workspace file: ${vscode.workspace.workspaceFile!.fsPath}`
@@ -129,6 +131,7 @@ export class WorkspacePanel {
 /** Global dashboard webview panel. */
 export class DashboardPanel {
   public static currentPanel: DashboardPanel | undefined;
+  private static storageRoots?: string[];
   private readonly panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
   private disposed = false;
@@ -162,7 +165,8 @@ export class DashboardPanel {
     );
   }
 
-  public static async refresh(): Promise<void> {
+  public static async refresh(storageRoots?: string[]): Promise<void> {
+    DashboardPanel.storageRoots = storageRoots ?? DashboardPanel.storageRoots;
     if (DashboardPanel.currentPanel) {
       await DashboardPanel.currentPanel.loadData();
     }
@@ -203,7 +207,7 @@ export class DashboardPanel {
     const autoRefreshSeconds = cfg.get<number>('dashboard.autoRefreshSeconds', 0);
     const showDebugLogBanner = !isCopilotDebugLogEnabled();
 
-    const workspaces = await discoverWorkspaces();
+    const workspaces = await discoverWorkspaces(DashboardPanel.storageRoots);
     if (workspaces.length === 0) {
       this.setHtml(getDashboardHtml(undefined, undefined, undefined, undefined, 'No Copilot session data found.', autoRefreshSeconds, 0, showDebugLogBanner));
       return;

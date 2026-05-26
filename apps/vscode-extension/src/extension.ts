@@ -14,9 +14,9 @@ export function activate(context: vscode.ExtensionContext) {
 	/** Refresh status bar + any open panels. */
 	const refreshAll = async () => {
 		const tasks: Promise<unknown>[] = [
-			statusBar.refresh(),
-			WorkspacePanel.refresh(),
-			DashboardPanel.refresh(),
+			statusBar.refresh(storageRoots),
+			WorkspacePanel.refresh(storageRoots),
+			DashboardPanel.refresh(storageRoots),
 		];
 		if (enableCostEstimator) {
 			tasks.push(CostEstimatorPanel.refresh());

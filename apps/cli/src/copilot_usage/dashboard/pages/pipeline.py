@@ -53,8 +53,9 @@ def _run_pipeline_thread(storage_path: str):
 
     try:
         if storage_path and storage_path.strip():
-            storage_roots = [Path(p.strip()) for p in storage_path.split(";") if p.strip()]
-            _append_log(f"Storage paths: {'; '.join(str(p) for p in storage_roots)}", 0)
+            storage_roots = [Path(p.strip()) for p in storage_path.split(";") if p.strip()] or None
+            if storage_roots:
+                _append_log(f"Storage paths: {'; '.join(str(p) for p in storage_roots)}", 0)
         else:
             storage_roots = None  # use all auto-detected roots
             _append_log(f"Storage paths: {'; '.join(str(p) for p in VSCODE_STORAGE_ROOTS)}", 0)
