@@ -58,7 +58,7 @@ def resolve_workspace(workspace_dir: Path, storage_root: Path | None = None) -> 
                         try:
                             ws_data = json.loads(ws_file.read_text(encoding="utf-8"))
                             folder_paths = [
-                                _uri_to_path(f.get("uri", "") or f.get("path", ""))
+                                _uri_to_path(f.get("uri", "") or f.get("path", ""), storage_root)
                                 for f in ws_data.get("folders", [])
                                 if isinstance(f, dict)
                             ]

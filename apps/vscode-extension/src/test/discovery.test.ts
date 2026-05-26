@@ -101,19 +101,19 @@ suite('Discovery: getWorkspaceStorageRoots ordering', () => {
   test('returns stable root first when appName is undefined', () => {
     const roots = getWorkspaceStorageRoots();
     assert.strictEqual(roots.length, 2);
-    assert.ok(!roots[0].toLowerCase().includes('insiders'), `Expected stable root first, got: ${roots[0]}`);
-    assert.ok(roots[1].toLowerCase().includes('insiders'), `Expected Insiders root second, got: ${roots[1]}`);
+    assert.ok(!roots[0].toLowerCase().includes('code - insiders'), `Expected stable root first, got: ${roots[0]}`);
+    assert.ok(roots[1].toLowerCase().includes('code - insiders'), `Expected Insiders root second, got: ${roots[1]}`);
   });
 
   test('returns stable root first when appName is "Visual Studio Code"', () => {
     const roots = getWorkspaceStorageRoots('Visual Studio Code');
-    assert.ok(!roots[0].toLowerCase().includes('insiders'), `Expected stable root first, got: ${roots[0]}`);
-    assert.ok(roots[1].toLowerCase().includes('insiders'), `Expected Insiders root second, got: ${roots[1]}`);
+    assert.ok(!roots[0].toLowerCase().includes('code - insiders'), `Expected stable root first, got: ${roots[0]}`);
+    assert.ok(roots[1].toLowerCase().includes('code - insiders'), `Expected Insiders root second, got: ${roots[1]}`);
   });
 
   test('returns Insiders root first when appName contains "Insiders"', () => {
     const roots = getWorkspaceStorageRoots('Visual Studio Code - Insiders');
-    assert.ok(roots[0].toLowerCase().includes('insiders'), `Expected Insiders root first, got: ${roots[0]}`);
-    assert.ok(!roots[1].toLowerCase().includes('insiders'), `Expected stable root second, got: ${roots[1]}`);
+    assert.ok(roots[0].toLowerCase().includes('code - insiders'), `Expected Insiders root first, got: ${roots[0]}`);
+    assert.ok(!roots[1].toLowerCase().includes('code - insiders'), `Expected stable root second, got: ${roots[1]}`);
   });
 });
