@@ -24,7 +24,7 @@ export function activate(context: vscode.ExtensionContext) {
 		await Promise.all(tasks);
 	};
 
-	const storageRoots = getWorkspaceStorageRoots();
+	const storageRoots = getWorkspaceStorageRoots(vscode.env.appName);
 	let lastSignature: string | undefined;
 	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 

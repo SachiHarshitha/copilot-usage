@@ -25,9 +25,12 @@ def run_scan(
     con: duckdb.DuckDBPyConnection,
     *,
     storage_roots=None,
+    storage_root=None,  # deprecated: use storage_roots
     on_progress: ProgressCallback | None = None,
 ) -> dict:
     """Execute a full incremental scan pipeline. Returns stats dict."""
+    if storage_root is not None and storage_roots is None:
+        storage_roots = [storage_root]
     t0 = time.perf_counter()
 
     def _emit(msg: str, pct: float | None = None):

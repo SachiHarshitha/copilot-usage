@@ -5,27 +5,32 @@ import * as path from 'path';
 import * as os from 'os';
 import { WorkspaceInfo } from './types';
 
-/** Return platform-specific VS Code workspace storage roots (stable + Insiders). */
-export function getWorkspaceStorageRoots(): string[] {
+/**
+ * Return platform-specific VS Code workspace storage roots.
+ *
+ * When `appName` contains "Insiders" (e.g. `vscode.env.appName`), the Insiders
+ * root is returned first so that workspace lookups prefer the current host's
+ * storage over the stable installation's storage.
+ */
+export function getWorkspaceStorageRoots(appName?: string): string[] {
+  const isInsiders = appName?.toLowerCase().includes('insiders') ?? false;
   switch (process.platform) {
     case 'win32': {
       const appdata = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-      return [
-        path.join(appdata, 'Code', 'User', 'workspaceStorage'),
-        path.join(appdata, 'Code - Insiders', 'User', 'workspaceStorage'),
-      ];
+      const stable = path.join(appdata, 'Code', 'User', 'workspaceStorage');
+      const insiders = path.join(appdata, 'Code - Insiders', 'User', 'workspaceStorage');
+      return isInsiders ? [insiders, stable] : [stable, insiders];
     }
-    case 'darwin':
-      return [
-        path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User', 'workspaceStorage'),
-        path.join(os.homedir(), 'Library', 'Application Support', 'Code - Insiders', 'User', 'workspaceStorage'),
-      ];
+    case 'darwin': {
+      const stable = path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User', 'workspaceStorage');
+      const insiders = path.join(os.homedir(), 'Library', 'Application Support', 'Code - Insiders', 'User', 'workspaceStorage');
+      return isInsiders ? [insiders, stable] : [stable, insiders];
+    }
     default: {
       const config = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-      return [
-        path.join(config, 'Code', 'User', 'workspaceStorage'),
-        path.join(config, 'Code - Insiders', 'User', 'workspaceStorage'),
-      ];
+      const stable = path.join(config, 'Code', 'User', 'workspaceStorage');
+      const insiders = path.join(config, 'Code - Insiders', 'User', 'workspaceStorage');
+      return isInsiders ? [insiders, stable] : [stable, insiders];
     }
   }
 }

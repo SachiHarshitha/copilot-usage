@@ -77,12 +77,15 @@ def resolve_workspace(workspace_dir: Path, storage_root: Path | None = None) -> 
 
 def discover_all_session_files(
     storage_roots: list[Path] | None = None,
+    storage_root: Path | None = None,  # deprecated: use storage_roots
 ) -> tuple[list[tuple[str, str, Path]], list[tuple[str, str, Path]]]:
     """Single-pass discovery of both JSONL and legacy JSON session files across all roots.
 
     Returns (jsonl_files, legacy_json_files) where each item is
     (workspace_id, workspace_path, file_path).
     """
+    if storage_root is not None and storage_roots is None:
+        storage_roots = [storage_root]
     roots = storage_roots or VSCODE_STORAGE_ROOTS
     jsonl_results: list[tuple[str, str, Path]] = []
     legacy_results: list[tuple[str, str, Path]] = []
