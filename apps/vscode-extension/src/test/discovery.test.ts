@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
-import { findCurrentWorkspace, computeChatSessionsSignature } from '../core/discovery';
+import { getWorkspaceStorageRoots, findCurrentWorkspace, computeChatSessionsSignature } from '../core/discovery';
 
 async function withTempStorage(run: (storageRoot: string, folderA: string, folderB: string, wsFilePath: string) => Promise<void>): Promise<void> {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-usage-discovery-'));
@@ -94,5 +94,26 @@ suite('Discovery: current workspace matching', () => {
       const afterJsonCreate = await computeChatSessionsSignature([storageRoot]);
       assert.notStrictEqual(afterJsonCreate, afterJsonlAppend);
     });
+  });
+});
+
+suite('Discovery: getWorkspaceStorageRoots ordering', () => {
+  test('returns stable root first when appName is undefined', () => {
+    const roots = getWorkspaceStorageRoots();
+    assert.strictEqual(roots.length, 2);
+    assert.ok(!roots[0].toLowerCase().includes('insiders'), `Expected stable root first, got: ${roots[0]}`);
+    assert.ok(roots[1].toLowerCase().includes('insiders'), `Expected Insiders root second, got: ${roots[1]}`);
+  });
+
+  test('returns stable root first when appName is "Visual Studio Code"', () => {
+    const roots = getWorkspaceStorageRoots('Visual Studio Code');
+    assert.ok(!roots[0].toLowerCase().includes('insiders'), `Expected stable root first, got: ${roots[0]}`);
+    assert.ok(roots[1].toLowerCase().includes('insiders'), `Expected Insiders root second, got: ${roots[1]}`);
+  });
+
+  test('returns Insiders root first when appName contains "Insiders"', () => {
+    const roots = getWorkspaceStorageRoots('Visual Studio Code - Insiders');
+    assert.ok(roots[0].toLowerCase().includes('insiders'), `Expected Insiders root first, got: ${roots[0]}`);
+    assert.ok(!roots[1].toLowerCase().includes('insiders'), `Expected stable root second, got: ${roots[1]}`);
   });
 });
