@@ -9,7 +9,7 @@ from dash import Input, Output, State, callback, dcc, html
 from dash_bootstrap_templates import ThemeChangerAIO
 
 from copilot_usage import __version__
-from copilot_usage.config import APP_DATA_DIR, DB_PATH, VSCODE_STORAGE_ROOT
+from copilot_usage.config import APP_DATA_DIR, DB_PATH, VSCODE_STORAGE_ROOTS
 from copilot_usage.dashboard.app import THEME_OPTIONS
 from copilot_usage.logging import LOG_DIR
 
@@ -78,7 +78,13 @@ _settings_content = html.Div([
                     _about_row("Database", str(DB_PATH)),
                     _about_row("App Data", str(APP_DATA_DIR)),
                     _about_row("Log Directory", str(LOG_DIR)),
-                    _about_row("VS Code Storage", str(VSCODE_STORAGE_ROOT)),
+                    *[
+                        _about_row(
+                            "VS Code Storage" + (f" ({i + 1})" if len(VSCODE_STORAGE_ROOTS) > 1 else ""),
+                            str(p),
+                        )
+                        for i, p in enumerate(VSCODE_STORAGE_ROOTS)
+                    ],
                 ])
             ], className="table table-dark table-sm mb-0",
                style={"--bs-table-bg": "transparent"}),

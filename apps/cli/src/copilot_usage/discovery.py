@@ -8,10 +8,10 @@ from urllib.parse import unquote
 import duckdb
 from loguru import logger as log
 
-from copilot_usage.config import VSCODE_STORAGE_ROOT
+from copilot_usage.config import VSCODE_STORAGE_ROOT, VSCODE_STORAGE_ROOTS
 
 
-def _uri_to_path(uri: str) -> str:
+def _uri_to_path(uri: str, storage_root: Path | None = None) -> str:
     """Strip a VS Code URI scheme and decode percent-encoding → plain filesystem path.
 
     Handles:
@@ -25,12 +25,13 @@ def _uri_to_path(uri: str) -> str:
         rel = unquote(uri[len("vscode-userdata:///"):])
         # vscode-userdata:/// is rooted at the VS Code user-data base (e.g. %APPDATA% on Windows),
         # which is three levels above workspaceStorage: .../Code/User/workspaceStorage
-        userdata_base = VSCODE_STORAGE_ROOT.parents[2]
+        root = storage_root or VSCODE_STORAGE_ROOT
+        userdata_base = root.parents[2]
         return str(userdata_base / rel)
     return unquote(uri)
 
 
-def resolve_workspace(workspace_dir: Path) -> tuple[str, str]:
+def resolve_workspace(workspace_dir: Path, storage_root: Path | None = None) -> tuple[str, str]:
     """Return (workspace_id, workspace_path) from a workspaceStorage subfolder.
 
     For single-folder workspaces the path is the decoded project folder.
@@ -48,7 +49,7 @@ def resolve_workspace(workspace_dir: Path) -> tuple[str, str]:
             workspace_uri = data.get("workspace", "")
             raw = folder_uri or workspace_uri
             if raw:
-                resolved = _uri_to_path(raw)
+                resolved = _uri_to_path(raw, storage_root)
                 if workspace_uri:
                     # Multi-root workspace: try to read the referenced workspace file
                     # and extract the actual folder paths for a readable workspace_path.
@@ -75,34 +76,35 @@ def resolve_workspace(workspace_dir: Path) -> tuple[str, str]:
 
 
 def discover_all_session_files(
-    storage_root: Path | None = None,
+    storage_roots: list[Path] | None = None,
 ) -> tuple[list[tuple[str, str, Path]], list[tuple[str, str, Path]]]:
-    """Single-pass discovery of both JSONL and legacy JSON session files.
+    """Single-pass discovery of both JSONL and legacy JSON session files across all roots.
 
     Returns (jsonl_files, legacy_json_files) where each item is
     (workspace_id, workspace_path, file_path).
     """
-    root = storage_root or VSCODE_STORAGE_ROOT
+    roots = storage_roots or VSCODE_STORAGE_ROOTS
     jsonl_results: list[tuple[str, str, Path]] = []
     legacy_results: list[tuple[str, str, Path]] = []
-    if not root.exists():
-        log.warning("VS Code storage root not found: {}", root)
-        return jsonl_results, legacy_results
 
-    for workspace_dir in root.iterdir():
-        if not workspace_dir.is_dir():
+    for root in roots:
+        if not root.exists():
+            log.warning("VS Code storage root not found: {}", root)
             continue
-        sessions_dir = workspace_dir / "chatSessions"
-        if not sessions_dir.is_dir():
-            continue
-        workspace_id, workspace_path = resolve_workspace(workspace_dir)
-        for f in sessions_dir.iterdir():
-            if not f.is_file():
+        for workspace_dir in root.iterdir():
+            if not workspace_dir.is_dir():
                 continue
-            if f.suffix == ".jsonl":
-                jsonl_results.append((workspace_id, workspace_path, f))
-            elif f.suffix == ".json":
-                legacy_results.append((workspace_id, workspace_path, f))
+            sessions_dir = workspace_dir / "chatSessions"
+            if not sessions_dir.is_dir():
+                continue
+            workspace_id, workspace_path = resolve_workspace(workspace_dir, root)
+            for f in sessions_dir.iterdir():
+                if not f.is_file():
+                    continue
+                if f.suffix == ".jsonl":
+                    jsonl_results.append((workspace_id, workspace_path, f))
+                elif f.suffix == ".json":
+                    legacy_results.append((workspace_id, workspace_path, f))
 
     log.info(
         "Discovered {} JSONL + {} legacy JSON files across {} workspaces",
@@ -114,24 +116,24 @@ def discover_all_session_files(
 
 
 def discover_jsonl_files(
-    storage_root: Path | None = None,
+    storage_roots: list[Path] | None = None,
 ) -> list[tuple[str, str, Path]]:
     """Find all chatSessions/*.jsonl files.
 
     Returns list of (workspace_id, workspace_path, jsonl_path).
     """
-    jsonl, _ = discover_all_session_files(storage_root)
+    jsonl, _ = discover_all_session_files(storage_roots)
     return jsonl
 
 
 def discover_legacy_json_files(
-    storage_root: Path | None = None,
+    storage_roots: list[Path] | None = None,
 ) -> list[tuple[str, str, Path]]:
     """Find all chatSessions/*.json files (legacy, pre-Feb 2026).
 
     Returns list of (workspace_id, workspace_path, json_path).
     """
-    _, legacy = discover_all_session_files(storage_root)
+    _, legacy = discover_all_session_files(storage_roots)
     return legacy
 
 

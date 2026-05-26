@@ -231,7 +231,7 @@ def _interactive():
 def _settings_menu(console):
     """Interactive settings sub-menu."""
     from InquirerPy import inquirer
-    from copilot_usage.config import APP_DATA_DIR, DB_PATH, VSCODE_STORAGE_ROOT
+    from copilot_usage.config import APP_DATA_DIR, DB_PATH, VSCODE_STORAGE_ROOTS
     from copilot_usage.logging import LOG_DIR
     from copilot_usage import __version__
     from rich.table import Table
@@ -244,7 +244,9 @@ def _settings_menu(console):
     info.add_row("Database", str(DB_PATH))
     info.add_row("App Data", str(APP_DATA_DIR))
     info.add_row("Log Dir", str(LOG_DIR))
-    info.add_row("VS Code Storage", str(VSCODE_STORAGE_ROOT))
+    for i, p in enumerate(VSCODE_STORAGE_ROOTS):
+        label = "VS Code Storage" + (f" ({i + 1})" if len(VSCODE_STORAGE_ROOTS) > 1 else "")
+        info.add_row(label, str(p))
     console.print(info)
     console.print()
 

@@ -67,3 +67,5 @@ badges/
 .github/copilot-instructions.md
 
 reference/
+# BlamePrompt staging (auto-generated)
+.blameprompt/

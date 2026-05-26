@@ -58,7 +58,7 @@ async function withTempStorage(run: (storageRoot: string, folderA: string, folde
 suite('Discovery: current workspace matching', () => {
   test('prefers multi-root storage entry by referenced folders when workspaceFileUri is unavailable', async () => {
     await withTempStorage(async (storageRoot, folderA, folderB) => {
-      const match = await findCurrentWorkspace(undefined, [folderA, folderB], storageRoot);
+      const match = await findCurrentWorkspace(undefined, [folderA, folderB], [storageRoot]);
       assert.ok(match);
       assert.strictEqual(match!.workspaceId, 'multi-root-workspace-id');
     });
@@ -66,7 +66,7 @@ suite('Discovery: current workspace matching', () => {
 
   test('still matches single-folder entry when only one folder is open', async () => {
     await withTempStorage(async (storageRoot, folderA) => {
-      const match = await findCurrentWorkspace(undefined, [folderA], storageRoot);
+      const match = await findCurrentWorkspace(undefined, [folderA], [storageRoot]);
       assert.ok(match);
       assert.strictEqual(match!.workspaceId, 'single-folder-workspace-id');
     });
@@ -74,7 +74,7 @@ suite('Discovery: current workspace matching', () => {
 
   test('matches multi-root entry when workspaceFileUri is available', async () => {
     await withTempStorage(async (storageRoot, folderA, folderB, wsFilePath) => {
-      const match = await findCurrentWorkspace(pathToFileURL(wsFilePath).toString(), [folderA, folderB], storageRoot);
+      const match = await findCurrentWorkspace(pathToFileURL(wsFilePath).toString(), [folderA, folderB], [storageRoot]);
       assert.ok(match);
       assert.strictEqual(match!.workspaceId, 'multi-root-workspace-id');
     });
@@ -82,16 +82,16 @@ suite('Discovery: current workspace matching', () => {
 
   test('chat session signature changes when tracked files change', async () => {
     await withTempStorage(async (storageRoot) => {
-      const before = await computeChatSessionsSignature(storageRoot);
+      const before = await computeChatSessionsSignature([storageRoot]);
 
       const jsonlPath = path.join(storageRoot, 'single-folder-workspace-id', 'chatSessions', 'single.jsonl');
       await fs.appendFile(jsonlPath, '{"kind":1,"k":["requests",0,"completionTokens"],"v":42}\n', 'utf-8');
-      const afterJsonlAppend = await computeChatSessionsSignature(storageRoot);
+      const afterJsonlAppend = await computeChatSessionsSignature([storageRoot]);
       assert.notStrictEqual(afterJsonlAppend, before);
 
       const jsonPath = path.join(storageRoot, 'single-folder-workspace-id', 'chatSessions', 'legacy.json');
       await fs.writeFile(jsonPath, '{"requests":[]}', 'utf-8');
-      const afterJsonCreate = await computeChatSessionsSignature(storageRoot);
+      const afterJsonCreate = await computeChatSessionsSignature([storageRoot]);
       assert.notStrictEqual(afterJsonCreate, afterJsonlAppend);
     });
   });

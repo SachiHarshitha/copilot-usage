@@ -24,7 +24,7 @@ ProgressCallback = Callable[[str, float | None], None]  # (message, progress_pct
 def run_scan(
     con: duckdb.DuckDBPyConnection,
     *,
-    storage_root=None,
+    storage_roots=None,
     on_progress: ProgressCallback | None = None,
 ) -> dict:
     """Execute a full incremental scan pipeline. Returns stats dict."""
@@ -43,7 +43,7 @@ def run_scan(
 
     # 2. Discover all session files (single directory walk)
     _emit("Discovering session files…", 5)
-    all_jsonl, all_legacy = discover_all_session_files(storage_root)
+    all_jsonl, all_legacy = discover_all_session_files(storage_roots)
     _emit(f"  Found {len(all_jsonl)} JSONL + {len(all_legacy)} legacy JSON files", 15)
     all_files = all_jsonl + all_legacy
 

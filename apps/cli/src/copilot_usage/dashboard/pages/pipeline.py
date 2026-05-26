@@ -9,7 +9,7 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, ctx, dcc, html
 
-from copilot_usage.config import VSCODE_STORAGE_ROOT
+from copilot_usage.config import VSCODE_STORAGE_ROOT, VSCODE_STORAGE_ROOTS
 
 dash.register_page(__name__, path="/pipeline", name="Pipeline", order=2)
 
@@ -52,10 +52,14 @@ def _run_pipeline_thread(storage_path: str):
     from copilot_usage.pipeline import run_scan
 
     try:
-        _append_log(f"Storage path: {storage_path}", 0)
-        storage_root = Path(storage_path) if storage_path else None
+        if storage_path and storage_path.strip():
+            storage_roots = [Path(p.strip()) for p in storage_path.split(";") if p.strip()]
+            _append_log(f"Storage paths: {'; '.join(str(p) for p in storage_roots)}", 0)
+        else:
+            storage_roots = None  # use all auto-detected roots
+            _append_log(f"Storage paths: {'; '.join(str(p) for p in VSCODE_STORAGE_ROOTS)}", 0)
         con = get_connection()
-        stats = run_scan(con, storage_root=storage_root, on_progress=_append_log)
+        stats = run_scan(con, storage_roots=storage_roots, on_progress=_append_log)
         con.close()
         # Invalidate dashboard query cache so fresh data appears immediately
         from copilot_usage.dashboard.queries import invalidate_cache
@@ -93,8 +97,8 @@ layout = html.Div([
                         dbc.Input(
                             id="pl-storage-path",
                             type="text",
-                            value=str(VSCODE_STORAGE_ROOT),
-                            placeholder="Auto-detected path…",
+                            value="",
+                            placeholder=f"Auto-detect ({'; '.join(str(p) for p in VSCODE_STORAGE_ROOTS)})",
                             className="theme-input",
                         ),
                         dbc.Button(
@@ -106,8 +110,9 @@ layout = html.Div([
                         ),
                     ]),
                     html.Small(
-                        "Path to VS Code workspaceStorage directory. "
-                        "Uses auto-detected default if left unchanged.",
+                        "One or more workspaceStorage paths separated by semicolons. "
+                        "Leave blank to scan all auto-detected locations "
+                        "(Code and Code - Insiders).",
                         className="text-muted",
                     ),
                 ], md=9),
@@ -176,7 +181,7 @@ layout = html.Div([
     prevent_initial_call=True,
 )
 def _reset_path(_):
-    return str(VSCODE_STORAGE_ROOT)
+    return ""
 
 
 @callback(

@@ -9,18 +9,25 @@ import platform
 # VS Code workspace storage root
 # ---------------------------------------------------------------------------
 
-def _default_vscode_storage() -> pathlib.Path:
-    sys = platform.system()
-    if sys == "Windows":
+def _default_vscode_storage_roots() -> list[pathlib.Path]:
+    sys_name = platform.system()
+    if sys_name == "Windows":
         base = pathlib.Path(os.environ.get("APPDATA", "") or str(pathlib.Path.home() / "AppData" / "Roaming"))
-    elif sys == "Darwin":
+    elif sys_name == "Darwin":
         base = pathlib.Path.home() / "Library" / "Application Support"
     else:  # Linux / other
         base = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", "") or str(pathlib.Path.home() / ".config"))
-    return base / "Code" / "User" / "workspaceStorage"
+    candidates = [
+        base / "Code" / "User" / "workspaceStorage",
+        base / "Code - Insiders" / "User" / "workspaceStorage",
+    ]
+    found = [p for p in candidates if p.exists()]
+    return found if found else [candidates[0]]
 
 
-VSCODE_STORAGE_ROOT = _default_vscode_storage()
+VSCODE_STORAGE_ROOTS: list[pathlib.Path] = _default_vscode_storage_roots()
+# Backward-compat alias: first discovered root (stable Code path when neither exists yet)
+VSCODE_STORAGE_ROOT: pathlib.Path = VSCODE_STORAGE_ROOTS[0]
 
 # ---------------------------------------------------------------------------
 # App data directory (writable; holds DuckDB, layout JSON, badge exports)
