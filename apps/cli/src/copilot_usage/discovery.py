@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
 
 import duckdb
 from loguru import logger as log
@@ -19,8 +20,8 @@ def _uri_to_path(uri: str, storage_root: Path | None = None) -> str:
     - ``vscode-userdata:///Code/...``  → ``{APPDATA}/Code/...``
     - bare string                      → decoded as-is
     """
-    if uri.startswith("file:///"):
-        return unquote(uri[len("file:///"):])
+    if uri.startswith("file://"):
+        return url2pathname(urlparse(uri).path)
     if uri.startswith("vscode-userdata:///"):
         rel = unquote(uri[len("vscode-userdata:///"):])
         # vscode-userdata:/// is rooted at the VS Code user-data base (e.g. %APPDATA% on Windows),
@@ -76,6 +77,7 @@ def resolve_workspace(workspace_dir: Path, storage_root: Path | None = None) -> 
 
 
 def discover_all_session_files(
+    *,
     storage_roots: list[Path] | None = None,
     storage_root: Path | None = None,  # deprecated: use storage_roots
 ) -> tuple[list[tuple[str, str, Path]], list[tuple[str, str, Path]]]:
