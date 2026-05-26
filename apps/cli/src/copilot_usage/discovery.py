@@ -16,9 +16,10 @@ def _uri_to_path(uri: str, storage_root: Path | None = None) -> str:
     """Strip a VS Code URI scheme and decode percent-encoding → plain filesystem path.
 
     Handles:
-    - ``file:///c%3A/path``            → ``c:/path``
+    - ``file:///c%3A/path``            → platform-native path (e.g. ``C:/path`` or ``C:\\path``)
     - ``vscode-userdata:///Code/...``  → ``{APPDATA}/Code/...``
     - bare string                      → decoded as-is
+    Output is platform-dependent (Windows paths use backslashes, POSIX uses forward slashes).
     """
     if uri.startswith("file://"):
         return url2pathname(urlparse(uri).path)

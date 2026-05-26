@@ -184,7 +184,9 @@ layout = html.Div([
     prevent_initial_call=True,
 )
 def _reset_path(_):
-    return ""
+    # Set to joined VSCODE_STORAGE_ROOTS for user visibility
+    from copilot_usage.config import VSCODE_STORAGE_ROOTS
+    return ";".join(str(p) for p in VSCODE_STORAGE_ROOTS)
 
 
 @callback(
