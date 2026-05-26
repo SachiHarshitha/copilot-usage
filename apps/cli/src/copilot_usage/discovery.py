@@ -127,7 +127,7 @@ def discover_jsonl_files(
 
     Returns list of (workspace_id, workspace_path, jsonl_path).
     """
-    jsonl, _ = discover_all_session_files(storage_roots)
+    jsonl, _ = discover_all_session_files(storage_roots=storage_roots)
     return jsonl
 
 
@@ -138,7 +138,7 @@ def discover_legacy_json_files(
 
     Returns list of (workspace_id, workspace_path, json_path).
     """
-    _, legacy = discover_all_session_files(storage_roots)
+    _, legacy = discover_all_session_files(storage_roots=storage_roots)
     return legacy
 
 
