@@ -114,8 +114,8 @@ layout = html.Div([
                     ]),
                     html.Small(
                         "One or more workspaceStorage paths separated by semicolons. "
-                        "Leave blank to scan all auto-detected locations "
-                        "(Code and Code - Insiders).",
+                        f"Leave blank to scan all auto-detected locations "
+                        f"({'; '.join(str(p) for p in VSCODE_STORAGE_ROOTS)}).",
                         className="text-muted",
                     ),
                 ], md=9),
