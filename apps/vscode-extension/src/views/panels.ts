@@ -97,6 +97,7 @@ export class WorkspacePanel {
 
     const wsFileUri = vscode.workspace.workspaceFile?.toString();
     const folderPaths = folders.map(f => f.uri.fsPath);
+    WorkspacePanel.storageRoots ??= getWorkspaceStorageRoots(vscode.env.appName);
     const ws = await findCurrentWorkspace(wsFileUri, folderPaths, WorkspacePanel.storageRoots);
     if (!ws) {
       const searched = wsFileUri
@@ -207,6 +208,7 @@ export class DashboardPanel {
     const autoRefreshSeconds = cfg.get<number>('dashboard.autoRefreshSeconds', 0);
     const showDebugLogBanner = !isCopilotDebugLogEnabled();
 
+    DashboardPanel.storageRoots ??= getWorkspaceStorageRoots(vscode.env.appName);
     const workspaces = await discoverWorkspaces(DashboardPanel.storageRoots);
     if (workspaces.length === 0) {
       this.setHtml(getDashboardHtml(undefined, undefined, undefined, undefined, 'No Copilot session data found.', autoRefreshSeconds, 0, showDebugLogBanner));
