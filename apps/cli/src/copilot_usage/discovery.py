@@ -22,7 +22,11 @@ def _uri_to_path(uri: str, storage_root: Path | None = None) -> str:
     Output is platform-dependent (Windows paths use backslashes, POSIX uses forward slashes).
     """
     if uri.startswith("file://"):
-        return url2pathname(unquote(urlparse(uri).path))
+        parsed = urlparse(uri)
+        parsed_path = parsed.path
+        if parsed.netloc:
+            parsed_path = f"//{parsed.netloc}{parsed_path}"
+        return url2pathname(unquote(parsed_path))
     if uri.startswith("vscode-userdata:///"):
         rel = unquote(uri[len("vscode-userdata:///"):])
         # vscode-userdata:/// is rooted at the VS Code user-data base (e.g. %APPDATA% on Windows),
