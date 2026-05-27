@@ -129,7 +129,28 @@ export async function discoverWorkspaces(
     }
   }
 
-  return results;
+  // De-duplicate by workspaceId: when both stable and Insiders roots contain
+  // entries for the same workspace, merge their session files and referenced
+  // folders so downstream sees a unified view across all installations.
+  const merged = new Map<string, WorkspaceInfo>();
+  for (const ws of results) {
+    const existing = merged.get(ws.workspaceId);
+    if (existing) {
+      existing.sessionFiles = [...existing.sessionFiles, ...ws.sessionFiles];
+      if (!existing.workspacePath && ws.workspacePath) {
+        existing.workspacePath = ws.workspacePath;
+      }
+      if (ws.referencedFolders) {
+        existing.referencedFolders = [
+          ...(existing.referencedFolders ?? []),
+          ...ws.referencedFolders,
+        ];
+      }
+    } else {
+      merged.set(ws.workspaceId, { ...ws });
+    }
+  }
+  return [...merged.values()];
 }
 
 /**
