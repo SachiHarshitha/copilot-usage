@@ -1,7 +1,7 @@
 /** Workspace-scoped analysis webview panel. */
 
 import * as vscode from 'vscode';
-import { findCurrentWorkspace, discoverWorkspaces } from '../core/discovery';
+import { findCurrentWorkspace, discoverWorkspaces, getWorkspaceStorageRoots } from '../core/discovery';
 import { parseAllFiles, flattenEvents, computeKpis, computeModelStats, computeDailyStats, computeWorkspaceStats } from '../core/aggregator';
 import { computeRepoAttributionStats, discoverRepoDescriptors, RepoAttributionStats } from '../core/repoAttribution';
 import { enableCostEstimator } from '../features/costEstimator/flags';
@@ -48,7 +48,7 @@ export class WorkspacePanel {
   }
 
   public static async refresh(storageRoots?: string[]): Promise<void> {
-    WorkspacePanel.storageRoots = storageRoots ?? WorkspacePanel.storageRoots;
+    WorkspacePanel.storageRoots = storageRoots ?? WorkspacePanel.storageRoots ?? getWorkspaceStorageRoots(vscode.env.appName);
     if (WorkspacePanel.currentPanel) {
       await WorkspacePanel.currentPanel.loadData();
     }
@@ -166,7 +166,7 @@ export class DashboardPanel {
   }
 
   public static async refresh(storageRoots?: string[]): Promise<void> {
-    DashboardPanel.storageRoots = storageRoots ?? DashboardPanel.storageRoots;
+    DashboardPanel.storageRoots = storageRoots ?? DashboardPanel.storageRoots ?? getWorkspaceStorageRoots(vscode.env.appName);
     if (DashboardPanel.currentPanel) {
       await DashboardPanel.currentPanel.loadData();
     }

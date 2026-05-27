@@ -1,7 +1,7 @@
 /** Status bar item showing workspace token count, split by input/output. */
 
 import * as vscode from 'vscode';
-import { findCurrentWorkspace } from '../core/discovery';
+import { findCurrentWorkspace, getWorkspaceStorageRoots } from '../core/discovery';
 import { parseAllFiles, flattenEvents } from '../core/aggregator';
 import { RequestEvent } from '../core/types';
 import { didAffectCopilotDebugLogSetting, isCopilotDebugLogEnabled } from '../core/copilotDebugLog';
@@ -34,7 +34,7 @@ export class StatusBarManager implements vscode.Disposable {
   }
 
   async refresh(storageRoots?: string[]): Promise<void> {
-    this.storageRoots = storageRoots ?? this.storageRoots;
+    this.storageRoots = storageRoots ?? this.storageRoots ?? getWorkspaceStorageRoots(vscode.env.appName);
     if (isCopilotDebugLogEnabled()) {
       this.debugLogItem.hide();
     } else {
