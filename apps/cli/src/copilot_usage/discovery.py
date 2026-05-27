@@ -123,22 +123,28 @@ def discover_all_session_files(
 
 def discover_jsonl_files(
     storage_roots: list[Path] | None = None,
+    storage_root: Path | None = None,
 ) -> list[tuple[str, str, Path]]:
     """Find all chatSessions/*.jsonl files.
 
     Returns list of (workspace_id, workspace_path, jsonl_path).
     """
+    if storage_root is not None and storage_roots is None:
+        storage_roots = [storage_root]
     jsonl, _ = discover_all_session_files(storage_roots=storage_roots)
     return jsonl
 
 
 def discover_legacy_json_files(
     storage_roots: list[Path] | None = None,
+    storage_root: Path | None = None,
 ) -> list[tuple[str, str, Path]]:
     """Find all chatSessions/*.json files (legacy, pre-Feb 2026).
 
     Returns list of (workspace_id, workspace_path, json_path).
     """
+    if storage_root is not None and storage_roots is None:
+        storage_roots = [storage_root]
     _, legacy = discover_all_session_files(storage_roots=storage_roots)
     return legacy
 

@@ -136,14 +136,16 @@ export async function discoverWorkspaces(
   for (const ws of results) {
     const existing = merged.get(ws.workspaceId);
     if (existing) {
-      existing.sessionFiles = [...existing.sessionFiles, ...ws.sessionFiles];
+      existing.sessionFiles = [...new Set([...existing.sessionFiles, ...ws.sessionFiles])];
       if (!existing.workspacePath && ws.workspacePath) {
         existing.workspacePath = ws.workspacePath;
       }
       if (ws.referencedFolders) {
         existing.referencedFolders = [
-          ...(existing.referencedFolders ?? []),
-          ...ws.referencedFolders,
+          ...new Set([
+            ...(existing.referencedFolders ?? []),
+            ...ws.referencedFolders,
+          ]),
         ];
       }
     } else {
