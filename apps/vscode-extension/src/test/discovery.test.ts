@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
-import { getWorkspaceStorageRoots, findCurrentWorkspace, computeChatSessionsSignature } from '../core/discovery';
+import { getWorkspaceStorageRoots, findCurrentWorkspace, computeChatSessionsSignature, discoverWorkspaces } from '../core/discovery';
 
 async function withTempStorage(run: (storageRoot: string, folderA: string, folderB: string, wsFilePath: string) => Promise<void>): Promise<void> {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-usage-discovery-'));
@@ -115,5 +115,57 @@ suite('Discovery: getWorkspaceStorageRoots ordering', () => {
     const roots = getWorkspaceStorageRoots('Visual Studio Code - Insiders');
     assert.ok(roots[0].toLowerCase().includes('code - insiders'), `Expected Insiders root first, got: ${roots[0]}`);
     assert.ok(!roots[1].toLowerCase().includes('code - insiders'), `Expected stable root second, got: ${roots[1]}`);
+  });
+});
+
+suite('Discovery: merged workspace entries across roots', () => {
+  test('merges same workspaceId from multiple storage roots and preserves matching', async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-usage-discovery-merge-'));
+    try {
+      const storageRootStable = path.join(tempRoot, 'stable', 'workspaceStorage');
+      const storageRootInsiders = path.join(tempRoot, 'insiders', 'workspaceStorage');
+      const workspaceId = 'shared-workspace-id';
+
+      const sharedFolder = path.join(tempRoot, 'repo-shared');
+      await fs.mkdir(sharedFolder, { recursive: true });
+
+      const stableWsDir = path.join(storageRootStable, workspaceId);
+      await fs.mkdir(path.join(stableWsDir, 'chatSessions'), { recursive: true });
+      await fs.writeFile(
+        path.join(stableWsDir, 'workspace.json'),
+        JSON.stringify({ folder: pathToFileURL(sharedFolder).toString() }),
+        'utf-8',
+      );
+      await fs.writeFile(path.join(stableWsDir, 'chatSessions', 'stable.jsonl'), '{"kind":0}\n', 'utf-8');
+
+      const insidersWsDir = path.join(storageRootInsiders, workspaceId);
+      await fs.mkdir(path.join(insidersWsDir, 'chatSessions'), { recursive: true });
+      await fs.writeFile(
+        path.join(insidersWsDir, 'workspace.json'),
+        JSON.stringify({ folder: pathToFileURL(sharedFolder).toString() }),
+        'utf-8',
+      );
+      await fs.writeFile(path.join(insidersWsDir, 'chatSessions', 'insiders.jsonl'), '{"kind":0}\n', 'utf-8');
+
+      const workspaces = await discoverWorkspaces([storageRootStable, storageRootInsiders]);
+      assert.strictEqual(workspaces.length, 1, `Expected one merged workspace entry, got ${workspaces.length}`);
+      assert.strictEqual(workspaces[0].workspaceId, workspaceId);
+      assert.strictEqual(workspaces[0].sessionFiles.length, 2, 'Expected merged session files from both roots');
+      assert.ok(
+        workspaces[0].sessionFiles.some((f) => f.endsWith(path.join('chatSessions', 'stable.jsonl'))),
+        'Expected stable root session file to be preserved',
+      );
+      assert.ok(
+        workspaces[0].sessionFiles.some((f) => f.endsWith(path.join('chatSessions', 'insiders.jsonl'))),
+        'Expected Insiders root session file to be preserved',
+      );
+
+      const matched = await findCurrentWorkspace(undefined, [sharedFolder], [storageRootStable, storageRootInsiders]);
+      assert.ok(matched);
+      assert.strictEqual(matched!.workspaceId, workspaceId);
+      assert.strictEqual(matched!.sessionFiles.length, 2);
+    } finally {
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
   });
 });
