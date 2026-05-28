@@ -82,15 +82,17 @@ def resolve_workspace(workspace_dir: Path, storage_root: Path | None = None) -> 
 
 
 def discover_all_session_files(
-    *,
-    storage_roots: list[Path] | None = None,
     storage_root: Path | None = None,  # deprecated: use storage_roots
+    *,
+    storage_roots: list[Path] | Path | None = None,
 ) -> tuple[list[tuple[str, str, Path]], list[tuple[str, str, Path]]]:
     """Single-pass discovery of both JSONL and legacy JSON session files across all roots.
 
     Returns (jsonl_files, legacy_json_files) where each item is
     (workspace_id, workspace_path, file_path).
     """
+    if isinstance(storage_roots, Path):
+        storage_roots = [storage_roots]
     if storage_root is not None and storage_roots is None:
         storage_roots = [storage_root]
     roots = storage_roots or VSCODE_STORAGE_ROOTS
@@ -126,13 +128,16 @@ def discover_all_session_files(
 
 
 def discover_jsonl_files(
-    storage_roots: list[Path] | None = None,
     storage_root: Path | None = None,
+    *,
+    storage_roots: list[Path] | Path | None = None,
 ) -> list[tuple[str, str, Path]]:
     """Find all chatSessions/*.jsonl files.
 
     Returns list of (workspace_id, workspace_path, jsonl_path).
     """
+    if isinstance(storage_roots, Path):
+        storage_roots = [storage_roots]
     if storage_root is not None and storage_roots is None:
         storage_roots = [storage_root]
     jsonl, _ = discover_all_session_files(storage_roots=storage_roots)
@@ -140,13 +145,16 @@ def discover_jsonl_files(
 
 
 def discover_legacy_json_files(
-    storage_roots: list[Path] | None = None,
     storage_root: Path | None = None,
+    *,
+    storage_roots: list[Path] | Path | None = None,
 ) -> list[tuple[str, str, Path]]:
     """Find all chatSessions/*.json files (legacy, pre-Feb 2026).
 
     Returns list of (workspace_id, workspace_path, json_path).
     """
+    if isinstance(storage_roots, Path):
+        storage_roots = [storage_roots]
     if storage_root is not None and storage_roots is None:
         storage_roots = [storage_root]
     _, legacy = discover_all_session_files(storage_roots=storage_roots)
