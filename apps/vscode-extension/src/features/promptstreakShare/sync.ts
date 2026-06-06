@@ -71,7 +71,16 @@ function toNonNegativePremium(value: number): number {
 }
 
 function normalizeBaseUrl(raw: string): string {
-  return raw.replace(/\/+$/, '');
+  const trimmed = (raw || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const withScheme = /^[a-z][a-z\d+\-.]*:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  return withScheme.replace(/\/+$/, '');
 }
 
 function parseRetryAfterSeconds(raw: string | null): number | undefined {
@@ -91,6 +100,16 @@ function classifyTransient(status: number): boolean {
 
 function isAuthFailure(status: number): boolean {
   return status === 401 || status === 403;
+}
+
+export function shouldInvalidateLinkForAuthFailure(
+  currentToken: string | undefined,
+  failingToken: string,
+  status: number,
+): boolean {
+  const active = (currentToken || '').trim();
+  const failing = (failingToken || '').trim();
+  return status === 401 && active.length > 0 && active === failing;
 }
 
 function modelInputsFromEvents(events: RequestEvent[]): ShareModelInput[] {
@@ -259,21 +278,31 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
       });
 
       if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        const trimmed = errorText.length > 120 ? `${errorText.slice(0, 120)}...` : errorText;
+
         if (isAuthFailure(response.status)) {
-          const settings = loadShareSettings(this.context);
-          settings.linkedAtIso = undefined;
-          settings.lastSyncStatus = 'auth_required';
-          await saveShareSettings(this.context, settings);
-          await clearDeviceToken(this.context);
-          this.notify();
+          const invalidated = await this.invalidateLinkIfTokenUnchanged(token, response.status);
+          if (invalidated) {
+            return {
+              updated: false,
+              detail: 'PromptStreak link expired or was revoked. Please link this device again.',
+            };
+          }
+
+          if (response.status === 401) {
+            return {
+              updated: false,
+              detail: `PromptStreak rejected an older link token (HTTP ${response.status}), but a newer link is active. Try saving alias again.`,
+            };
+          }
+
           return {
             updated: false,
-            detail: 'PromptStreak link expired or was revoked. Please link this device again.',
+            detail: `Alias update was rejected (HTTP ${response.status}). Link token was kept.${trimmed ? ` Server detail: ${trimmed}` : ''}`,
           };
         }
 
-        const errorText = await response.text().catch(() => '');
-        const trimmed = errorText.length > 120 ? `${errorText.slice(0, 120)}...` : errorText;
         return {
           updated: false,
           detail: `Alias update failed (HTTP ${response.status})${trimmed ? `: ${trimmed}` : ''}`,
@@ -312,6 +341,21 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
     await saveShareSettings(this.context, settings);
     await setDeviceToken(this.context, token);
     this.notify();
+  }
+
+  private async invalidateLinkIfTokenUnchanged(failingToken: string, status = 401): Promise<boolean> {
+    const currentToken = await getDeviceToken(this.context);
+    if (!shouldInvalidateLinkForAuthFailure(currentToken, failingToken, status)) {
+      return false;
+    }
+
+    const settings = loadShareSettings(this.context);
+    settings.linkedAtIso = undefined;
+    settings.lastSyncStatus = 'auth_required';
+    await saveShareSettings(this.context, settings);
+    await clearDeviceToken(this.context);
+    this.notify();
+    return true;
   }
 
   refreshSchedule(): void {
@@ -462,12 +506,16 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
       });
 
       if (!signatureHeaders) {
-        settings.linkedAtIso = undefined;
-        settings.lastSyncStatus = 'auth_required';
-        await saveShareSettings(this.context, settings);
-        await clearDeviceToken(this.context);
-        this.notify();
-        return this.appendHistory('failed', 'Linked device token is malformed.', false);
+        const invalidated = await this.invalidateLinkIfTokenUnchanged(token);
+        if (invalidated) {
+          return this.appendHistory('failed', 'Linked device token is malformed.', false);
+        }
+
+        return this.appendHistory(
+          'failed',
+          'Skipped malformed stale token because a newer link is already active.',
+          false,
+        );
       }
 
       const response = await fetch(`${normalizeBaseUrl(settings.promptstreakBaseUrl)}/api/upload`, {
@@ -497,15 +545,32 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
       const trimmed = responseBody.length > 120 ? `${responseBody.slice(0, 120)}...` : responseBody;
 
       if (isAuthFailure(response.status)) {
-        settings.linkedAtIso = undefined;
-        settings.lastSyncStatus = 'auth_required';
-        await saveShareSettings(this.context, settings);
-        await clearDeviceToken(this.context);
-        this.notify();
+        const invalidated = await this.invalidateLinkIfTokenUnchanged(token, response.status);
+        if (invalidated) {
+          return this.appendHistory(
+            'failed',
+            `PromptStreak link expired or was revoked (HTTP ${response.status}). Sign in and link this device again.`,
+            false,
+            response.status,
+            payloadBytes,
+            retryAfter,
+          );
+        }
+
+        if (response.status === 401) {
+          return this.appendHistory(
+            'failed',
+            `PromptStreak rejected an older link token (HTTP ${response.status}), but a newer link is active.`,
+            false,
+            response.status,
+            payloadBytes,
+            retryAfter,
+          );
+        }
 
         return this.appendHistory(
           'failed',
-          `PromptStreak link expired or was revoked (HTTP ${response.status}). Sign in and link this device again.`,
+          `Upload rejected (HTTP ${response.status}). Link token was kept.${trimmed ? ` Server detail: ${trimmed}` : ''} This usually indicates a server-side policy/proxy issue, not an expired device token.`,
           false,
           response.status,
           payloadBytes,

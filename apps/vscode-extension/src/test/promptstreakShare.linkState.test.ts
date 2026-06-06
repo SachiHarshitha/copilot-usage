@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 
 import {
+  canUnlinkDevice,
   deriveDeviceLinkState,
   isAuthExpiredLinkStatus,
 } from '../features/promptstreakShare/linkState';
@@ -45,5 +46,15 @@ suite('PromptStreak Share: link state', () => {
     assert.strictEqual(state.linked, false);
     assert.strictEqual(state.disableRelinkActions, false);
     assert.strictEqual(state.statusLabel, 'Not linked');
+  });
+
+  test('canUnlinkDevice stays enabled when auth has expired but token is already cleared', () => {
+    assert.strictEqual(canUnlinkDevice(false, 'auth_required'), true);
+    assert.strictEqual(canUnlinkDevice(false, 'failed:403'), true);
+  });
+
+  test('canUnlinkDevice is disabled only when no token exists and status is not auth-expired', () => {
+    assert.strictEqual(canUnlinkDevice(false, undefined), false);
+    assert.strictEqual(canUnlinkDevice(true, undefined), true);
   });
 });

@@ -20,6 +20,10 @@ export function isAuthExpiredLinkStatus(lastSyncStatus?: string): boolean {
   return status === 'auth_required' || status === 'failed:401' || status === 'failed:403';
 }
 
+export function canUnlinkDevice(hasToken: boolean, lastSyncStatus?: string): boolean {
+  return hasToken || isAuthExpiredLinkStatus(lastSyncStatus);
+}
+
 export function deriveDeviceLinkState(input: DeviceLinkStateInput): DeviceLinkState {
   const authExpired = isAuthExpiredLinkStatus(input.lastSyncStatus);
 

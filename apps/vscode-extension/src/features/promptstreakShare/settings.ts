@@ -4,7 +4,33 @@ import type { ExtensionContext } from 'vscode';
 import { PromptstreakShareSettings, ShareFieldConfig, ShareRecipe } from './types';
 
 const KEY = 'promptstreakShare.settings.v1';
-const LOCAL_PROMPTSTREAK_BASE_URL = 'http://localhost:3000';
+const LOCAL_PROMPTSTREAK_BASE_URL = 'staging.promptstreak.dev';
+const FALLBACK_PROMPTSTREAK_BASE_URL = 'https://staging.promptstreak.dev';
+
+function canonicalPromptstreakBaseUrl(raw: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) {
+    return FALLBACK_PROMPTSTREAK_BASE_URL;
+  }
+
+  const withScheme = /^[a-z][a-z\d+\-.]*:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(withScheme);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return FALLBACK_PROMPTSTREAK_BASE_URL;
+    }
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return FALLBACK_PROMPTSTREAK_BASE_URL;
+  }
+}
+
+const PROMPTSTREAK_BASE_URL = canonicalPromptstreakBaseUrl(LOCAL_PROMPTSTREAK_BASE_URL);
 
 const RECIPE_FIELDS: Record<ShareRecipe, ShareFieldConfig> = {
   privacy_first: {
@@ -33,7 +59,7 @@ export const DEFAULT_SHARE_SETTINGS: PromptstreakShareSettings = {
   fields: { ...RECIPE_FIELDS.privacy_first },
   autoSyncMinutes: 60,
   historyLimit: 100,
-  promptstreakBaseUrl: LOCAL_PROMPTSTREAK_BASE_URL,
+  promptstreakBaseUrl: PROMPTSTREAK_BASE_URL,
   deviceAlias: '',
 };
 
@@ -61,8 +87,8 @@ export function loadShareSettings(ctx: ExtensionContext): PromptstreakShareSetti
     ...DEFAULT_SHARE_SETTINGS,
     ...raw,
     fields: mergeFields(raw.fields),
-    // Keep base URL hardcoded to local for current testing.
-    promptstreakBaseUrl: LOCAL_PROMPTSTREAK_BASE_URL,
+    // Keep base URL pinned for the current staging rollout.
+    promptstreakBaseUrl: PROMPTSTREAK_BASE_URL,
   };
 }
 
@@ -74,6 +100,6 @@ export async function saveShareSettings(
   await ctx.globalState.update(KEY, {
     ...settings,
     deviceAlias: normalizedAlias,
-    promptstreakBaseUrl: LOCAL_PROMPTSTREAK_BASE_URL,
+    promptstreakBaseUrl: PROMPTSTREAK_BASE_URL,
   });
 }

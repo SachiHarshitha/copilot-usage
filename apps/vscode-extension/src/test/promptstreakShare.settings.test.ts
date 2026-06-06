@@ -15,13 +15,20 @@ class InMemoryMemento {
 }
 
 suite('PromptStreak Share: settings', () => {
+  test('loadShareSettings emits an absolute https base URL', () => {
+    const ctx = { globalState: new InMemoryMemento() };
+    const loaded = loadShareSettings(ctx as never);
+    assert.strictEqual(loaded.promptstreakBaseUrl, 'https://staging.promptstreak.dev');
+    assert.ok(loaded.promptstreakBaseUrl.startsWith('https://'));
+  });
+
   test('loadShareSettings returns defaults when state is empty', () => {
     const ctx = { globalState: new InMemoryMemento() };
     const loaded = loadShareSettings(ctx as never);
     assert.deepStrictEqual(loaded, DEFAULT_SHARE_SETTINGS);
   });
 
-  test('loadShareSettings keeps localhost base URL even when persisted state has a remote URL', async () => {
+  test('loadShareSettings keeps pinned staging base URL even when persisted state has a remote URL', async () => {
     const ctx = { globalState: new InMemoryMemento() };
     await ctx.globalState.update('promptstreakShare.settings.v1', {
       ...DEFAULT_SHARE_SETTINGS,
@@ -29,10 +36,10 @@ suite('PromptStreak Share: settings', () => {
     });
 
     const loaded = loadShareSettings(ctx as never);
-    assert.strictEqual(loaded.promptstreakBaseUrl, 'http://localhost:3000');
+    assert.strictEqual(loaded.promptstreakBaseUrl, 'https://staging.promptstreak.dev');
   });
 
-  test('save + load roundtrip preserves explicit values', async () => {
+  test('save + load roundtrip preserves explicit values while pinning staging base URL', async () => {
     const ctx = { globalState: new InMemoryMemento() };
     const updated = {
       ...DEFAULT_SHARE_SETTINGS,
@@ -53,7 +60,7 @@ suite('PromptStreak Share: settings', () => {
     const loaded = loadShareSettings(ctx as never);
     assert.deepStrictEqual(loaded, {
       ...updated,
-      promptstreakBaseUrl: 'http://localhost:3000',
+      promptstreakBaseUrl: 'https://staging.promptstreak.dev',
     });
   });
 

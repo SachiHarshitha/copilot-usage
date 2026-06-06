@@ -18,7 +18,7 @@ import {
   setPendingLinkState,
 } from './storage';
 import { PromptstreakShareSyncService } from './sync';
-import { deriveDeviceLinkState } from './linkState';
+import { canUnlinkDevice, deriveDeviceLinkState } from './linkState';
 import { ShareFieldConfig, ShareRecipe } from './types';
 import { PROMPTSTREAK_LINK_PATH } from './linkCallback';
 import { buildDeviceFingerprint } from './deviceFingerprint';
@@ -164,6 +164,7 @@ export class PromptstreakSharePanel {
       lastSyncStatus: settings.lastSyncStatus,
       hasPendingLinkState: !!pendingLinkState,
     });
+    const canUnlink = canUnlinkDevice(!!token, settings.lastSyncStatus);
 
     this.setHtml(getPromptstreakShareHtml({
       settings,
@@ -180,7 +181,7 @@ export class PromptstreakSharePanel {
       linkStatusLabel: linkState.statusLabel,
       linkStatusTone: linkState.statusTone,
       disableRelinkActions: linkState.disableRelinkActions,
-      canUnlink: !!token,
+      canUnlink,
     }));
   }
 
@@ -321,6 +322,7 @@ export class PromptstreakSharePanel {
     const settings = loadShareSettings(this.context);
     settings.enabled = false;
     settings.linkedAtIso = undefined;
+    settings.lastSyncStatus = undefined;
     await saveShareSettings(this.context, settings);
     await clearPendingLinkState(this.context);
 
