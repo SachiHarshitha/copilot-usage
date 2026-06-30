@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Vibe Combined Profile Demo</title>
+  <style>
+    :root {
+      --bg: #f7f9f8;
+      --surface: #ffffff;
+      --line: #d9e3dd;
+      --text: #202a24;
+      --muted: #637067;
+      --accent: #184f35;
+      --chip: #edf6f0;
+      --shadow: 0 20px 42px rgba(24, 63, 45, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(900px 500px at 7% -5%, #dcf0df 0%, transparent 58%),
+        radial-gradient(1000px 600px at 100% -6%, #dfecf6 0%, transparent 60%),
+        linear-gradient(180deg, var(--bg) 0%, #fbfcfb 100%);
+      padding: 24px 20px 34px;
+    }
+
+    .shell {
+      max-width: 1250px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .hero {
+      background: linear-gradient(120deg, #fefefe 0%, #f3fbf6 100%);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(25px, 4vw, 35px);
+      line-height: 1.08;
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+      max-width: 85ch;
+      font-size: 14px;
+    }
+
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+
+    .chip {
+      font-size: 12px;
+      color: #25573d;
+      background: var(--chip);
+      border: 1px solid #cfe3d7;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-weight: 700;
+    }
+
+    .layout {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+
+    .frame-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .frame-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #284e3a;
+      padding: 0 2px;
+    }
+
+    iframe {
+      width: 100%;
+      border: 1px solid #dbe5dd;
+      border-radius: 12px;
+      background: #ffffff;
+    }
+
+    .h-map {
+      height: 690px;
+    }
+
+    .h-style {
+      height: 770px;
+    }
+
+    .note {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+      border-top: 1px dashed var(--line);
+      padding-top: 10px;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        padding: 14px 10px 20px;
+      }
+
+      .hero,
+      .frame-card {
+        border-radius: 12px;
+        padding: 10px;
+      }
+
+      .h-map {
+        height: 640px;
+      }
+
+      .h-style {
+        height: 730px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">PromptStreak / Profile Concept</p>
+      <h1>Agent Vibe Profile Demo</h1>
+      <p class="subtitle">
+        This combined preview includes a check-in heatmap and a double-sided XY style graph focused on
+        coding-agent behavior. It intentionally avoids GitHub event semantics and uses agent-vibe criteria.
+      </p>
+      <div class="chips">
+        <span class="chip">Agent check-ins</span>
+        <span class="chip">Vibe quadrants</span>
+        <span class="chip">Action density</span>
+        <span class="chip">Model exploration</span>
+      </div>
+    </section>
+
+    <section class="layout">
+      <article class="frame-card">
+        <h2 class="frame-title">1) Agent Check-in Heatmap</h2>
+        <iframe class="h-map" src="./agent-vibe-checkin-demo.html" title="Agent check-in heatmap demo"></iframe>
+      </article>
+
+      <article class="frame-card">
+        <h2 class="frame-title">2) Agent Vibe XY Style Map</h2>
+        <iframe class="h-style" src="./agent-vibe-style-map-demo.html" title="Agent vibe style map demo"></iframe>
+      </article>
+    </section>
+
+    <p class="note">
+      Data anchor comes from the baseline model usage file under reference. Day-level and action-level points are deterministic
+      inferred samples for UX demonstration only.
+    </p>
+  </main>
+</body>
+</html>

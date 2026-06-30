@@ -1,0 +1,1059 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Vibe XY (Alt Design) Demo</title>
+  <style>
+    :root {
+      --bg: #f5f8f6;
+      --panel: #ffffff;
+      --line: #d8e4dc;
+      --text: #1e2922;
+      --muted: #627066;
+      --green: #1f6a43;
+      --blue: #245fa8;
+      --q1: #eef7ff;
+      --q2: #effaf2;
+      --q3: #f8f1ff;
+      --q4: #fff2ec;
+      --chip: #eaf5ee;
+      --shadow: 0 20px 42px rgba(23, 63, 40, 0.12);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 680px at 8% -8%, #dcefdc 0%, transparent 56%),
+        radial-gradient(1100px 720px at 95% -10%, #dce8f5 0%, transparent 58%),
+        linear-gradient(180deg, var(--bg) 0%, #fafcfb 100%);
+      padding: 22px 16px 30px;
+    }
+
+    .app {
+      max-width: 1380px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+
+    .hero,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .eyebrow {
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 6px 0 8px;
+      font-size: clamp(22px, 3.5vw, 34px);
+      line-height: 1.1;
+      color: #183f2a;
+    }
+
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 14px;
+      max-width: 90ch;
+    }
+
+    .chips {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #cde3d4;
+      background: var(--chip);
+      font-size: 11px;
+      font-weight: 700;
+      color: #2b5d42;
+    }
+
+    .layout {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: minmax(300px, 1.05fr) minmax(460px, 1.2fr) minmax(300px, 1fr);
+      align-items: start;
+    }
+
+    .section-title {
+      margin: 0 0 8px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #244a35;
+    }
+
+    .grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(120px, 1fr));
+      gap: 8px;
+    }
+
+    .field {
+      display: grid;
+      gap: 4px;
+    }
+
+    label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid #cfddd2;
+      border-radius: 10px;
+      padding: 7px 8px;
+      font: inherit;
+      color: var(--text);
+      background: #ffffff;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(100px, 1fr));
+      gap: 8px;
+    }
+
+    .kpi {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px;
+      background: linear-gradient(180deg, #ffffff 0%, #f7fbf8 100%);
+    }
+
+    .kpi .k {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      margin: 0 0 3px;
+    }
+
+    .kpi .v {
+      margin: 0;
+      font-size: 18px;
+      color: #194f33;
+      font-weight: 800;
+    }
+
+    .map-wrap {
+      display: grid;
+      gap: 10px;
+    }
+
+    .map {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border: 1px solid #cddad2;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #ffffff;
+      min-height: 340px;
+    }
+
+    .quad {
+      position: absolute;
+      width: 50%;
+      height: 50%;
+      opacity: 0.9;
+    }
+
+    .q1 { left: 0; top: 0; background: var(--q1); }
+    .q2 { left: 50%; top: 0; background: var(--q2); }
+    .q3 { left: 0; top: 50%; background: var(--q3); }
+    .q4 { left: 50%; top: 50%; background: var(--q4); }
+
+    .axis-h,
+    .axis-v {
+      position: absolute;
+      background: rgba(70, 102, 86, 0.45);
+      z-index: 2;
+    }
+
+    .axis-h { left: 0; right: 0; top: 50%; height: 2px; transform: translateY(-1px); }
+    .axis-v { top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-1px); }
+
+    .quad-label {
+      position: absolute;
+      z-index: 2;
+      font-size: 11px;
+      font-weight: 700;
+      color: #4d6a58;
+      pointer-events: none;
+    }
+
+    .ql1 { top: 10px; left: 10px; }
+    .ql2 { top: 10px; right: 10px; }
+    .ql3 { bottom: 10px; left: 10px; }
+    .ql4 { bottom: 10px; right: 10px; }
+
+    .point,
+    .smooth-point {
+      position: absolute;
+      z-index: 3;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .point {
+      width: 16px;
+      height: 16px;
+      background: #0f4f88;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 4px rgba(15, 79, 136, 0.2);
+    }
+
+    .smooth-point {
+      width: 13px;
+      height: 13px;
+      background: #1f6a43;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 0 3px rgba(31, 106, 67, 0.2);
+    }
+
+    .point-label {
+      position: absolute;
+      z-index: 4;
+      transform: translate(10px, -18px);
+      font-size: 11px;
+      font-weight: 700;
+      color: #104875;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #cfe0ee;
+      border-radius: 8px;
+      padding: 2px 6px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .axis-notes {
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .bars {
+      display: grid;
+      gap: 8px;
+    }
+
+    .bar-row {
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .bar-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      align-items: baseline;
+    }
+
+    .bar-track {
+      height: 9px;
+      background: #ecf2ee;
+      border-radius: 999px;
+      border: 1px solid #dbe7df;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, #2b7a50 0%, #4aab77 100%);
+    }
+
+    .source {
+      color: #6d7f72;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+    }
+
+    .json {
+      margin: 0;
+      background: #0e1720;
+      color: #dff6ec;
+      border: 1px solid #1f3347;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.35;
+      max-height: 460px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .traits {
+      display: grid;
+      gap: 7px;
+    }
+
+    .trait {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbfa 100%);
+      display: grid;
+      gap: 4px;
+    }
+
+    .trait .name {
+      font-size: 12px;
+      font-weight: 700;
+      color: #234b34;
+      margin: 0;
+    }
+
+    .trait .meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .warn {
+      border: 1px solid #f1d3c5;
+      background: #fff3ee;
+      color: #8c4d34;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.4;
+      display: none;
+    }
+
+    .small {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .baseline-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .baseline-item {
+      display: grid;
+      grid-template-columns: minmax(110px, 1fr) 1fr 38px;
+      gap: 8px;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text);
+    }
+
+    .baseline-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: #edf1f7;
+      border: 1px solid #dbe3ee;
+      overflow: hidden;
+    }
+
+    .baseline-bar > span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #205c9a 0%, #4d93d6 100%);
+    }
+
+    @media (max-width: 1200px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .map {
+        max-width: 640px;
+      }
+    }
+
+    @media (max-width: 700px) {
+      body { padding: 12px 8px 18px; }
+      .hero, .panel { border-radius: 12px; padding: 10px; }
+      .field-grid { grid-template-columns: 1fr; }
+      .kpis { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <p class="eyebrow">Alternate Design Demo</p>
+      <h1>Agent Vibe XY Map (Method v1.0.0)</h1>
+      <p class="sub">
+        This demo implements the exact style-map method from your alternate design doc: normalization bounds,
+        weighted-available components, confidence with reliability x sample coverage, smoothing, secondary traits,
+        and privacy-safe public output.
+      </p>
+      <div class="chips">
+        <span class="chip">No prompts or source code</span>
+        <span class="chip">Not a skill score</span>
+        <span class="chip">Usage style only</span>
+        <span class="chip">Local-first aggregate signals</span>
+      </div>
+    </section>
+
+    <section class="layout">
+      <section class="panel grid">
+        <h2 class="section-title">Inputs</h2>
+        <div class="field-grid">
+          <div class="field"><label for="totalRequests">Total requests</label><input id="totalRequests" type="number" min="0" step="1" value="184" /></div>
+          <div class="field"><label for="activeDays">Active days</label><input id="activeDays" type="number" min="0" step="1" value="18" /></div>
+
+          <div class="field"><label for="chatRequests">Chat requests</label><input id="chatRequests" type="number" min="0" step="1" value="40" /></div>
+          <div class="field"><label for="editRequests">Edit requests</label><input id="editRequests" type="number" min="0" step="1" value="30" /></div>
+
+          <div class="field"><label for="agentRequests">Agent requests</label><input id="agentRequests" type="number" min="0" step="1" value="114" /></div>
+          <div class="field"><label for="repoCount">Repo count</label><input id="repoCount" type="number" min="0" step="1" value="12" /></div>
+
+          <div class="field"><label for="inputTokens">Input tokens</label><input id="inputTokens" type="number" min="0" step="1" /></div>
+          <div class="field"><label for="outputTokens">Output tokens</label><input id="outputTokens" type="number" min="0" step="1" /></div>
+
+          <div class="field"><label for="agentHeavyRatio">Agent-heavy ratio (0-1)</label><input id="agentHeavyRatio" type="number" min="0" max="1" step="0.01" value="0.71" /></div>
+          <div class="field"><label for="medianSessionMinutes">Median session minutes</label><input id="medianSessionMinutes" type="number" min="0" step="0.1" value="28" /></div>
+
+          <div class="field"><label for="toolCallRounds">Tool call rounds / request (optional)</label><input id="toolCallRounds" type="number" min="0" step="0.01" value="1.6" /></div>
+          <div class="field"><label for="modelSwitchRate">Model switch rate (optional, 0-1)</label><input id="modelSwitchRate" type="number" min="0" max="1" step="0.01" value="0.11" /></div>
+
+          <div class="field"><label for="turnsPerSession">Turns / session (event-level, optional)</label><input id="turnsPerSession" type="number" min="0" step="0.1" value="4.8" /></div>
+          <div class="field"><label for="followupRate">Follow-up rate (event-level, optional)</label><input id="followupRate" type="number" min="0" max="1" step="0.01" value="0.46" /></div>
+
+          <div class="field"><label for="editAfterGenerationRate">Edit-after-generation rate (event-level, optional)</label><input id="editAfterGenerationRate" type="number" min="0" max="1" step="0.01" value="0.33" /></div>
+          <div class="field"><label for="distinctModelCount">Distinct model count (optional)</label><input id="distinctModelCount" type="number" min="0" step="1" value="5" /></div>
+
+          <div class="field"><label for="cacheReadRatio">Cache read ratio (optional, 0-1)</label><input id="cacheReadRatio" type="number" min="0" max="1" step="0.01" value="0.32" /></div>
+          <div class="field"><label for="nightUsageShare">Night usage share (optional, 0-1)</label><input id="nightUsageShare" type="number" min="0" max="1" step="0.01" value="0.22" /></div>
+
+          <div class="field"><label for="weekendUsageShare">Weekend usage share (optional, 0-1)</label><input id="weekendUsageShare" type="number" min="0" max="1" step="0.01" value="0.31" /></div>
+          <div class="field"><label for="alpha">EWMA alpha</label><input id="alpha" type="number" min="0" max="1" step="0.01" value="0.35" /></div>
+
+          <div class="field"><label for="prevXSmoothed">Previous smoothed X</label><input id="prevXSmoothed" type="number" min="0" max="100" step="1" value="59" /></div>
+          <div class="field"><label for="prevYSmoothed">Previous smoothed Y</label><input id="prevYSmoothed" type="number" min="0" max="100" step="1" value="61" /></div>
+        </div>
+
+        <div class="row">
+          <label class="toggle"><input id="preferEventY" type="checkbox" checked /> Prefer event-level Y formula when available</label>
+          <label class="toggle"><input id="freezeToInsufficient" type="checkbox" /> Force insufficient-data preview</label>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="coreSource">Core metrics source reliability</label>
+            <select id="coreSource">
+              <option value="exact" selected>exact</option>
+              <option value="parsed_log">parsed_log</option>
+              <option value="estimated">estimated</option>
+              <option value="user_entered">user_entered</option>
+              <option value="unknown">unknown</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="behaviorSource">Behavioral optional source reliability</label>
+            <select id="behaviorSource">
+              <option value="exact">exact</option>
+              <option value="parsed_log" selected>parsed_log</option>
+              <option value="estimated">estimated</option>
+              <option value="user_entered">user_entered</option>
+              <option value="unknown">unknown</option>
+            </select>
+          </div>
+        </div>
+
+        <p class="hint">All scores are style descriptors. They should not be used for ranking or performance judgment.</p>
+
+        <div>
+          <h3 class="section-title">Baseline token mix anchor</h3>
+          <div class="baseline-list" id="baselineList"></div>
+          <p class="small">Defaults for input/output tokens are seeded from reference/baseline_usage_from_screenshot.csv totals.</p>
+        </div>
+      </section>
+
+      <section class="panel grid">
+        <h2 class="section-title">XY Style Map</h2>
+
+        <div class="warn" id="insufficientWarn"></div>
+
+        <div class="kpis" id="kpis"></div>
+
+        <div class="map-wrap">
+          <div class="map" id="map">
+            <div class="quad q1"></div>
+            <div class="quad q2"></div>
+            <div class="quad q3"></div>
+            <div class="quad q4"></div>
+            <div class="axis-h"></div>
+            <div class="axis-v"></div>
+            <div class="quad-label ql1">Reflective Crafter</div>
+            <div class="quad-label ql2">Agentic Architect</div>
+            <div class="quad-label ql3">Direct Executor</div>
+            <div class="quad-label ql4">Agent Sprinter</div>
+            <div class="smooth-point" id="smoothPoint" title="Smoothed score"></div>
+            <div class="point" id="currentPoint" title="Current score"></div>
+            <div class="point-label" id="pointLabel">Current</div>
+          </div>
+          <div class="axis-notes">
+            <div><strong>X Axis (Agenticity):</strong> Manual / inline assistance -> agent-driven workflow</div>
+            <div><strong>Y Axis (Deliberation):</strong> Fast / direct interactions -> reflective / iterative workflow</div>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="section-title">X Components</h3>
+          <div class="bars" id="xBars"></div>
+        </div>
+
+        <div>
+          <h3 class="section-title">Y Components</h3>
+          <div class="bars" id="yBars"></div>
+        </div>
+      </section>
+
+      <section class="panel grid">
+        <h2 class="section-title">Output Summary</h2>
+        <div class="small" id="summaryText"></div>
+
+        <div>
+          <h3 class="section-title">Secondary Traits</h3>
+          <div class="traits" id="traits"></div>
+        </div>
+
+        <div>
+          <h3 class="section-title">Privacy-Safe JSON</h3>
+          <pre class="json" id="jsonOut"></pre>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const BASELINE_MODELS = [
+      { model: "Claude Opus 4.6", provider: "Anthropic", input: 16051864, output: 109542, share: 81.53 },
+      { model: "Claude Opus 4.7", provider: "Anthropic", input: 2142007, output: 17647, share: 10.95 },
+      { model: "Claude Sonnet 4.6", provider: "Anthropic", input: 1221691, output: 11835, share: 3.77 },
+      { model: "GPT-5.3-Codex", provider: "OpenAI", input: 1593442, output: 10186, share: 2.88 },
+      { model: "Claude Sonnet 4.5", provider: "Anthropic", input: 235900, output: 11464, share: 0.86 },
+    ];
+
+    const REL = {
+      exact: 1.0,
+      parsed_log: 0.85,
+      estimated: 0.6,
+      user_entered: 0.5,
+      unknown: 0.3,
+    };
+
+    function clamp(v, lo, hi) {
+      return Math.max(lo, Math.min(hi, v));
+    }
+
+    function norm01(v, lo, hi) {
+      if (v === null || v === undefined || Number.isNaN(v)) return null;
+      if (hi === lo) return null;
+      return clamp((v - lo) / (hi - lo), 0, 1);
+    }
+
+    function weightedMeanAvailable(components) {
+      let num = 0;
+      let den = 0;
+      const available = [];
+      for (const c of components) {
+        if (c.value === null || c.value === undefined || Number.isNaN(c.value)) continue;
+        num += c.value * c.weight;
+        den += c.weight;
+        available.push(c);
+      }
+      if (den === 0) return { value: null, available, den: 0 };
+      return { value: num / den, available, den };
+    }
+
+    function confidenceLabel(score) {
+      if (score >= 0.8) return "high";
+      if (score >= 0.6) return "medium";
+      if (score >= 0.4) return "low";
+      return "very_low";
+    }
+
+    function reliabilityWeighted(components) {
+      let num = 0;
+      let den = 0;
+      for (const c of components) {
+        const rel = REL[c.source] ?? REL.unknown;
+        num += c.weight * rel;
+        den += c.weight;
+      }
+      if (den === 0) return null;
+      return num / den;
+    }
+
+    function bandLabel(score0to100) {
+      if (score0to100 < 25) return "Low";
+      if (score0to100 < 50) return "Moderate";
+      if (score0to100 < 75) return "High";
+      return "Very High";
+    }
+
+    function styleQuadrant(xScore, yScore) {
+      if (xScore < 50 && yScore < 50) {
+        return {
+          name: "Direct Executor",
+          description: "Manual + direct interactions with short transactional loops.",
+        };
+      }
+      if (xScore >= 50 && yScore < 50) {
+        return {
+          name: "Agent Sprinter",
+          description: "Agentic delegation with speed-first execution.",
+        };
+      }
+      if (xScore < 50 && yScore >= 50) {
+        return {
+          name: "Reflective Crafter",
+          description: "Manual guidance plus deeper revision and thought loops.",
+        };
+      }
+      return {
+        name: "Agentic Architect",
+        description: "Agentic delegation paired with deliberate iteration.",
+      };
+    }
+
+    function contextLabel(score0to100) {
+      if (score0to100 < 25) return "Context Minimalist";
+      if (score0to100 < 75) return "Context Balancer";
+      return "Context Hoarder";
+    }
+
+    function toNum(id, optional) {
+      const raw = document.getElementById(id).value.trim();
+      if (raw.length === 0) return optional ? null : 0;
+      const n = Number(raw);
+      if (!Number.isFinite(n)) return optional ? null : 0;
+      return n;
+    }
+
+    function seedInputOutputFromBaseline() {
+      const sumInput = BASELINE_MODELS.reduce((a, m) => a + m.input, 0);
+      const sumOutput = BASELINE_MODELS.reduce((a, m) => a + m.output, 0);
+      document.getElementById("inputTokens").value = String(sumInput);
+      document.getElementById("outputTokens").value = String(sumOutput);
+
+      const list = document.getElementById("baselineList");
+      list.innerHTML = "";
+      for (const row of BASELINE_MODELS) {
+        const item = document.createElement("div");
+        item.className = "baseline-item";
+
+        const name = document.createElement("div");
+        name.textContent = row.model;
+
+        const bar = document.createElement("div");
+        bar.className = "baseline-bar";
+        const fill = document.createElement("span");
+        fill.style.width = row.share + "%";
+        bar.appendChild(fill);
+
+        const pct = document.createElement("div");
+        pct.textContent = row.share.toFixed(1) + "%";
+        pct.style.textAlign = "right";
+        pct.style.fontWeight = "700";
+        pct.style.color = "#2c5a85";
+
+        item.appendChild(name);
+        item.appendChild(bar);
+        item.appendChild(pct);
+        list.appendChild(item);
+      }
+    }
+
+    function createBarRows(containerId, components) {
+      const root = document.getElementById(containerId);
+      root.innerHTML = "";
+      for (const c of components) {
+        const row = document.createElement("div");
+        row.className = "bar-row";
+
+        const top = document.createElement("div");
+        top.className = "bar-top";
+
+        const left = document.createElement("span");
+        left.textContent = c.label + " (w=" + c.weight.toFixed(2) + ")";
+
+        const right = document.createElement("span");
+        right.innerHTML = "<span class=\"source\">" + c.source + "</span> " + (c.value === null ? "missing" : Math.round(c.value * 100) + "%");
+
+        top.appendChild(left);
+        top.appendChild(right);
+
+        const track = document.createElement("div");
+        track.className = "bar-track";
+
+        const fill = document.createElement("div");
+        fill.className = "bar-fill";
+        fill.style.width = c.value === null ? "0%" : (c.value * 100).toFixed(1) + "%";
+        if (c.value === null) fill.style.background = "#c4cfcc";
+        track.appendChild(fill);
+
+        row.appendChild(top);
+        row.appendChild(track);
+        root.appendChild(row);
+      }
+    }
+
+    function createTraits(traits) {
+      const root = document.getElementById("traits");
+      root.innerHTML = "";
+      for (const t of traits) {
+        const el = document.createElement("article");
+        el.className = "trait";
+
+        const name = document.createElement("p");
+        name.className = "name";
+        name.textContent = t.name;
+
+        const meta = document.createElement("p");
+        meta.className = "meta";
+        meta.textContent = (t.score === null ? "n/a" : Math.round(t.score) + "/100") + " • " + t.label;
+
+        el.appendChild(name);
+        el.appendChild(meta);
+        root.appendChild(el);
+      }
+    }
+
+    function setPoint(id, x, y) {
+      const el = document.getElementById(id);
+      el.style.left = clamp(x, 0, 100) + "%";
+      el.style.top = clamp(100 - y, 0, 100) + "%";
+    }
+
+    function refresh() {
+      const totalRequests = Math.max(0, toNum("totalRequests", false));
+      const activeDaysInput = toNum("activeDays", true);
+      const chatRequests = Math.max(0, toNum("chatRequests", false));
+      const editRequests = Math.max(0, toNum("editRequests", false));
+      const agentRequests = Math.max(0, toNum("agentRequests", false));
+      const inputTokens = Math.max(0, toNum("inputTokens", false));
+      const outputTokens = Math.max(0, toNum("outputTokens", false));
+      const agentHeavyRatio = clamp(toNum("agentHeavyRatio", true) ?? 0, 0, 1);
+      const medianSessionMinutes = Math.max(0, toNum("medianSessionMinutes", false));
+      const toolCallRounds = toNum("toolCallRounds", true);
+      const modelSwitchRate = toNum("modelSwitchRate", true);
+      const turnsPerSession = toNum("turnsPerSession", true);
+      const followupRate = toNum("followupRate", true);
+      const editAfterGenerationRate = toNum("editAfterGenerationRate", true);
+      const distinctModelCount = toNum("distinctModelCount", true);
+      const repoCount = toNum("repoCount", true);
+      const cacheReadRatio = toNum("cacheReadRatio", true);
+      const nightUsageShare = toNum("nightUsageShare", true);
+      const weekendUsageShare = toNum("weekendUsageShare", true);
+      const alpha = clamp(toNum("alpha", false), 0, 1);
+      const prevXSmoothed = clamp(toNum("prevXSmoothed", false), 0, 100);
+      const prevYSmoothed = clamp(toNum("prevYSmoothed", false), 0, 100);
+
+      const preferEventY = document.getElementById("preferEventY").checked;
+      const forceInsufficient = document.getElementById("freezeToInsufficient").checked;
+
+      const coreSource = document.getElementById("coreSource").value;
+      const behaviorSource = document.getElementById("behaviorSource").value;
+
+      const minimumTotalRequests = 10;
+      const insufficient = forceInsufficient || totalRequests < minimumTotalRequests;
+
+      const agentRequestShare = totalRequests > 0 ? agentRequests / totalRequests : 0;
+      const toolIntensity = toolCallRounds === null ? null : norm01(toolCallRounds, 0.0, 4.0);
+
+      const xComponents = [
+        { key: "agentRequestShare", label: "agentRequestShare", value: clamp(agentRequestShare, 0, 1), weight: 0.5, source: coreSource },
+        { key: "agentHeavy", label: "agentHeavy", value: clamp(agentHeavyRatio, 0, 1), weight: 0.3, source: coreSource },
+        { key: "toolIntensity", label: "toolIntensity", value: toolIntensity, weight: 0.2, source: behaviorSource },
+      ];
+
+      const xMean = weightedMeanAvailable(xComponents);
+      const xRaw = xMean.value;
+      const xScore = xRaw === null ? null : Math.round(xRaw * 100);
+
+      const sessionMs = medianSessionMinutes * 60 * 1000;
+      const sessionDepth = norm01(sessionMs, 2 * 60 * 1000, 45 * 60 * 1000);
+
+      const useEventY = preferEventY
+        && turnsPerSession !== null
+        && followupRate !== null
+        && editAfterGenerationRate !== null;
+
+      let yComponents;
+      if (useEventY) {
+        yComponents = [
+          { key: "sessionDepth", label: "sessionDepth", value: sessionDepth, weight: 0.25, source: coreSource },
+          { key: "turnDepth", label: "turnDepth", value: norm01(turnsPerSession, 1.0, 8.0), weight: 0.25, source: behaviorSource },
+          { key: "followupDepth", label: "followupDepth", value: norm01(followupRate, 0.0, 0.75), weight: 0.20, source: behaviorSource },
+          { key: "editDepth", label: "editDepth", value: norm01(editAfterGenerationRate, 0.0, 0.60), weight: 0.20, source: behaviorSource },
+          { key: "toolDepth", label: "toolDepth", value: toolIntensity, weight: 0.10, source: behaviorSource },
+        ];
+      } else {
+        const editShare = totalRequests > 0 ? editRequests / totalRequests : 0;
+        const generationRatio = outputTokens / Math.max(inputTokens, 1);
+        yComponents = [
+          { key: "sessionDepth", label: "sessionDepth", value: sessionDepth, weight: 0.35, source: coreSource },
+          { key: "editDepth", label: "editDepth", value: norm01(editShare, 0.0, 0.60), weight: 0.25, source: coreSource },
+          { key: "generationExpansion", label: "generationExpansion", value: norm01(generationRatio, 0.10, 1.20), weight: 0.20, source: coreSource },
+          { key: "toolDepth", label: "toolDepth", value: toolIntensity, weight: 0.15, source: behaviorSource },
+          { key: "modelSwitch", label: "modelSwitch", value: modelSwitchRate === null ? null : norm01(modelSwitchRate, 0.0, 0.30), weight: 0.05, source: behaviorSource },
+        ];
+      }
+
+      const yMean = weightedMeanAvailable(yComponents);
+      const yRaw = yMean.value;
+      const yScore = yRaw === null ? null : Math.round(yRaw * 100);
+
+      const requestCoverage = Math.min(1, Math.sqrt(totalRequests / 50));
+      const activeDayCoverage = activeDaysInput === null ? 0.70 : Math.min(1, activeDaysInput / 10);
+      const sampleConfidence = requestCoverage * activeDayCoverage;
+
+      const xFieldReliability = reliabilityWeighted(xMean.available);
+      const yFieldReliability = reliabilityWeighted(yMean.available);
+
+      const xConfidenceScore = xFieldReliability === null ? 0 : xFieldReliability * sampleConfidence;
+      const yConfidenceScore = yFieldReliability === null ? 0 : yFieldReliability * sampleConfidence;
+
+      const xConfidenceLabel = confidenceLabel(xConfidenceScore);
+      const yConfidenceLabel = confidenceLabel(yConfidenceScore);
+
+      const safeXScore = xScore ?? 0;
+      const safeYScore = yScore ?? 0;
+
+      const style = styleQuadrant(safeXScore, safeYScore);
+      const xSmoothed = Math.round(alpha * safeXScore + (1 - alpha) * prevXSmoothed);
+      const ySmoothed = Math.round(alpha * safeYScore + (1 - alpha) * prevYSmoothed);
+      const xDelta = safeXScore - prevXSmoothed;
+      const yDelta = safeYScore - prevYSmoothed;
+
+      const repoBreadthScore = repoCount === null ? null : norm01(repoCount, 1, 20) * 100;
+      const modelBreadth = distinctModelCount === null ? null : norm01(distinctModelCount, 1, 6);
+      const modelSwitchNorm = modelSwitchRate === null ? null : norm01(modelSwitchRate, 0.0, 0.30);
+      const modelExplorer = weightedMeanAvailable([
+        { key: "modelBreadth", value: modelBreadth, weight: 0.60, source: behaviorSource },
+        { key: "modelSwitch", value: modelSwitchNorm, weight: 0.40, source: behaviorSource },
+      ]).value;
+
+      const avgInputPerReq = inputTokens / Math.max(totalRequests, 1);
+      const contextLoadScore = norm01(avgInputPerReq, 500, 12000) * 100;
+      const cacheWizardScore = cacheReadRatio === null ? null : norm01(cacheReadRatio, 0.10, 0.85) * 100;
+      const agentWrangler = weightedMeanAvailable([
+        { key: "agentRequestShare", value: clamp(agentRequestShare, 0, 1), weight: 0.50, source: coreSource },
+        { key: "toolIntensity", value: toolIntensity, weight: 0.50, source: behaviorSource },
+      ]).value;
+      const nightBuilderScore = nightUsageShare === null ? null : norm01(nightUsageShare, 0.10, 0.60) * 100;
+      const weekendBuilderScore = weekendUsageShare === null ? null : norm01(weekendUsageShare, 0.20, 0.70) * 100;
+
+      const traits = [
+        { name: "Repo Explorer", score: repoBreadthScore, label: repoBreadthScore === null ? "n/a" : bandLabel(repoBreadthScore) },
+        { name: "Model Explorer", score: modelExplorer === null ? null : modelExplorer * 100, label: modelExplorer === null ? "n/a" : bandLabel(modelExplorer * 100) },
+        { name: contextLabel(contextLoadScore), score: contextLoadScore, label: bandLabel(contextLoadScore) },
+        { name: "Cache Wizard", score: cacheWizardScore, label: cacheWizardScore === null ? "n/a" : bandLabel(cacheWizardScore) },
+        { name: "Agent Wrangler", score: agentWrangler === null ? null : agentWrangler * 100, label: agentWrangler === null ? "n/a" : bandLabel(agentWrangler * 100) },
+        { name: "Night Builder", score: nightBuilderScore, label: nightBuilderScore === null ? "n/a" : bandLabel(nightBuilderScore) },
+        { name: "Weekend Builder", score: weekendBuilderScore, label: weekendBuilderScore === null ? "n/a" : bandLabel(weekendBuilderScore) },
+      ];
+
+      const kpiData = [
+        { k: "X Agenticity", v: safeXScore + "/100" },
+        { k: "Y Deliberation", v: safeYScore + "/100" },
+        { k: "Quadrant", v: style.name },
+        { k: "Sample confidence", v: Math.round(sampleConfidence * 100) + "%" },
+        { k: "X confidence", v: xConfidenceLabel },
+        { k: "Y confidence", v: yConfidenceLabel },
+      ];
+
+      const kpis = document.getElementById("kpis");
+      kpis.innerHTML = "";
+      for (const item of kpiData) {
+        const card = document.createElement("article");
+        card.className = "kpi";
+
+        const k = document.createElement("p");
+        k.className = "k";
+        k.textContent = item.k;
+
+        const v = document.createElement("p");
+        v.className = "v";
+        v.textContent = item.v;
+
+        card.appendChild(k);
+        card.appendChild(v);
+        kpis.appendChild(card);
+      }
+
+      createBarRows("xBars", xComponents);
+      createBarRows("yBars", yComponents);
+      createTraits(traits);
+
+      const insufficientWarn = document.getElementById("insufficientWarn");
+      if (insufficient) {
+        insufficientWarn.style.display = "block";
+        insufficientWarn.textContent = "Status: insufficient_data. Not enough local usage data to compute a stable style map. Public card should show: Still warming up.";
+      } else {
+        insufficientWarn.style.display = "none";
+      }
+
+      setPoint("currentPoint", safeXScore, safeYScore);
+      setPoint("smoothPoint", xSmoothed, ySmoothed);
+      const pointLabel = document.getElementById("pointLabel");
+      pointLabel.style.left = clamp(safeXScore, 2, 98) + "%";
+      pointLabel.style.top = clamp(100 - safeYScore, 8, 92) + "%";
+      pointLabel.textContent = "Current: " + style.name;
+
+      const summaryText = document.getElementById("summaryText");
+      summaryText.textContent = "This map describes how AI tools are used, not developer quality. Higher values are not better.";
+
+      const status = insufficient ? "insufficient_data" : "ok";
+      const from = new Date();
+      from.setDate(from.getDate() - 30);
+      const to = new Date();
+      const toIso = (d) => d.toISOString().slice(0, 10);
+
+      const json = insufficient
+        ? {
+            algorithm: { name: "agent_vibe_xy", version: "1.0.0", normalizationProfile: "fixed_v1" },
+            period: { from: toIso(from), to: toIso(to), days: 30 },
+            status,
+            reason: "Not enough local usage data to compute a stable style map.",
+            sample: {
+              totalRequests,
+              activeDays: activeDaysInput,
+              sufficientData: false,
+            },
+            privacy: {
+              publicSafe: true,
+              visibility: "private",
+            },
+          }
+        : {
+            algorithm: { name: "agent_vibe_xy", version: "1.0.0", normalizationProfile: "fixed_v1" },
+            period: { from: toIso(from), to: toIso(to), days: 30 },
+            status,
+            sample: {
+              totalRequests,
+              activeDays: activeDaysInput,
+              sufficientData: true,
+              requestCoverage: Number(requestCoverage.toFixed(3)),
+              activeDayCoverage: Number(activeDayCoverage.toFixed(3)),
+            },
+            scores: {
+              xScore: safeXScore,
+              yScore: safeYScore,
+              xScoreSmoothed: xSmoothed,
+              yScoreSmoothed: ySmoothed,
+              xDelta,
+              yDelta,
+            },
+            style: {
+              quadrant: style.name,
+              xLabel: bandLabel(safeXScore) + " agenticity",
+              yLabel: bandLabel(safeYScore) + " deliberation",
+              description: style.description,
+            },
+            confidence: {
+              x: { score: Number(xConfidenceScore.toFixed(3)), label: xConfidenceLabel },
+              y: { score: Number(yConfidenceScore.toFixed(3)), label: yConfidenceLabel },
+            },
+            components: {
+              x: Object.fromEntries(xComponents.map((c) => [c.key, c.value === null ? null : Number(c.value.toFixed(3))])),
+              y: Object.fromEntries(yComponents.map((c) => [c.key, c.value === null ? null : Number(c.value.toFixed(3))])),
+            },
+            secondaryTraits: traits
+              .filter((t) => t.score !== null)
+              .map((t) => ({ name: t.name, score: Math.round(t.score), label: t.label })),
+            privacy: {
+              containsPrompts: false,
+              containsCompletions: false,
+              containsSourceCode: false,
+              containsRepoNames: false,
+              containsFilePaths: false,
+              containsUserIdentity: false,
+              publicSafe: true,
+              visibility: "private",
+            },
+            metadata: {
+              yFormula: useEventY ? "event_level_preferred" : "default_v1",
+              assumptionsVisible: true,
+              antiGamingCopy: "Higher axis values are not better.",
+            },
+          };
+
+      document.getElementById("jsonOut").textContent = JSON.stringify(json, null, 2);
+    }
+
+    seedInputOutputFromBaseline();
+
+    const controls = document.querySelectorAll("input, select");
+    for (const el of controls) {
+      el.addEventListener("input", refresh);
+      el.addEventListener("change", refresh);
+    }
+
+    refresh();
+  </script>
+</body>
+</html>

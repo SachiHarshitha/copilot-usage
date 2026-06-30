@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Vibe Check-in Demo</title>
+  <style>
+    :root {
+      --bg: #f4f8f4;
+      --bg-soft: #e8f2e8;
+      --surface: #ffffff;
+      --text: #1f2a21;
+      --muted: #5e7162;
+      --line: #d9e6d9;
+      --green-0: #e9efe9;
+      --green-1: #cdeac7;
+      --green-2: #8fce84;
+      --green-3: #4ca45a;
+      --green-4: #1f7438;
+      --accent: #174f2b;
+      --shadow: 0 24px 44px rgba(22, 66, 37, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 700px at 8% -5%, #d6efd3 0%, transparent 54%),
+        radial-gradient(900px 500px at 94% -8%, #d7ead4 0%, transparent 52%),
+        linear-gradient(180deg, var(--bg) 0%, #f8fbf8 100%);
+      padding: 28px 20px 38px;
+    }
+
+    .shell {
+      max-width: 1160px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .header {
+      background: linear-gradient(120deg, #fefefe 0%, #f4faf3 100%);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .eyebrow {
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 34px);
+      line-height: 1.1;
+      color: var(--accent);
+    }
+
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      max-width: 78ch;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .kpi {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: linear-gradient(180deg, #ffffff 0%, #f7fbf7 100%);
+      padding: 10px 12px;
+    }
+
+    .kpi-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0 0 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+    }
+
+    .kpi-value {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .board {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      display: grid;
+      gap: 12px;
+      overflow-x: auto;
+    }
+
+    .month-row {
+      margin-left: 42px;
+      min-width: 860px;
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--muted);
+      height: 16px;
+      align-items: end;
+      font-weight: 600;
+    }
+
+    .calendar-wrap {
+      display: flex;
+      gap: 8px;
+      min-width: 920px;
+    }
+
+    .weekday-col {
+      width: 34px;
+      display: grid;
+      grid-template-rows: repeat(7, 12px);
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      align-items: center;
+      justify-items: end;
+      padding-top: 1px;
+      font-weight: 600;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-auto-flow: column;
+      grid-template-rows: repeat(7, 12px);
+      grid-auto-columns: 12px;
+      gap: 4px;
+    }
+
+    .cell {
+      border-radius: 3px;
+      border: 1px solid rgba(16, 70, 36, 0.08);
+      cursor: default;
+    }
+
+    .legend {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      min-width: 920px;
+    }
+
+    .legend-swatches {
+      display: flex;
+      gap: 4px;
+    }
+
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      border: 1px solid rgba(16, 70, 36, 0.12);
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+      border-top: 1px dashed var(--line);
+      padding-top: 10px;
+    }
+
+    @media (max-width: 740px) {
+      body {
+        padding: 16px 12px 24px;
+      }
+
+      .header,
+      .board {
+        border-radius: 14px;
+        padding: 14px;
+      }
+
+      .kpi-value {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="header">
+      <p class="eyebrow">PromptStreak Demo</p>
+      <h1>Agent Check-in Heatmap</h1>
+      <p class="sub">
+        This demo grid shows daily coding-agent presence. A green block means a day reached the
+        check-in threshold from agent activity score, not GitHub events.
+      </p>
+      <div class="kpis" id="kpis"></div>
+    </section>
+
+    <section class="board">
+      <div class="month-row" id="monthRow"></div>
+      <div class="calendar-wrap">
+        <div class="weekday-col">
+          <span>Mon</span>
+          <span></span>
+          <span>Wed</span>
+          <span></span>
+          <span>Fri</span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="calendar-grid" id="calendar"></div>
+      </div>
+      <div class="legend">
+        <span>Less</span>
+        <div class="legend-swatches" id="legendSwatches"></div>
+        <span>More</span>
+      </div>
+      <p class="note" id="note"></p>
+    </section>
+  </main>
+
+  <script>
+    const baselineUsage = [
+      { model: "Claude Opus 4.6", provider: "Anthropic", input: 16051864, output: 109542, cost: 83.0, share: 81.53 },
+      { model: "Claude Opus 4.7", provider: "Anthropic", input: 2142007, output: 17647, cost: 11.15, share: 10.95 },
+      { model: "Claude Sonnet 4.6", provider: "Anthropic", input: 1221691, output: 11835, cost: 3.84, share: 3.77 },
+      { model: "GPT-5.3-Codex", provider: "OpenAI", input: 1593442, output: 10186, cost: 2.93, share: 2.88 },
+      { model: "Claude Sonnet 4.5", provider: "Anthropic", input: 235900, output: 11464, cost: 0.88, share: 0.86 },
+    ];
+
+    const palette = ["#e9efe9", "#cdeac7", "#8fce84", "#4ca45a", "#1f7438"];
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    function mulberry32(seed) {
+      let t = seed >>> 0;
+      return function() {
+        t += 0x6d2b79f5;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function toIso(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return y + "-" + m + "-" + d;
+    }
+
+    function fromIso(iso) {
+      const [y, m, d] = iso.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function sum(arr, pick) {
+      return arr.reduce((acc, item) => acc + pick(item), 0);
+    }
+
+    function generateDailySeries(days, dailyBaseTokens, seed) {
+      const rand = mulberry32(seed);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const rows = [];
+      for (let offset = days - 1; offset >= 0; offset--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - offset);
+        const idx = days - 1 - offset;
+
+        const dayOfWeek = date.getDay();
+        const weekendFactor = (dayOfWeek === 0 || dayOfWeek === 6) ? 0.53 : 1.0;
+        const deepWorkCycle = 0.87 + 0.27 * Math.sin(idx / 14.0);
+        const flowCycle = 0.92 + 0.17 * Math.cos(idx / 36.0);
+        const noise = 0.67 + rand() * 0.66;
+
+        const tokens = Math.max(0, Math.round(dailyBaseTokens * weekendFactor * deepWorkCycle * flowCycle * noise));
+        const requests = Math.max(1, Math.round(tokens / 7600));
+        const checkinThreshold = Math.round(dailyBaseTokens * 0.36);
+        const checkin = tokens >= checkinThreshold;
+
+        rows.push({
+          date: toIso(date),
+          tokens,
+          requests,
+          checkin,
+        });
+      }
+      return rows;
+    }
+
+    function consecutiveFromEnd(rows, predicate) {
+      let streak = 0;
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if (predicate(rows[i])) streak += 1;
+        else break;
+      }
+      return streak;
+    }
+
+    function quantile(sorted, q) {
+      if (sorted.length === 0) return 0;
+      const pos = (sorted.length - 1) * q;
+      const base = Math.floor(pos);
+      const rest = pos - base;
+      const next = sorted[base + 1] !== undefined ? sorted[base + 1] : sorted[base];
+      return sorted[base] + rest * (next - sorted[base]);
+    }
+
+    function bucketize(tokens, checkin, q1, q2, q3) {
+      if (!checkin) return 0;
+      if (tokens < q1) return 1;
+      if (tokens < q2) return 2;
+      if (tokens < q3) return 3;
+      return 4;
+    }
+
+    function render() {
+      const totalMonthlyInput = sum(baselineUsage, (r) => r.input);
+      const totalMonthlyOutput = sum(baselineUsage, (r) => r.output);
+      const totalMonthlyTokens = totalMonthlyInput + totalMonthlyOutput;
+      const dailyBaseTokens = totalMonthlyTokens / 30;
+
+      const daily = generateDailySeries(365, dailyBaseTokens, 20260607);
+      const byDate = new Map(daily.map((d) => [d.date, d]));
+
+      const activeTokens = daily.filter((d) => d.checkin).map((d) => d.tokens).sort((a, b) => a - b);
+      const q1 = quantile(activeTokens, 0.25);
+      const q2 = quantile(activeTokens, 0.5);
+      const q3 = quantile(activeTokens, 0.75);
+
+      const firstDate = fromIso(daily[0].date);
+      const lastDate = fromIso(daily[daily.length - 1].date);
+      const calendarStart = new Date(firstDate);
+      calendarStart.setDate(calendarStart.getDate() - calendarStart.getDay());
+      const calendarEnd = new Date(lastDate);
+      calendarEnd.setDate(calendarEnd.getDate() + (6 - calendarEnd.getDay()));
+
+      const calendarEl = document.getElementById("calendar");
+      calendarEl.innerHTML = "";
+
+      const monthRow = document.getElementById("monthRow");
+      monthRow.innerHTML = "";
+
+      const monthLabels = [];
+      let weekIndex = -1;
+      const dayCursor = new Date(calendarStart);
+      while (dayCursor <= calendarEnd) {
+        if (dayCursor.getDay() === 0) {
+          weekIndex += 1;
+        }
+
+        const iso = toIso(dayCursor);
+        const row = byDate.get(iso);
+        const tokens = row ? row.tokens : 0;
+        const checkin = row ? row.checkin : false;
+        const level = bucketize(tokens, checkin, q1, q2, q3);
+
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.style.background = palette[level];
+
+        if (row) {
+          cell.title = row.date + "\n" +
+            "Agent score: " + tokens.toLocaleString() + " tokens\n" +
+            "Estimated requests: " + row.requests.toLocaleString() + "\n" +
+            (row.checkin ? "Check-in: yes" : "Check-in: no");
+        } else {
+          cell.style.opacity = "0.35";
+          cell.title = iso + "\nOut of selected window";
+        }
+
+        calendarEl.appendChild(cell);
+
+        if (dayCursor.getDate() === 1) {
+          monthLabels.push({ week: weekIndex, month: monthNames[dayCursor.getMonth()] });
+        }
+
+        dayCursor.setDate(dayCursor.getDate() + 1);
+      }
+
+      calendarEl.style.gridAutoColumns = "12px";
+      monthRow.style.gridTemplateColumns = "repeat(" + (weekIndex + 1) + ", 12px)";
+
+      for (let i = 0; i <= weekIndex; i++) {
+        const label = document.createElement("div");
+        label.textContent = "";
+        label.style.gridColumn = String(i + 1);
+        monthRow.appendChild(label);
+      }
+      for (const m of monthLabels) {
+        const idx = m.week + 1;
+        if (idx >= 1 && idx <= monthRow.children.length) {
+          monthRow.children[idx - 1].textContent = m.month;
+        }
+      }
+
+      const checkinDays = daily.filter((d) => d.checkin);
+      const activeCount = checkinDays.length;
+      const currentStreak = consecutiveFromEnd(daily, (d) => d.checkin);
+      const avgActiveTokens = Math.round(sum(checkinDays, (d) => d.tokens) / Math.max(checkinDays.length, 1));
+      const peakDay = daily.reduce((best, d) => d.tokens > best.tokens ? d : best, daily[0]);
+
+      const kpis = [
+        { label: "Agent check-ins", value: activeCount.toLocaleString() + " days" },
+        { label: "Current streak", value: currentStreak.toLocaleString() + " days" },
+        { label: "Avg active-day score", value: avgActiveTokens.toLocaleString() + " tok" },
+        { label: "Peak day", value: peakDay.tokens.toLocaleString() + " tok" },
+      ];
+
+      const kpiEl = document.getElementById("kpis");
+      kpiEl.innerHTML = "";
+      for (const k of kpis) {
+        const card = document.createElement("article");
+        card.className = "kpi";
+
+        const label = document.createElement("p");
+        label.className = "kpi-label";
+        label.textContent = k.label;
+
+        const value = document.createElement("p");
+        value.className = "kpi-value";
+        value.textContent = k.value;
+
+        card.appendChild(label);
+        card.appendChild(value);
+        kpiEl.appendChild(card);
+      }
+
+      const legend = document.getElementById("legendSwatches");
+      legend.innerHTML = "";
+      for (const color of palette) {
+        const sw = document.createElement("span");
+        sw.className = "swatch";
+        sw.style.background = color;
+        legend.appendChild(sw);
+      }
+
+      const note = document.getElementById("note");
+      note.textContent =
+        "Data source anchor: baseline model-token mix from reference/baseline_usage_from_screenshot.csv. " +
+        "This page infers daily agent vibe intensity from that mix using deterministic simulation for design preview.";
+    }
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Vibe Style Map Demo</title>
+  <style>
+    :root {
+      --bg: #f5f8fb;
+      --surface: #ffffff;
+      --line: #d8e1ea;
+      --text: #1f2731;
+      --muted: #607283;
+      --x-axis: #1d6f4f;
+      --y-axis: #245ca8;
+      --dot: #17603f;
+      --dot-current: #0a4e8b;
+      --q1: #edf5ff;
+      --q2: #effaf3;
+      --q3: #f9f2ff;
+      --q4: #fff3ef;
+      --shadow: 0 22px 44px rgba(30, 50, 70, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(900px 600px at 5% 0%, #dce8f8 0%, transparent 55%),
+        radial-gradient(1100px 700px at 98% 0%, #deeedf 0%, transparent 58%),
+        linear-gradient(180deg, var(--bg) 0%, #f8fafd 100%);
+      padding: 28px 20px 34px;
+    }
+
+    .shell {
+      max-width: 1160px;
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .header,
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    h1 {
+      margin: 6px 0 8px;
+      font-size: clamp(24px, 4vw, 34px);
+      line-height: 1.1;
+      color: #16314f;
+    }
+
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 78ch;
+      line-height: 1.45;
+    }
+
+    .layout {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: minmax(340px, 2fr) minmax(280px, 1fr);
+    }
+
+    .chart-wrap {
+      display: grid;
+      gap: 12px;
+    }
+
+    #chart {
+      width: 100%;
+      height: auto;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff 0%, #fdfefe 100%);
+    }
+
+    .axis-note {
+      font-size: 13px;
+      color: var(--muted);
+      display: grid;
+      gap: 6px;
+    }
+
+    .cards {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .card p {
+      margin: 0;
+    }
+
+    .card .label {
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .card .value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #123e6d;
+    }
+
+    .side {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .mix-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #15446a;
+    }
+
+    .mix {
+      display: grid;
+      gap: 8px;
+    }
+
+    .mix-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 44px;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .bar {
+      height: 10px;
+      border-radius: 999px;
+      background: #edf2f7;
+      overflow: hidden;
+      border: 1px solid #deebf5;
+    }
+
+    .bar > span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #2c7d4f 0%, #4aa877 100%);
+    }
+
+    .criteria {
+      border-top: 1px dashed var(--line);
+      padding-top: 10px;
+      display: grid;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .foot {
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px dashed var(--line);
+      padding-top: 10px;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 980px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 16px 12px 24px;
+      }
+
+      .header,
+      .panel {
+        border-radius: 14px;
+        padding: 14px;
+      }
+
+      .mix-row {
+        grid-template-columns: 120px 1fr 40px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="header">
+      <p class="eyebrow">PromptStreak Demo</p>
+      <h1>Agent Vibe XY Style Map</h1>
+      <p class="sub">
+        Double-sided XY view of coding-agent style. Left/right shows deliberation vs execution, and
+        down/up shows focused depth vs exploratory spread.
+      </p>
+    </section>
+
+    <section class="panel layout">
+      <div class="chart-wrap">
+        <svg id="chart" viewBox="0 0 860 520" aria-label="Agent vibe chart"></svg>
+        <div class="cards" id="summaryCards"></div>
+        <div class="axis-note">
+          <div><strong>X axis:</strong> Deliberation-heavy (-1) to Action-heavy (+1)</div>
+          <div><strong>Y axis:</strong> Focused specialist (-1) to Exploratory polymath (+1)</div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <h2 class="mix-title">Inferred action mix</h2>
+        <div class="mix" id="mix"></div>
+
+        <div class="criteria">
+          <div><strong>Criterion 1:</strong> Action density = (tool + terminal + file + diff + review) / requests</div>
+          <div><strong>Criterion 2:</strong> Model exploration = normalized entropy of model-share distribution</div>
+          <div><strong>Criterion 3:</strong> Focus pressure = dominant-model concentration signal</div>
+          <div><strong>Criterion 4:</strong> Recency trend = last 6-week vector to show style drift</div>
+        </div>
+
+        <p class="foot" id="foot"></p>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const baselineUsage = [
+      { model: "Claude Opus 4.6", provider: "Anthropic", input: 16051864, output: 109542, cost: 83.0, share: 81.53 },
+      { model: "Claude Opus 4.7", provider: "Anthropic", input: 2142007, output: 17647, cost: 11.15, share: 10.95 },
+      { model: "Claude Sonnet 4.6", provider: "Anthropic", input: 1221691, output: 11835, cost: 3.84, share: 3.77 },
+      { model: "GPT-5.3-Codex", provider: "OpenAI", input: 1593442, output: 10186, cost: 2.93, share: 2.88 },
+      { model: "Claude Sonnet 4.5", provider: "Anthropic", input: 235900, output: 11464, cost: 0.88, share: 0.86 },
+    ];
+
+    function sum(arr, pick) {
+      return arr.reduce((acc, item) => acc + pick(item), 0);
+    }
+
+    function clamp(v, lo, hi) {
+      return Math.max(lo, Math.min(hi, v));
+    }
+
+    function mulberry32(seed) {
+      let t = seed >>> 0;
+      return function() {
+        t += 0x6d2b79f5;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function entropyNormalized(values) {
+      const total = sum(values, (v) => v);
+      if (total <= 0 || values.length <= 1) return 0;
+      const probs = values.map((v) => v / total).filter((p) => p > 0);
+      let h = 0;
+      for (const p of probs) h += -p * Math.log(p);
+      return h / Math.log(values.length);
+    }
+
+    function inferProfileSignals() {
+      const totalInput = sum(baselineUsage, (m) => m.input);
+      const totalOutput = sum(baselineUsage, (m) => m.output);
+      const totalTokens = totalInput + totalOutput;
+
+      const shares = baselineUsage.map((m) => m.share / 100);
+      const maxShare = Math.max.apply(null, shares);
+      const outputRatio = totalOutput / Math.max(1, totalTokens);
+      const entropy = entropyNormalized(shares);
+
+      const explorationIndex = clamp(entropy * 0.72 + (1 - maxShare) * 0.28, 0, 1);
+      const executionIndex = clamp(0.34 + outputRatio * 12 + (1 - maxShare) * 0.18, 0, 1);
+
+      const x = executionIndex * 2 - 1;
+      const y = explorationIndex * 2 - 1;
+
+      return {
+        totalInput,
+        totalOutput,
+        totalTokens,
+        maxShare,
+        outputRatio,
+        entropy,
+        executionIndex,
+        explorationIndex,
+        x,
+        y,
+      };
+    }
+
+    function buildWeeklyTrail(baseX, baseY) {
+      const rand = mulberry32(20260607);
+      const points = [];
+      for (let i = 0; i < 26; i++) {
+        const drift = i / 25;
+        const x = clamp((baseX + 1) / 2 + 0.06 * Math.sin(i / 3.8) + 0.08 * drift + (rand() - 0.5) * 0.08, 0, 1) * 2 - 1;
+        const y = clamp((baseY + 1) / 2 + 0.10 * Math.cos(i / 5.6) - 0.03 * drift + (rand() - 0.5) * 0.09, 0, 1) * 2 - 1;
+        const energy = clamp(0.48 + 0.22 * Math.sin(i / 4.0) + (rand() - 0.5) * 0.1, 0.2, 0.95);
+        points.push({ week: i + 1, x, y, energy });
+      }
+      return points;
+    }
+
+    function quadrantName(x, y) {
+      if (x >= 0 && y >= 0) return "Explorer Builder";
+      if (x < 0 && y >= 0) return "Explorer Analyst";
+      if (x >= 0 && y < 0) return "Focused Builder";
+      return "Focused Strategist";
+    }
+
+    function inferActionMix(currentX) {
+      const exec = (currentX + 1) / 2;
+      let tool = 0.30 + exec * 0.14;
+      let file = 0.22 + exec * 0.12;
+      let terminal = 0.14 + exec * 0.08;
+      let diff = 0.10 + exec * 0.05;
+      let review = 1 - (tool + file + terminal + diff);
+
+      if (review < 0.03) {
+        const borrow = 0.03 - review;
+        review = 0.03;
+        tool -= borrow * 0.5;
+        file -= borrow * 0.5;
+      }
+
+      const raw = [
+        { key: "tool_call", label: "Tool orchestration", value: tool },
+        { key: "file_edit", label: "Direct file edits", value: file },
+        { key: "terminal_command", label: "Terminal ops", value: terminal },
+        { key: "diff_apply", label: "Patch application", value: diff },
+        { key: "review_comment", label: "Review feedback", value: review },
+      ];
+
+      const total = sum(raw, (r) => r.value);
+      return raw.map((r) => ({
+        key: r.key,
+        label: r.label,
+        pct: Math.round((r.value / total) * 100),
+      }));
+    }
+
+    function toPlotX(x, width, margin) {
+      return margin + ((x + 1) / 2) * (width - margin * 2);
+    }
+
+    function toPlotY(y, height, margin) {
+      return height - margin - ((y + 1) / 2) * (height - margin * 2);
+    }
+
+    function line(svg, x1, y1, x2, y2, color, width, dash) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      el.setAttribute("x1", x1);
+      el.setAttribute("y1", y1);
+      el.setAttribute("x2", x2);
+      el.setAttribute("y2", y2);
+      el.setAttribute("stroke", color);
+      el.setAttribute("stroke-width", width);
+      if (dash) el.setAttribute("stroke-dasharray", dash);
+      svg.appendChild(el);
+      return el;
+    }
+
+    function rect(svg, x, y, w, h, fill, opacity) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      el.setAttribute("x", x);
+      el.setAttribute("y", y);
+      el.setAttribute("width", w);
+      el.setAttribute("height", h);
+      el.setAttribute("fill", fill);
+      if (opacity !== undefined) el.setAttribute("opacity", opacity);
+      svg.appendChild(el);
+      return el;
+    }
+
+    function text(svg, x, y, value, size, color, weight, anchor) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      el.setAttribute("x", x);
+      el.setAttribute("y", y);
+      el.setAttribute("font-size", size);
+      el.setAttribute("fill", color);
+      el.setAttribute("font-family", "Avenir Next, Segoe UI, sans-serif");
+      if (weight) el.setAttribute("font-weight", weight);
+      if (anchor) el.setAttribute("text-anchor", anchor);
+      el.textContent = value;
+      svg.appendChild(el);
+      return el;
+    }
+
+    function circle(svg, cx, cy, r, fill, stroke, strokeWidth, title) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      el.setAttribute("cx", cx);
+      el.setAttribute("cy", cy);
+      el.setAttribute("r", r);
+      el.setAttribute("fill", fill);
+      if (stroke) el.setAttribute("stroke", stroke);
+      if (strokeWidth) el.setAttribute("stroke-width", strokeWidth);
+      if (title) {
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "title");
+        t.textContent = title;
+        el.appendChild(t);
+      }
+      svg.appendChild(el);
+      return el;
+    }
+
+    function render() {
+      const signals = inferProfileSignals();
+      const trail = buildWeeklyTrail(signals.x, signals.y);
+      const current = trail[trail.length - 1];
+      const recent = trail.slice(-6);
+      const recentAvg = {
+        x: sum(recent, (p) => p.x) / recent.length,
+        y: sum(recent, (p) => p.y) / recent.length,
+      };
+      const actionMix = inferActionMix(current.x);
+
+      const svg = document.getElementById("chart");
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+      const width = 860;
+      const height = 520;
+      const margin = 62;
+      const midX = toPlotX(0, width, margin);
+      const midY = toPlotY(0, height, margin);
+
+      rect(svg, margin, margin, (width - margin * 2) / 2, (height - margin * 2) / 2, "#edf5ff", 0.8);
+      rect(svg, midX, margin, (width - margin * 2) / 2, (height - margin * 2) / 2, "#effaf3", 0.8);
+      rect(svg, margin, midY, (width - margin * 2) / 2, (height - margin * 2) / 2, "#f9f2ff", 0.8);
+      rect(svg, midX, midY, (width - margin * 2) / 2, (height - margin * 2) / 2, "#fff3ef", 0.8);
+
+      line(svg, margin, midY, width - margin, midY, "#2f6a4a", 2, null);
+      line(svg, midX, margin, midX, height - margin, "#2b5f9d", 2, null);
+
+      for (let t = -0.75; t <= 0.75; t += 0.25) {
+        if (Math.abs(t) < 0.001) continue;
+        line(svg, toPlotX(t, width, margin), margin, toPlotX(t, width, margin), height - margin, "#d2dde8", 1, "4 4");
+        line(svg, margin, toPlotY(t, height, margin), width - margin, toPlotY(t, height, margin), "#d2dde8", 1, "4 4");
+      }
+
+      text(svg, width / 2, height - 18, "Deliberation heavy  ←  X  →  Action heavy", 13, "#2f6a4a", "700", "middle");
+      text(svg, 20, height / 2 - 2, "Exploratory", 12, "#2b5f9d", "700", "middle").setAttribute("transform", "rotate(-90 20 " + (height / 2 - 2) + ")");
+      text(svg, 39, height / 2 + 2, "Focused", 12, "#2b5f9d", "700", "middle").setAttribute("transform", "rotate(-90 39 " + (height / 2 + 2) + ")");
+
+      text(svg, toPlotX(-0.97, width, margin), toPlotY(0.94, height, margin), "Explorer Analyst", 12, "#436281", "700", "start");
+      text(svg, toPlotX(0.97, width, margin), toPlotY(0.94, height, margin), "Explorer Builder", 12, "#356c55", "700", "end");
+      text(svg, toPlotX(-0.97, width, margin), toPlotY(-0.94, height, margin), "Focused Strategist", 12, "#6f5e8b", "700", "start");
+      text(svg, toPlotX(0.97, width, margin), toPlotY(-0.94, height, margin), "Focused Builder", 12, "#8f5f55", "700", "end");
+
+      for (let i = 1; i < trail.length; i++) {
+        line(
+          svg,
+          toPlotX(trail[i - 1].x, width, margin),
+          toPlotY(trail[i - 1].y, height, margin),
+          toPlotX(trail[i].x, width, margin),
+          toPlotY(trail[i].y, height, margin),
+          "#79a98a",
+          1.3,
+          null
+        );
+      }
+
+      for (let i = 0; i < trail.length; i++) {
+        const p = trail[i];
+        const alpha = 0.25 + (i / (trail.length - 1)) * 0.6;
+        const r = 3.5 + p.energy * 3.0;
+        circle(
+          svg,
+          toPlotX(p.x, width, margin),
+          toPlotY(p.y, height, margin),
+          r,
+          "rgba(23, 96, 63, " + alpha.toFixed(3) + ")",
+          "#ffffff",
+          0.8,
+          "Week " + p.week + "\nX=" + p.x.toFixed(2) + "  Y=" + p.y.toFixed(2)
+        );
+      }
+
+      circle(
+        svg,
+        toPlotX(recentAvg.x, width, margin),
+        toPlotY(recentAvg.y, height, margin),
+        10,
+        "rgba(10,78,139,0.18)",
+        "#0a4e8b",
+        2,
+        "Last 6-week average"
+      );
+
+      circle(
+        svg,
+        toPlotX(current.x, width, margin),
+        toPlotY(current.y, height, margin),
+        9,
+        "#0a4e8b",
+        "#ffffff",
+        2,
+        "Current vibe"
+      );
+
+      const currentLabel = quadrantName(current.x, current.y);
+      text(
+        svg,
+        toPlotX(current.x, width, margin) + 12,
+        toPlotY(current.y, height, margin) - 12,
+        "Current: " + currentLabel,
+        12,
+        "#0a4e8b",
+        "700",
+        "start"
+      );
+
+      const summaryCards = document.getElementById("summaryCards");
+      summaryCards.innerHTML = "";
+
+      const cards = [
+        { label: "Current quadrant", value: currentLabel },
+        { label: "Execution score", value: ((current.x + 1) * 50).toFixed(1) + "%" },
+        { label: "Exploration score", value: ((current.y + 1) * 50).toFixed(1) + "%" },
+        { label: "Model concentration", value: (signals.maxShare * 100).toFixed(1) + "%" },
+        { label: "Model entropy", value: (signals.entropy * 100).toFixed(1) + "%" },
+        { label: "Output / total tokens", value: (signals.outputRatio * 100).toFixed(2) + "%" },
+      ];
+
+      for (const c of cards) {
+        const card = document.createElement("article");
+        card.className = "card";
+
+        const label = document.createElement("p");
+        label.className = "label";
+        label.textContent = c.label;
+
+        const value = document.createElement("p");
+        value.className = "value";
+        value.textContent = c.value;
+
+        card.appendChild(label);
+        card.appendChild(value);
+        summaryCards.appendChild(card);
+      }
+
+      const mix = document.getElementById("mix");
+      mix.innerHTML = "";
+      for (const row of actionMix) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "mix-row";
+
+        const label = document.createElement("div");
+        label.textContent = row.label;
+
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        const fill = document.createElement("span");
+        fill.style.width = row.pct + "%";
+        bar.appendChild(fill);
+
+        const val = document.createElement("div");
+        val.textContent = row.pct + "%";
+        val.style.textAlign = "right";
+        val.style.fontWeight = "700";
+        val.style.color = "#1a4e7d";
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(bar);
+        wrapper.appendChild(val);
+        mix.appendChild(wrapper);
+      }
+
+      const foot = document.getElementById("foot");
+      foot.textContent =
+        "Data anchor: reference/baseline_usage_from_screenshot.csv. " +
+        "Action mix and weekly trail are deterministic inferences for vibe-design preview, not raw event logs.";
+    }
+
+    render();
+  </script>
+</body>
+</html>
