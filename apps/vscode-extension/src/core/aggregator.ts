@@ -3,6 +3,7 @@
 import * as path from 'path';
 import { ParsedFile, RequestEvent, KpiTotals, ModelStats, WorkspaceStats, DailyStats } from './types';
 import { getMultiplier } from './config';
+import { creditsForRequest, CreditRateMap } from './credits';
 import { parseJsonl, parseLegacyJson } from './parser';
 import { WorkspaceInfo } from './types';
 
@@ -34,7 +35,7 @@ export function flattenEvents(files: ParsedFile[]): RequestEvent[] {
 }
 
 /** Compute KPI totals. */
-export function computeKpis(files: ParsedFile[], events: RequestEvent[]): KpiTotals {
+export function computeKpis(files: ParsedFile[], events: RequestEvent[], rates?: CreditRateMap): KpiTotals {
   const workspaceIds = new Set<string>();
   const sessionIds = new Set<string>();
   for (const pf of files) {
@@ -46,6 +47,7 @@ export function computeKpis(files: ParsedFile[], events: RequestEvent[]): KpiTot
   let totalOutputTokens = 0;
   let totalToolCallRounds = 0;
   let totalPremium = 0;
+  let totalCredits = 0;
   for (const e of events) {
     totalPromptTokens += e.promptTokens;
     totalOutputTokens += e.outputTokens;
@@ -54,6 +56,7 @@ export function computeKpis(files: ParsedFile[], events: RequestEvent[]): KpiTot
     if (e.promptTokens || e.outputTokens) {
       totalPremium += m;
     }
+    totalCredits += creditsForRequest(e.modelId, e.promptTokens, e.outputTokens, rates);
   }
 
   return {
@@ -62,19 +65,20 @@ export function computeKpis(files: ParsedFile[], events: RequestEvent[]): KpiTot
     totalOutputTokens,
     totalToolCallRounds,
     totalPremium: Math.round(totalPremium * 100) / 100,
+    totalCredits: Math.round(totalCredits * 100) / 100,
     workspaceCount: workspaceIds.size,
     sessionCount: sessionIds.size,
   };
 }
 
 /** Compute per-model stats. */
-export function computeModelStats(events: RequestEvent[]): ModelStats[] {
+export function computeModelStats(events: RequestEvent[], rates?: CreditRateMap): ModelStats[] {
   const map = new Map<string, ModelStats>();
   for (const e of events) {
     const modelId = e.modelId || 'unknown';
     let s = map.get(modelId);
     if (!s) {
-      s = { modelId, requests: 0, totalTokens: 0, premium: 0 };
+      s = { modelId, requests: 0, totalTokens: 0, premium: 0, credits: 0 };
       map.set(modelId, s);
     }
     s.requests++;
@@ -82,12 +86,13 @@ export function computeModelStats(events: RequestEvent[]): ModelStats[] {
     if (e.promptTokens || e.outputTokens) {
       s.premium += getMultiplier(modelId, e.timestampMs);
     }
+    s.credits += creditsForRequest(e.modelId, e.promptTokens, e.outputTokens, rates);
   }
   return [...map.values()].sort((a, b) => b.requests - a.requests);
 }
 
 /** Compute per-workspace stats. */
-export function computeWorkspaceStats(files: ParsedFile[], events: RequestEvent[]): WorkspaceStats[] {
+export function computeWorkspaceStats(files: ParsedFile[], events: RequestEvent[], rates?: CreditRateMap): WorkspaceStats[] {
   // Group events by workspace
   const wsMap = new Map<string, { path: string; events: RequestEvent[] }>();
   const fileWsMap = new Map<string, string>(); // chatSessionId → workspaceId
@@ -112,7 +117,7 @@ export function computeWorkspaceStats(files: ParsedFile[], events: RequestEvent[
 
   const results: WorkspaceStats[] = [];
   for (const [wsId, { path: wsPath, events: wsEvents }] of wsMap) {
-    let promptTokens = 0, outputTokens = 0, premium = 0;
+    let promptTokens = 0, outputTokens = 0, premium = 0, credits = 0;
     const modelCounts = new Map<string, number>();
 
     for (const e of wsEvents) {
@@ -121,6 +126,7 @@ export function computeWorkspaceStats(files: ParsedFile[], events: RequestEvent[
       if (e.promptTokens || e.outputTokens) {
         premium += getMultiplier(e.modelId || '', e.timestampMs);
       }
+      credits += creditsForRequest(e.modelId, e.promptTokens, e.outputTokens, rates);
       const mid = e.modelId || 'unknown';
       modelCounts.set(mid, (modelCounts.get(mid) || 0) + 1);
     }
@@ -138,6 +144,7 @@ export function computeWorkspaceStats(files: ParsedFile[], events: RequestEvent[
       promptTokens,
       outputTokens,
       premium: Math.round(premium * 100) / 100,
+      credits: Math.round(credits * 100) / 100,
       topModel,
     });
   }

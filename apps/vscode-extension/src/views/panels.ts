@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import { findCurrentWorkspace, discoverWorkspaces } from '../core/discovery';
 import { parseAllFiles, flattenEvents, computeKpis, computeModelStats, computeDailyStats, computeWorkspaceStats } from '../core/aggregator';
+import { loadCreditRates } from '../core/credits';
 import { computeRepoAttributionStats, discoverRepoDescriptors, RepoAttributionStats } from '../core/repoAttribution';
 import { enableCostEstimator } from '../features/costEstimator/flags';
 import {
@@ -108,8 +109,9 @@ export class WorkspacePanel {
     const parsed = await parseAllFiles([ws]);
     const allEvents = flattenEvents(parsed);
     const events = filterEventsByDateRange(allEvents, dateRange);
-    const kpis = computeKpis(parsed, events);
-    const models = computeModelStats(events);
+    const rates = await loadCreditRates();
+    const kpis = computeKpis(parsed, events, rates);
+    const models = computeModelStats(events, rates);
     const daily = computeDailyStats(events);
     const repos = await discoverRepoDescriptors([ws]);
     const repoStats = computeRepoAttributionStats(events, repos);
@@ -212,11 +214,12 @@ export class DashboardPanel {
     const parsed = await parseAllFiles(workspaces);
     const allEvents = flattenEvents(parsed);
     const events = filterEventsByDateRange(allEvents, dateRange);
-    const kpis = computeKpis(parsed, events);
-    const models = computeModelStats(events);
+    const rates = await loadCreditRates();
+    const kpis = computeKpis(parsed, events, rates);
+    const models = computeModelStats(events, rates);
     const daily = computeDailyStats(events);
 
-    const wsStats = computeWorkspaceStats(parsed, events);
+    const wsStats = computeWorkspaceStats(parsed, events, rates);
     const repos = await discoverRepoDescriptors(workspaces);
     const repoStats = computeRepoAttributionStats(events, repos);
 
@@ -306,12 +309,12 @@ function getDashboardHtml(
   }
 
   const modelRows = (models || []).map(m =>
-    `<tr><td>${esc(shortModel(m.modelId))}</td><td>${fmt(m.requests)}</td><td>${fmt(m.totalTokens)}</td><td>${m.premium.toFixed(1)}×</td></tr>`
+    `<tr><td>${esc(shortModel(m.modelId))}</td><td>${fmt(m.requests)}</td><td>${fmt(m.totalTokens)}</td><td>${m.premium.toFixed(1)}×</td><td>${fmt(Math.round(m.credits))}</td></tr>`
   ).join('');
 
   const wsRows = (wsStats || []).map(w => {
     const display = shortPath(w.workspacePath || w.workspaceId);
-    return `<tr><td title="${esc(w.workspacePath)}">${esc(display)}</td><td>${fmt(w.requests)}</td><td>${fmt(w.promptTokens)}</td><td>${fmt(w.outputTokens)}</td><td>${w.premium.toFixed(1)}×</td><td>${esc(shortModel(w.topModel))}</td></tr>`;
+    return `<tr><td title="${esc(w.workspacePath)}">${esc(display)}</td><td>${fmt(w.requests)}</td><td>${fmt(w.promptTokens)}</td><td>${fmt(w.outputTokens)}</td><td>${w.premium.toFixed(1)}×</td><td>${fmt(Math.round(w.credits))}</td><td>${esc(shortModel(w.topModel))}</td></tr>`;
   }).join('');
 
   const totalTokens = Math.max(0, kpis.totalPromptTokens + kpis.totalOutputTokens);
@@ -356,6 +359,7 @@ ${debugLogBanner(showDebugLogBanner)}
   ${kpiCard('Output Tokens', fmt(kpis.totalOutputTokens), perMonth(kpis.totalOutputTokens, months))}
   ${kpiCard('Tool Rounds', fmt(kpis.totalToolCallRounds))}
   ${kpiCard('Premium', kpis.totalPremium.toFixed(1) + '×', perMonthDecimal(kpis.totalPremium, months))}
+  ${kpiCard('Credits', fmt(Math.round(kpis.totalCredits)), perMonth(Math.round(kpis.totalCredits), months) ?? '≈ token-metered')}
   ${kpiCard('Workspaces', String(kpis.workspaceCount))}
   ${kpiCard('Sessions', String(kpis.sessionCount))}
 </div>
@@ -368,12 +372,12 @@ ${debugLogBanner(showDebugLogBanner)}
 <div class="tables-row">
   <div class="table-box">
     <h3>Models</h3>
-    <table><thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Premium</th></tr></thead>
+    <table><thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Premium</th><th>Credits</th></tr></thead>
     <tbody>${modelRows}</tbody></table>
   </div>
   <div class="table-box" style="flex:2">
     <h3>Workspaces</h3>
-    <table><thead><tr><th>Workspace</th><th>Requests</th><th>Prompt</th><th>Output</th><th>Premium</th><th>Top Model</th></tr></thead>
+    <table><thead><tr><th>Workspace</th><th>Requests</th><th>Prompt</th><th>Output</th><th>Premium</th><th>Credits</th><th>Top Model</th></tr></thead>
     <tbody>${wsRows}</tbody></table>
   </div>
   <div class="table-box" style="flex:2">
@@ -585,7 +589,7 @@ function getWorkspaceHtml(
   }
 
   const modelRows = (models || []).map(m =>
-    `<tr><td>${esc(shortModel(m.modelId))}</td><td>${fmt(m.requests)}</td><td>${fmt(m.totalTokens)}</td><td>${m.premium.toFixed(1)}×</td></tr>`
+    `<tr><td>${esc(shortModel(m.modelId))}</td><td>${fmt(m.requests)}</td><td>${fmt(m.totalTokens)}</td><td>${m.premium.toFixed(1)}×</td><td>${fmt(Math.round(m.credits))}</td></tr>`
   ).join('');
 
   const dailyLabels = JSON.stringify((daily || []).map(d => d.date));
@@ -632,6 +636,7 @@ ${debugLogBanner(showDebugLogBanner)}
   ${kpiCard('Output Tokens', fmt(kpis.totalOutputTokens), perMonth(kpis.totalOutputTokens, months))}
   ${kpiCard('Tool Rounds', fmt(kpis.totalToolCallRounds))}
   ${kpiCard('Premium', kpis.totalPremium.toFixed(1) + '×', perMonthDecimal(kpis.totalPremium, months))}
+  ${kpiCard('Credits', fmt(Math.round(kpis.totalCredits)), perMonth(Math.round(kpis.totalCredits), months) ?? '≈ token-metered')}
   ${kpiCard('Sessions', String(kpis.sessionCount))}
 </div>
 
@@ -643,7 +648,7 @@ ${debugLogBanner(showDebugLogBanner)}
 <div class="tables-row">
   <div class="table-box">
     <h3>Models</h3>
-    <table><thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Premium</th></tr></thead>
+    <table><thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Premium</th><th>Credits</th></tr></thead>
     <tbody>${modelRows}</tbody></table>
   </div>
   <div class="table-box" style="flex:2">

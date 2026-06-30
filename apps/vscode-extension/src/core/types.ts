@@ -45,6 +45,7 @@ export interface KpiTotals {
   totalOutputTokens: number;
   totalToolCallRounds: number;
   totalPremium: number;
+  totalCredits: number;
   workspaceCount: number;
   sessionCount: number;
 }
@@ -54,6 +55,7 @@ export interface ModelStats {
   requests: number;
   totalTokens: number;
   premium: number;
+  credits: number;
 }
 
 export interface WorkspaceStats {
@@ -63,6 +65,7 @@ export interface WorkspaceStats {
   promptTokens: number;
   outputTokens: number;
   premium: number;
+  credits: number;
   topModel: string;
 }
 
