@@ -43,15 +43,25 @@ BADGE_DIR = APP_DATA_DIR / "badges"
 LAYOUT_PATH = APP_DATA_DIR / "layout.json"
 
 # ---------------------------------------------------------------------------
-# Model multiplier table (May 2026 snapshot)
+# Model multiplier tables (legacy premium-request / request-based billing)
 # Source: https://docs.github.com/en/copilot/concepts/billing/copilot-requests#model-multipliers
+#
+# GitHub moved to usage-based (AI credit) billing on 2026-06-01 and, at the same
+# time, REBASED the legacy request-multiplier scale used by Copilot Pro/Pro+
+# annual subscribers who stayed on request-based billing. To keep historical
+# premium-request counts accurate, multipliers are selected per event by
+# timestamp relative to this cutoff.
 #
 # Keys are the model identifier prefix as it appears in the JSONL files
 # (e.g. "copilot/claude-opus-4.6").  Value is the multiplier on paid plans.
 # Models included at no extra cost on paid plans have multiplier 0.
 # ---------------------------------------------------------------------------
 
-MODEL_MULTIPLIERS: dict[str, float] = {
+# 2026-06-01T00:00:00Z expressed in epoch milliseconds.
+MULTIPLIER_REBASE_CUTOFF_MS = 1_780_272_000_000
+
+# ── Pre-cutoff (before 2026-06-01) — original scale ─────────────────────────
+MODEL_MULTIPLIERS_PRE_2026_06: dict[str, float] = {
     # ── Included models (0× on paid plans) ──────────────────────────────
     "copilot/gpt-4.1":             0.0,
     "copilot/gpt-4.1-mini":        0.0,   # legacy alias
@@ -96,12 +106,63 @@ MODEL_MULTIPLIERS: dict[str, float] = {
     "copilot/gemini-2.5-flash":    0.0,   # legacy; succeeded by Gemini 3 Flash
 }
 
+# ── On/after cutoff (2026-06-01) — rebased legacy scale ─────────────────────
+MODEL_MULTIPLIERS_2026_06: dict[str, float] = {
+    # ── 0.33× ───────────────────────────────────────────────────────────
+    "copilot/gpt-5-mini":          0.33,
+    "copilot/raptor-mini":         0.33,
+    "copilot/mai-code-1-flash":    0.33,  # promotional rate
+    "copilot/claude-haiku-4.5":    0.33,
+    "copilot/gemini-3-flash":      0.33,
+    # ── 1× ──────────────────────────────────────────────────────────────
+    "copilot/gemini-2.5-pro":      1.0,
+    # ── 6× ──────────────────────────────────────────────────────────────
+    "copilot/gpt-5.3-codex":       6.0,
+    "copilot/gpt-5.4":             6.0,
+    "copilot/gpt-5.4-mini":        6.0,
+    "copilot/gemini-3.1-pro":      6.0,
+    "copilot/claude-sonnet-4.5":   6.0,
+    # ── 9× ──────────────────────────────────────────────────────────────
+    "copilot/claude-sonnet-4.6":   9.0,
+    # ── 14× ─────────────────────────────────────────────────────────────
+    "copilot/gemini-3.5-flash":    14.0,
+    # ── 27× ─────────────────────────────────────────────────────────────
+    "copilot/claude-opus-4.5":     27.0,
+    "copilot/claude-opus-4.6":     27.0,
+    "copilot/claude-opus-4.7":     27.0,
+    "copilot/claude-opus-4.8":     27.0,
+    # ── 54× ─────────────────────────────────────────────────────────────
+    "copilot/claude-opus-4.8-fast": 54.0,  # Opus 4.8 fast mode (preview); 2x base
+    # ── 57× ─────────────────────────────────────────────────────────────
+    "copilot/gpt-5.5":             57.0,
+    # ── auto-mode ───────────────────────────────────────────────────────
+    "copilot/auto":                0.0,   # auto-mode; discount applied separately
+}
+
+# Backward-compatible alias for the current-era (post-cutoff) multiplier table.
+MODEL_MULTIPLIERS = MODEL_MULTIPLIERS_2026_06
+
 # For auto-model-selection, paid plans get a 10 % discount on the multiplier.
 AUTO_MODE_DISCOUNT = 0.10
 
-def get_multiplier(model_id: str, *, auto_mode: bool = False) -> float:
-    """Return the effective premium-request multiplier for *model_id*."""
-    m = MODEL_MULTIPLIERS.get(model_id)
+def get_multiplier(
+    model_id: str,
+    *,
+    auto_mode: bool = False,
+    timestamp_ms: int | None = None,
+) -> float:
+    """Return the effective premium-request multiplier for *model_id*.
+
+    When *timestamp_ms* is provided and falls before the 2026-06-01 rebase
+    cutoff, the original scale is used; otherwise the rebased (current-era)
+    scale applies. Unknown models default to 1.0.
+    """
+    table = (
+        MODEL_MULTIPLIERS_PRE_2026_06
+        if timestamp_ms is not None and timestamp_ms < MULTIPLIER_REBASE_CUTOFF_MS
+        else MODEL_MULTIPLIERS_2026_06
+    )
+    m = table.get(model_id)
     if m is None:
         # Unknown model – conservative default of 1.0
         m = 1.0

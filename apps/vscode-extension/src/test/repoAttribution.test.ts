@@ -49,6 +49,7 @@ suite('Repo attribution', () => {
       {
         chatSessionId: 's1',
         requestIndex: 0,
+        timestampMs: Date.UTC(2026, 0, 15),
         modelId: 'copilot/gpt-5.3-codex',
         promptTokens: 100,
         outputTokens: 20,
@@ -61,6 +62,7 @@ suite('Repo attribution', () => {
       {
         chatSessionId: 's1',
         requestIndex: 1,
+        timestampMs: Date.UTC(2026, 0, 15),
         modelId: 'copilot/gpt-4.1',
         promptTokens: 60,
         outputTokens: 30,
@@ -76,6 +78,7 @@ suite('Repo attribution', () => {
       {
         chatSessionId: 's1',
         requestIndex: 2,
+        timestampMs: Date.UTC(2026, 0, 15),
         modelId: 'copilot/claude-sonnet-4',
         promptTokens: 40,
         outputTokens: 10,

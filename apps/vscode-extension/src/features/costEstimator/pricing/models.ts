@@ -10,11 +10,13 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     displayName: 'GPT-4.1',
     provider: 'OpenAI',
     category: 'Versatile',
-    releaseStatus: 'GA',
+    releaseStatus: 'Retired',
+    retiredDate: '2026-06-01',
+    successorId: 'gpt-5.5',
     inputPerMillion: 2,
     cachedInputPerMillion: 0.5,
     outputPerMillion: 8,
-    notes: ['Included model in GitHub Copilot pricing table.'],
+    notes: ['Retired on 2026-06-01; succeeded by GPT-5.5.'],
   },
   'gpt-5-mini': {
     id: 'gpt-5-mini',
@@ -32,20 +34,26 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     displayName: 'GPT-5.2',
     provider: 'OpenAI',
     category: 'Versatile',
-    releaseStatus: 'GA',
+    releaseStatus: 'Retired',
+    retiredDate: '2026-06-01',
+    successorId: 'gpt-5.5',
     inputPerMillion: 1.75,
     cachedInputPerMillion: 0.175,
     outputPerMillion: 14,
+    notes: ['Retired on 2026-06-01; succeeded by GPT-5.5.'],
   },
   'gpt-5.2-codex': {
     id: 'gpt-5.2-codex',
     displayName: 'GPT-5.2-Codex',
     provider: 'OpenAI',
     category: 'Powerful',
-    releaseStatus: 'GA',
+    releaseStatus: 'Retired',
+    retiredDate: '2026-06-01',
+    successorId: 'gpt-5.3-codex',
     inputPerMillion: 1.75,
     cachedInputPerMillion: 0.175,
     outputPerMillion: 14,
+    notes: ['Retired on 2026-06-01; succeeded by GPT-5.3-Codex.'],
   },
   'gpt-5.3-codex': {
     id: 'gpt-5.3-codex',
@@ -119,12 +127,14 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     displayName: 'Claude Sonnet 4',
     provider: 'Anthropic',
     category: 'Versatile',
-    releaseStatus: 'GA',
+    releaseStatus: 'Retired',
+    retiredDate: '2026-05-01',
+    successorId: 'claude-sonnet-4.6',
     inputPerMillion: 3,
     cachedInputPerMillion: 0.3,
     cacheWritePerMillion: 3.75,
     outputPerMillion: 15,
-    notes: ['Anthropic models include cache write cost.'],
+    notes: ['Retired on 2026-05-01; succeeded by Claude Sonnet 4.6.'],
   },
   'claude-sonnet-4.5': {
     id: 'claude-sonnet-4.5',
@@ -186,6 +196,42 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPerMillion: 25,
     notes: ['Anthropic models include cache write cost.'],
   },
+  'claude-opus-4.8': {
+    id: 'claude-opus-4.8',
+    displayName: 'Claude Opus 4.8',
+    provider: 'Anthropic',
+    category: 'Powerful',
+    releaseStatus: 'GA',
+    inputPerMillion: 5,
+    cachedInputPerMillion: 0.5,
+    cacheWritePerMillion: 6.25,
+    outputPerMillion: 25,
+    notes: ['Anthropic models include cache write cost.'],
+  },
+  'claude-opus-4.8-fast': {
+    id: 'claude-opus-4.8-fast',
+    displayName: 'Claude Opus 4.8 (fast)',
+    provider: 'Anthropic',
+    category: 'Powerful',
+    releaseStatus: 'Public preview',
+    inputPerMillion: 10,
+    cachedInputPerMillion: 1,
+    cacheWritePerMillion: 12.5,
+    outputPerMillion: 50,
+    notes: ['Fast-tier variant priced at 2x standard Opus.'],
+  },
+  'claude-fable-5': {
+    id: 'claude-fable-5',
+    displayName: 'Claude Fable 5',
+    provider: 'Anthropic',
+    category: 'Powerful',
+    releaseStatus: 'GA',
+    inputPerMillion: 10,
+    cachedInputPerMillion: 1,
+    cacheWritePerMillion: 12.5,
+    outputPerMillion: 50,
+    notes: ['Anthropic models include cache write cost.'],
+  },
 
   // Google
   'gemini-2.5-pro': {
@@ -221,6 +267,17 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPerMillion: 12,
     notes: ['Pricing applies to prompts with <=200K tokens.'],
   },
+  'gemini-3.5-flash': {
+    id: 'gemini-3.5-flash',
+    displayName: 'Gemini 3.5 Flash',
+    provider: 'Google',
+    category: 'Lightweight',
+    releaseStatus: 'GA',
+    inputPerMillion: 1.5,
+    cachedInputPerMillion: 0.15,
+    outputPerMillion: 9,
+    notes: ['No long-context surcharge.'],
+  },
 
   // xAI
   'grok-code-fast-1': {
@@ -228,11 +285,26 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     displayName: 'Grok Code Fast 1',
     provider: 'xAI',
     category: 'Lightweight',
-    releaseStatus: 'GA',
+    releaseStatus: 'Retired',
+    retiredDate: '2026-05-15',
+    successorId: 'gpt-5-mini',
     inputPerMillion: 0.2,
     cachedInputPerMillion: 0.02,
     outputPerMillion: 1.5,
-    notes: ['Low-cost coding model.'],
+    notes: ['Retired on 2026-05-15; succeeded by GPT-5 mini.'],
+  },
+
+  // Microsoft
+  'mai-code-1-flash': {
+    id: 'mai-code-1-flash',
+    displayName: 'MAI Code 1 Flash',
+    provider: 'Microsoft',
+    category: 'Lightweight',
+    releaseStatus: 'GA',
+    inputPerMillion: 0.75,
+    cachedInputPerMillion: 0.075,
+    outputPerMillion: 4.5,
+    notes: ['Low-cost Microsoft coding model.'],
   },
 
   // Fine-tuned (GitHub)
@@ -241,7 +313,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     displayName: 'Raptor mini',
     provider: 'GitHub',
     category: 'Versatile',
-    releaseStatus: 'Public preview',
+    releaseStatus: 'GA',
     inputPerMillion: 0.25,
     cachedInputPerMillion: 0.025,
     outputPerMillion: 2,
@@ -252,15 +324,23 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     displayName: 'Goldeneye',
     provider: 'GitHub',
     category: 'Powerful',
-    releaseStatus: 'Public preview',
+    releaseStatus: 'Retired',
+    retiredDate: '2026-06-01',
     inputPerMillion: 1.25,
     cachedInputPerMillion: 0.125,
     outputPerMillion: 10,
-    notes: ['Uses GPT-5.1-Codex pricing.'],
+    notes: ['Internal codename; retired/evaluation model.'],
   },
 };
 
-/** Convenience array, ordered for UI display (cheap → expensive). */
+/** Convenience array, ordered for UI display (active first cheap → expensive, retired last). */
 export const MODEL_PRICING_LIST: ModelPricing[] = Object.values(MODEL_PRICING)
   .slice()
-  .sort((a, b) => a.outputPerMillion - b.outputPerMillion);
+  .sort((a, b) => {
+    const aRetired = a.releaseStatus === 'Retired' ? 1 : 0;
+    const bRetired = b.releaseStatus === 'Retired' ? 1 : 0;
+    if (aRetired !== bRetired) {
+      return aRetired - bRetired;
+    }
+    return a.outputPerMillion - b.outputPerMillion;
+  });

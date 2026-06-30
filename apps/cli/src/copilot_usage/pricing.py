@@ -32,6 +32,9 @@ class ModelPricing:
     output_per_million: float
     cached_input_per_million: float = 0.0
     cache_write_per_million: float = 0.0
+    release_status: str = "GA"
+    retired_date: str | None = None
+    successor_id: str | None = None
 
 
 MODEL_PRICING: dict[str, ModelPricing] = {
@@ -39,6 +42,7 @@ MODEL_PRICING: dict[str, ModelPricing] = {
     "gpt-4.1": ModelPricing(
         id="gpt-4.1", display_name="GPT-4.1", provider="OpenAI", category="Versatile",
         input_per_million=2.0, cached_input_per_million=0.5, output_per_million=8.0,
+        release_status="Retired", retired_date="2026-06-01", successor_id="gpt-5.5",
     ),
     "gpt-5-mini": ModelPricing(
         id="gpt-5-mini", display_name="GPT-5 mini", provider="OpenAI", category="Lightweight",
@@ -47,10 +51,12 @@ MODEL_PRICING: dict[str, ModelPricing] = {
     "gpt-5.2": ModelPricing(
         id="gpt-5.2", display_name="GPT-5.2", provider="OpenAI", category="Versatile",
         input_per_million=1.75, cached_input_per_million=0.175, output_per_million=14.0,
+        release_status="Retired", retired_date="2026-06-01", successor_id="gpt-5.5",
     ),
     "gpt-5.2-codex": ModelPricing(
         id="gpt-5.2-codex", display_name="GPT-5.2-Codex", provider="OpenAI", category="Powerful",
         input_per_million=1.75, cached_input_per_million=0.175, output_per_million=14.0,
+        release_status="Retired", retired_date="2026-06-01", successor_id="gpt-5.3-codex",
     ),
     "gpt-5.3-codex": ModelPricing(
         id="gpt-5.3-codex", display_name="GPT-5.3-Codex", provider="OpenAI", category="Powerful",
@@ -80,6 +86,7 @@ MODEL_PRICING: dict[str, ModelPricing] = {
     "claude-sonnet-4": ModelPricing(
         id="claude-sonnet-4", display_name="Claude Sonnet 4", provider="Anthropic", category="Versatile",
         input_per_million=3.0, cached_input_per_million=0.3, cache_write_per_million=3.75, output_per_million=15.0,
+        release_status="Retired", retired_date="2026-05-01", successor_id="claude-sonnet-4.6",
     ),
     "claude-sonnet-4.5": ModelPricing(
         id="claude-sonnet-4.5", display_name="Claude Sonnet 4.5", provider="Anthropic", category="Versatile",
@@ -101,6 +108,19 @@ MODEL_PRICING: dict[str, ModelPricing] = {
         id="claude-opus-4.7", display_name="Claude Opus 4.7", provider="Anthropic", category="Powerful",
         input_per_million=5.0, cached_input_per_million=0.5, cache_write_per_million=6.25, output_per_million=25.0,
     ),
+    "claude-opus-4.8": ModelPricing(
+        id="claude-opus-4.8", display_name="Claude Opus 4.8", provider="Anthropic", category="Powerful",
+        input_per_million=5.0, cached_input_per_million=0.5, cache_write_per_million=6.25, output_per_million=25.0,
+    ),
+    "claude-opus-4.8-fast": ModelPricing(
+        id="claude-opus-4.8-fast", display_name="Claude Opus 4.8 (fast)", provider="Anthropic", category="Powerful",
+        release_status="Public preview",
+        input_per_million=10.0, cached_input_per_million=1.0, cache_write_per_million=12.5, output_per_million=50.0,
+    ),
+    "claude-fable-5": ModelPricing(
+        id="claude-fable-5", display_name="Claude Fable 5", provider="Anthropic", category="Powerful",
+        input_per_million=10.0, cached_input_per_million=1.0, cache_write_per_million=12.5, output_per_million=50.0,
+    ),
     # ── Google ──────────────────────────────────────────────────────────────
     "gemini-2.5-pro": ModelPricing(
         id="gemini-2.5-pro", display_name="Gemini 2.5 Pro", provider="Google", category="Powerful",
@@ -113,11 +133,22 @@ MODEL_PRICING: dict[str, ModelPricing] = {
     "gemini-3.1-pro": ModelPricing(
         id="gemini-3.1-pro", display_name="Gemini 3.1 Pro", provider="Google", category="Powerful",
         input_per_million=2.0, cached_input_per_million=0.2, output_per_million=12.0,
+        release_status="Public preview",
+    ),
+    "gemini-3.5-flash": ModelPricing(
+        id="gemini-3.5-flash", display_name="Gemini 3.5 Flash", provider="Google", category="Lightweight",
+        input_per_million=1.5, cached_input_per_million=0.15, output_per_million=9.0,
     ),
     # ── xAI ─────────────────────────────────────────────────────────────────
     "grok-code-fast-1": ModelPricing(
         id="grok-code-fast-1", display_name="Grok Code Fast 1", provider="xAI", category="Lightweight",
         input_per_million=0.2, cached_input_per_million=0.02, output_per_million=1.5,
+        release_status="Retired", retired_date="2026-05-15", successor_id="gpt-5-mini",
+    ),
+    # ── Microsoft ─────────────────────────────────────────────────────────────
+    "mai-code-1-flash": ModelPricing(
+        id="mai-code-1-flash", display_name="MAI Code 1 Flash", provider="Microsoft", category="Lightweight",
+        input_per_million=0.75, cached_input_per_million=0.075, output_per_million=4.5,
     ),
     # ── GitHub fine-tuned ────────────────────────────────────────────────────
     "raptor-mini": ModelPricing(
@@ -127,19 +158,21 @@ MODEL_PRICING: dict[str, ModelPricing] = {
     "goldeneye": ModelPricing(
         id="goldeneye", display_name="Goldeneye", provider="GitHub", category="Powerful",
         input_per_million=1.25, cached_input_per_million=0.125, output_per_million=10.0,
+        release_status="Retired", retired_date="2026-06-01",
     ),
 }
 
-# Sorted cheapest-output-first for UI display
+# Sorted retired-last, then cheapest-output-first for UI display
 MODEL_PRICING_LIST: list[ModelPricing] = sorted(
-    MODEL_PRICING.values(), key=lambda m: m.output_per_million
+    MODEL_PRICING.values(),
+    key=lambda m: (1 if m.release_status == "Retired" else 0, m.output_per_million),
 )
 
 # ---------------------------------------------------------------------------
 # Plan allowances
 # ---------------------------------------------------------------------------
 
-CopilotPlan = Literal["free", "pro", "pro_plus", "business", "enterprise", "unknown"]
+CopilotPlan = Literal["free", "pro", "pro_plus", "max", "business", "enterprise", "unknown"]
 AllowanceType = Literal["individual", "pooled_org", "limited_or_unknown"]
 
 
@@ -147,7 +180,9 @@ AllowanceType = Literal["individual", "pooled_org", "limited_or_unknown"]
 class PlanAllowance:
     display_name: str
     allowance_type: AllowanceType
-    included_credits_per_month: int | None = None       # individual plans
+    included_credits_per_month: int | None = None       # individual plans (base + flex)
+    base_credits_per_month: int | None = None           # individual plans
+    flex_credits_per_month: int | None = None           # individual plans
     included_credits_per_user_per_month: int | None = None  # org plans
     included_usd_value: float | None = None
 
@@ -156,14 +191,26 @@ PLAN_ALLOWANCES: dict[str, PlanAllowance] = {
     "pro": PlanAllowance(
         display_name="Copilot Pro",
         allowance_type="individual",
-        included_credits_per_month=1000,
+        base_credits_per_month=1000,
+        flex_credits_per_month=500,
+        included_credits_per_month=1500,
         included_usd_value=10.0,
     ),
     "pro_plus": PlanAllowance(
         display_name="Copilot Pro+",
         allowance_type="individual",
-        included_credits_per_month=3900,
+        base_credits_per_month=3900,
+        flex_credits_per_month=3100,
+        included_credits_per_month=7000,
         included_usd_value=39.0,
+    ),
+    "max": PlanAllowance(
+        display_name="Copilot Max",
+        allowance_type="individual",
+        base_credits_per_month=10000,
+        flex_credits_per_month=10000,
+        included_credits_per_month=20000,
+        included_usd_value=100.0,
     ),
     "business": PlanAllowance(
         display_name="Copilot Business",
@@ -241,10 +288,13 @@ class PlanImpact:
     ]
     estimated_credits: int
     included_credits: int | None
-    extra_budget_credits: int
-    overage_credits: int
-    estimated_extra_usd: float
-    is_within_allowance: bool | None
+    included_base_credits: int | None = None
+    included_flex_credits: int | None = None
+    flex_applied: bool | None = None
+    extra_budget_credits: int = 0
+    overage_credits: int = 0
+    estimated_extra_usd: float = 0.0
+    is_within_allowance: bool | None = None
     warnings: list[str] = field(default_factory=list)
 
 
@@ -335,6 +385,7 @@ def compute_plan_impact(
     summary: CostSummary,
     plan_id: str,
     extra_budget_usd: float = 0.0,
+    include_flex: bool = True,
 ) -> PlanImpact:
     """Compare estimated monthly credits against a Copilot plan allowance."""
     allowance = PLAN_ALLOWANCES.get(plan_id, PLAN_ALLOWANCES["unknown"])
@@ -342,8 +393,11 @@ def compute_plan_impact(
     estimated = summary.total_monthly_credits
     warnings: list[str] = []
 
-    if allowance.allowance_type == "individual" and allowance.included_credits_per_month is not None:
-        included = allowance.included_credits_per_month
+    if allowance.allowance_type == "individual" and allowance.base_credits_per_month is not None:
+        base = allowance.base_credits_per_month
+        flex = allowance.flex_credits_per_month or 0
+        flex_applied = include_flex and flex > 0
+        included = base + (flex if flex_applied else 0)
         overage = max(0, estimated - included)
         extra_usd = overage * AI_CREDIT_USD_VALUE
         within = estimated <= included
@@ -360,6 +414,9 @@ def compute_plan_impact(
             status=status,
             estimated_credits=estimated,
             included_credits=included,
+            included_base_credits=base,
+            included_flex_credits=flex,
+            flex_applied=flex_applied,
             extra_budget_credits=extra_budget_credits,
             overage_credits=overage,
             estimated_extra_usd=extra_usd,

@@ -314,7 +314,7 @@ export function computeRepoAttributionStats(
     totalPromptTokens += event.promptTokens;
     totalOutputTokens += event.outputTokens;
     const hasTokenUsage = event.promptTokens > 0 || event.outputTokens > 0;
-    const premiumRequests = hasTokenUsage ? getMultiplier(event.modelId || '') : 0;
+    const premiumRequests = hasTokenUsage ? getMultiplier(event.modelId || '', event.timestampMs) : 0;
 
     const weights = resolveRepoWeights(event, repos);
     if (weights.length === 0) {

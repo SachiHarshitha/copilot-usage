@@ -20,14 +20,22 @@ export function computePlanImpact(
 
   const warnings: string[] = [];
   let includedCredits: number | undefined;
+  let includedBaseCredits: number | undefined;
+  let includedFlexCredits: number | undefined;
+  let flexApplied: boolean | undefined;
   let overageCredits: number | undefined;
   let estimatedExtraUsd: number | undefined;
   let isWithinIncludedAllowance: boolean | undefined;
   let isCoveredByExtraBudget: boolean | undefined;
   let status: PlanImpactStatus = 'estimate_only';
 
-  if (allowance.allowanceType === 'individual' && allowance.includedCreditsPerMonth !== undefined) {
-    includedCredits = allowance.includedCreditsPerMonth;
+  if (allowance.allowanceType === 'individual' && allowance.baseCreditsPerMonth !== undefined) {
+    const baseCredits = allowance.baseCreditsPerMonth;
+    const flexCredits = allowance.flexCreditsPerMonth ?? 0;
+    flexApplied = settings.includeFlexAllowance && flexCredits > 0;
+    includedBaseCredits = baseCredits;
+    includedFlexCredits = flexCredits;
+    includedCredits = baseCredits + (flexApplied ? flexCredits : 0);
     overageCredits = Math.max(0, cost.estimatedMonthlyCredits - includedCredits);
     estimatedExtraUsd = overageCredits * PRICING_METADATA.aiCreditUsdValue;
     isWithinIncludedAllowance = cost.estimatedMonthlyCredits <= includedCredits;
@@ -61,6 +69,9 @@ export function computePlanImpact(
     selectedModelId: settings.selectedModelId,
     estimatedCredits: cost.estimatedMonthlyCredits,
     includedCredits,
+    includedBaseCredits,
+    includedFlexCredits,
+    flexApplied,
     extraBudgetCredits,
     overageCredits,
     estimatedExtraUsd,

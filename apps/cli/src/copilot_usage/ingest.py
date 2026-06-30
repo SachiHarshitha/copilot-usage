@@ -52,7 +52,11 @@ def ingest_parsed_file(con: duckdb.DuckDBPyConnection, pf: ParsedFile) -> int:
         rows_by_id: dict[str, list] = {}
         for req in pf.requests:
             event_id = f"{req.chat_session_id}:{req.request_index}"
-            premium = get_multiplier(req.model_id or "") if (req.prompt_tokens or req.output_tokens) else 0.0
+            premium = (
+                get_multiplier(req.model_id or "", timestamp_ms=req.timestamp_ms)
+                if (req.prompt_tokens or req.output_tokens)
+                else 0.0
+            )
             # Last occurrence wins (JSONL may contain duplicate result lines)
             rows_by_id[event_id] = [
                 event_id, req.chat_session_id, pf.workspace_id,

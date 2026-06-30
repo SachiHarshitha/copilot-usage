@@ -1,10 +1,10 @@
 /** Types for the Cost Estimator feature. Pure data — no VS Code or DOM imports. */
 
-export type ModelProvider = 'OpenAI' | 'Anthropic' | 'Google' | 'xAI' | 'GitHub';
+export type ModelProvider = 'OpenAI' | 'Anthropic' | 'Google' | 'xAI' | 'GitHub' | 'Microsoft';
 
 export type ModelCategory = 'Lightweight' | 'Versatile' | 'Powerful' | 'Preview' | 'Unknown';
 
-export type ReleaseStatus = 'GA' | 'Public preview' | 'Unknown';
+export type ReleaseStatus = 'GA' | 'Public preview' | 'Retired' | 'Unknown';
 
 export interface ModelPricing {
   id: string;
@@ -18,6 +18,10 @@ export interface ModelPricing {
   cacheWritePerMillion?: number;
   /** USD per 1,000,000 output tokens. */
   outputPerMillion: number;
+  /** Retirement date (YYYY-MM-DD) if releaseStatus is 'Retired'. */
+  retiredDate?: string;
+  /** Suggested replacement model id for a retired model. */
+  successorId?: string;
   notes?: string[];
 }
 
@@ -25,6 +29,7 @@ export type CopilotPlan =
   | 'free'
   | 'pro'
   | 'pro_plus'
+  | 'max'
   | 'business'
   | 'enterprise'
   | 'unknown';
@@ -40,8 +45,12 @@ export type AllowanceType = 'individual' | 'pooled_org' | 'limited_or_unknown';
 
 export interface PlanAllowance {
   displayName: string;
-  /** Personal monthly credit allowance (individual plans). */
+  /** Personal monthly credit allowance (individual plans) = base + flex. */
   includedCreditsPerMonth?: number;
+  /** Base credits included with the subscription price (individual plans). */
+  baseCreditsPerMonth?: number;
+  /** Variable flex allotment added on top of base credits (individual plans). */
+  flexCreditsPerMonth?: number;
   /** Per-user monthly credits, pooled at the billing entity (org plans). */
   includedCreditsPerUserPerMonth?: number;
   includedUsdValue?: number;
@@ -99,6 +108,12 @@ export interface PlanImpactEstimate {
 
   estimatedCredits: number;
   includedCredits?: number;
+  /** Base credits portion of the included allowance (individual plans). */
+  includedBaseCredits?: number;
+  /** Flex credits portion of the included allowance (individual plans). */
+  includedFlexCredits?: number;
+  /** Whether the flex allotment was added to includedCredits. */
+  flexApplied?: boolean;
   extraBudgetCredits: number;
 
   overageCredits?: number;
@@ -118,6 +133,8 @@ export interface CostEstimatorSettings {
   extraBudgetUsd: number;
   selectedModelId: string;
   defaultRange: CostRangeKey;
+  /** Include the flex allotment on top of base credits in the included allowance. */
+  includeFlexAllowance: boolean;
 }
 
 export interface TrendInsight {

@@ -44,6 +44,7 @@ const PLANS: { v: string; l: string }[] = [
   { v: 'free', l: 'Copilot Free' },
   { v: 'pro', l: 'Copilot Pro' },
   { v: 'pro_plus', l: 'Copilot Pro+' },
+  { v: 'max', l: 'Copilot Max' },
   { v: 'business', l: 'Copilot Business' },
   { v: 'enterprise', l: 'Copilot Enterprise' },
 ];
@@ -159,6 +160,10 @@ ${commonStyles()}
   .compare-table tr.selected { background: rgba(56,189,248,0.08); }
   .compare-table td.fits-yes { color: #22c55e; font-weight: 600; }
   .compare-table td.fits-no { color: #ef4444; font-weight: 600; }
+  .compare-table tr.retired-row { opacity: 0.6; }
+  .retired-badge { display: inline-block; font-size: 0.72em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #f59e0b; border: 1px solid #f59e0b; border-radius: 4px; padding: 0 5px; margin-left: 6px; vertical-align: middle; }
+  .checkbox-label { flex-direction: row !important; align-items: center; gap: 8px !important; }
+  .checkbox-label input { width: auto; }
   .provider-compare-box { flex: 0 0 auto; min-height: 260px; margin-top: 14px; }
   .capability-compare { display: flex; flex-direction: column; gap: 12px; }
   .capability-summary {
@@ -319,6 +324,10 @@ ${noDataBanner}
     <label>Extra budget per month (USD)
       <input id="budgetInput" type="number" min="0" step="1" value="${s.extraBudgetUsd}" onchange="setSetting('extraBudgetUsd', this.value)">
     </label>
+    <label class="checkbox-label">
+      <input id="flexToggle" type="checkbox"${s.includeFlexAllowance ? ' checked' : ''} onchange="setSetting('includeFlexAllowance', this.checked)">
+      Include flex allowance
+    </label>
     <label>Estimate window
       <select id="rangeSelect" onchange="setRange(this.value)">${rangeOptions}</select>
     </label>
@@ -412,6 +421,12 @@ function renderPlanImpact(p: PlanImpactEstimate, planName: string): string {
   if (p.includedCredits !== undefined) {
     cells.push(impactCell(fmt(p.includedCredits), includedCellLabel));
   }
+  if (p.includedBaseCredits !== undefined && p.includedFlexCredits !== undefined && p.includedFlexCredits > 0) {
+    const flexLabel = p.flexApplied
+      ? `Base ${fmt(p.includedBaseCredits)} + flex ${fmt(p.includedFlexCredits)}`
+      : `Base ${fmt(p.includedBaseCredits)} (flex ${fmt(p.includedFlexCredits)} excluded)`;
+    cells.push(impactCell(p.flexApplied ? 'On' : 'Off', flexLabel));
+  }
   if (p.overageCredits !== undefined) {
     cells.push(impactCell(fmt(p.overageCredits), 'Overage credits'));
   }
@@ -449,8 +464,12 @@ function renderStatusPill(p: PlanImpactEstimate): string {
 function renderComparisonRow(c: CostEstimate, isSelected: boolean): string {
   const fitsPro = c.estimatedMonthlyCredits <= 1000;
   const fitsProPlus = c.estimatedMonthlyCredits <= 3900;
-  return `<tr class="${isSelected ? 'selected' : ''}">
-    <td>${esc(c.modelDisplayName)}${isSelected ? ' <strong>(selected)</strong>' : ''}</td>
+  const pricing = MODEL_PRICING_LIST.find(x => x.id === c.modelId);
+  const retiredBadge = pricing?.releaseStatus === 'Retired'
+    ? ' <span class="retired-badge">Retired</span>'
+    : '';
+  return `<tr class="${isSelected ? 'selected' : ''}${pricing?.releaseStatus === 'Retired' ? ' retired-row' : ''}">
+    <td>${esc(c.modelDisplayName)}${retiredBadge}${isSelected ? ' <strong>(selected)</strong>' : ''}</td>
     <td>${esc(providerOf(c.modelId))}</td>
     <td>$${c.estimatedMonthlyUsd.toFixed(2)}</td>
     <td>${fmt(c.estimatedMonthlyCredits)}</td>

@@ -5,14 +5,26 @@ import { CopilotPlan, PlanAllowance } from '../types';
 export const PLAN_ALLOWANCES: Record<CopilotPlan, PlanAllowance> = {
   pro: {
     displayName: 'Copilot Pro',
-    includedCreditsPerMonth: 1000,
+    baseCreditsPerMonth: 1000,
+    flexCreditsPerMonth: 500,
+    includedCreditsPerMonth: 1500,
     includedUsdValue: 10,
     allowanceType: 'individual',
   },
   pro_plus: {
     displayName: 'Copilot Pro+',
-    includedCreditsPerMonth: 3900,
+    baseCreditsPerMonth: 3900,
+    flexCreditsPerMonth: 3100,
+    includedCreditsPerMonth: 7000,
     includedUsdValue: 39,
+    allowanceType: 'individual',
+  },
+  max: {
+    displayName: 'Copilot Max',
+    baseCreditsPerMonth: 10000,
+    flexCreditsPerMonth: 10000,
+    includedCreditsPerMonth: 20000,
+    includedUsdValue: 100,
     allowanceType: 'individual',
   },
   business: {

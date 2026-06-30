@@ -50,7 +50,7 @@ export function computeKpis(files: ParsedFile[], events: RequestEvent[]): KpiTot
     totalPromptTokens += e.promptTokens;
     totalOutputTokens += e.outputTokens;
     totalToolCallRounds += e.toolCallRounds;
-    const m = getMultiplier(e.modelId || '');
+    const m = getMultiplier(e.modelId || '', e.timestampMs);
     if (e.promptTokens || e.outputTokens) {
       totalPremium += m;
     }
@@ -80,7 +80,7 @@ export function computeModelStats(events: RequestEvent[]): ModelStats[] {
     s.requests++;
     s.totalTokens += e.promptTokens + e.outputTokens;
     if (e.promptTokens || e.outputTokens) {
-      s.premium += getMultiplier(modelId);
+      s.premium += getMultiplier(modelId, e.timestampMs);
     }
   }
   return [...map.values()].sort((a, b) => b.requests - a.requests);
@@ -119,7 +119,7 @@ export function computeWorkspaceStats(files: ParsedFile[], events: RequestEvent[
       promptTokens += e.promptTokens;
       outputTokens += e.outputTokens;
       if (e.promptTokens || e.outputTokens) {
-        premium += getMultiplier(e.modelId || '');
+        premium += getMultiplier(e.modelId || '', e.timestampMs);
       }
       const mid = e.modelId || 'unknown';
       modelCounts.set(mid, (modelCounts.get(mid) || 0) + 1);
