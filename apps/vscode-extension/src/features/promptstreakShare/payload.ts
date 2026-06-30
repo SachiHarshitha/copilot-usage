@@ -2,7 +2,7 @@
 
 import { createHash } from 'crypto';
 import type { AgentAction, AgentDailyBucket, AgentModelCall, AgentSnapshot, AgentRun } from '@copilot-usage/shared-schema';
-import { SharePayloadInput } from './types';
+import { SharePayloadInput, ShareRunInput } from './types';
 
 function nonNegativeInt(value: number): number {
   if (!Number.isFinite(value) || value <= 0) {
@@ -37,6 +37,49 @@ function stableRepoRefKey(repoRef: SharePayloadInput['repoRef']): string {
     return `alias:${repoRef.aliasLabel}`;
   }
   return 'redacted';
+}
+
+function isDateOnly(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function runStartIso(date: string, fallbackIso: string): string {
+  if (!isDateOnly(date)) {
+    return fallbackIso;
+  }
+  return `${date}T00:00:00.000Z`;
+}
+
+function stableActionList(actions: ShareRunInput['actions']): Array<{ type: string; count: number; filesTouched: number }> {
+  if (!actions || actions.length === 0) {
+    return [];
+  }
+
+  return actions
+    .map(action => ({
+      type: action.type,
+      count: nonNegativeInt(action.count),
+      filesTouched: nonNegativeInt(action.filesTouched || 0),
+    }))
+    .sort((a, b) => a.type.localeCompare(b.type));
+}
+
+function stableRunModelList(modelCalls: ShareRunInput['modelCalls']): Array<{
+  modelId: string;
+  requestCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  premiumRequests: number;
+}> {
+  return modelCalls
+    .map(model => ({
+      modelId: stableModelId(model.modelId),
+      requestCount: nonNegativeInt(model.requestCount),
+      inputTokens: nonNegativeInt(model.inputTokens),
+      outputTokens: nonNegativeInt(model.outputTokens),
+      premiumRequests: nonNegativePremium(model.premiumRequests),
+    }))
+    .sort((a, b) => a.modelId.localeCompare(b.modelId));
 }
 
 function buildDeterministicUsageFingerprint(input: SharePayloadInput): string {
@@ -88,7 +131,38 @@ function buildDeterministicUsageFingerprint(input: SharePayloadInput): string {
         totalPremiumRequests: nonNegativePremium(run.totalPremiumRequests),
         topModel: run.topModel ? stableModelId(run.topModel) : '',
       }))
-      .sort((a, b) => a.repoRefKey.localeCompare(b.repoRefKey)),
+      .sort((a, b) => {
+        if (a.repoRefKey !== b.repoRefKey) {
+          return a.repoRefKey.localeCompare(b.repoRefKey);
+        }
+        if (a.topModel !== b.topModel) {
+          return a.topModel.localeCompare(b.topModel);
+        }
+        return a.totalRequests - b.totalRequests;
+      }),
+    runs: (input.runs || [])
+      .map(run => ({
+        date: isDateOnly(run.date) ? run.date : '',
+        repoRefKey: stableRepoRefKey(run.repoRef),
+        modelCalls: stableRunModelList(run.modelCalls),
+        actions: stableActionList(run.actions),
+      }))
+      .sort((a, b) => {
+        if (a.date !== b.date) {
+          return a.date.localeCompare(b.date);
+        }
+        if (a.repoRefKey !== b.repoRefKey) {
+          return a.repoRefKey.localeCompare(b.repoRefKey);
+        }
+
+        const modelA = JSON.stringify(a.modelCalls);
+        const modelB = JSON.stringify(b.modelCalls);
+        if (modelA !== modelB) {
+          return modelA.localeCompare(modelB);
+        }
+
+        return JSON.stringify(a.actions).localeCompare(JSON.stringify(b.actions));
+      }),
   };
 
   return JSON.stringify(canonical);
@@ -127,6 +201,46 @@ function buildModelCalls(input: SharePayloadInput): AgentModelCall[] {
   }];
 }
 
+function buildRunModelCalls(run: ShareRunInput, includeModelBreakdown: boolean): AgentModelCall[] {
+  const normalized = stableRunModelList(run.modelCalls);
+
+  if (includeModelBreakdown && normalized.length > 0) {
+    return normalized.map(model => ({
+      modelId: model.modelId,
+      requestCount: model.requestCount,
+      inputTokens: model.inputTokens,
+      outputTokens: model.outputTokens,
+      premiumRequests: model.premiumRequests,
+      sourceOfTruth: 'observed',
+    }));
+  }
+
+  const aggregate = normalized.reduce(
+    (acc, model) => {
+      acc.requestCount += model.requestCount;
+      acc.inputTokens += model.inputTokens;
+      acc.outputTokens += model.outputTokens;
+      acc.premiumRequests = nonNegativePremium(acc.premiumRequests + model.premiumRequests);
+      return acc;
+    },
+    {
+      requestCount: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      premiumRequests: 0,
+    },
+  );
+
+  return [{
+    modelId: 'all-models',
+    requestCount: aggregate.requestCount,
+    inputTokens: aggregate.inputTokens,
+    outputTokens: aggregate.outputTokens,
+    premiumRequests: aggregate.premiumRequests,
+    sourceOfTruth: 'observed',
+  }];
+}
+
 function buildActions(input: SharePayloadInput): AgentAction[] | undefined {
   if (!input.fields.includeActionCounts || input.actions.length === 0) {
     return undefined;
@@ -151,6 +265,69 @@ function buildDailyBuckets(input: SharePayloadInput): AgentDailyBucket[] | undef
     outputTokens: nonNegativeInt(bucket.outputTokens),
     premiumRequests: nonNegativePremium(bucket.premiumRequests),
   }));
+}
+
+function buildRunActions(actions: ShareRunInput['actions'], includeActionCounts: boolean): AgentAction[] | undefined {
+  if (!includeActionCounts || !actions || actions.length === 0) {
+    return undefined;
+  }
+
+  return stableActionList(actions).map(action => ({
+    type: action.type as AgentAction['type'],
+    count: action.count,
+    filesTouched: action.filesTouched,
+  }));
+}
+
+function buildExplicitRuns(input: SharePayloadInput, runHash: string): AgentRun[] {
+  if (!input.runs || input.runs.length === 0) {
+    return [];
+  }
+
+  const normalizedRuns = input.runs
+    .map(run => ({
+      date: isDateOnly(run.date) ? run.date : '',
+      repoRef: run.repoRef,
+      repoRefKey: stableRepoRefKey(run.repoRef),
+      modelCalls: buildRunModelCalls(run, input.fields.includeModelBreakdown),
+      actions: buildRunActions(run.actions, input.fields.includeActionCounts),
+    }))
+    .sort((a, b) => {
+      if (a.date !== b.date) {
+        return a.date.localeCompare(b.date);
+      }
+      if (a.repoRefKey !== b.repoRefKey) {
+        return a.repoRefKey.localeCompare(b.repoRefKey);
+      }
+
+      const modelA = JSON.stringify(a.modelCalls);
+      const modelB = JSON.stringify(b.modelCalls);
+      if (modelA !== modelB) {
+        return modelA.localeCompare(modelB);
+      }
+
+      return JSON.stringify(a.actions || []).localeCompare(JSON.stringify(b.actions || []));
+    });
+
+  return normalizedRuns.map((run, index) => {
+    const startedAt = runStartIso(run.date, input.observedAtIso);
+    const entry: AgentRun = {
+      runId: `run_${runHash.slice(0, 16)}_${String(index + 1).padStart(4, '0')}`,
+      startedAt,
+      endedAt: startedAt,
+      modelCalls: run.modelCalls,
+    };
+
+    if (run.actions && run.actions.length > 0) {
+      entry.actions = run.actions;
+    }
+
+    if (input.fields.includeRepoAttribution && run.repoRef) {
+      entry.repoRef = { ...run.repoRef };
+    }
+
+    return entry;
+  });
 }
 
 function buildAggregateRun(input: SharePayloadInput, runHash: string): AgentRun {
@@ -214,7 +391,10 @@ function buildRepoRuns(input: SharePayloadInput, runHash: string): AgentRun[] {
 
 export function buildShareSnapshot(input: SharePayloadInput): AgentSnapshot {
   const hash = buildRunHash(input);
-  const runs = buildRepoRuns(input, hash);
+  const runs = buildExplicitRuns(input, hash);
+  if (runs.length === 0) {
+    runs.push(...buildRepoRuns(input, hash));
+  }
   if (runs.length === 0) {
     runs.push(buildAggregateRun(input, hash));
   }

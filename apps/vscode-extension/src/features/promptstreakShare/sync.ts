@@ -11,6 +11,7 @@ import {
 import {
   computeRepoAttributionStats,
   discoverRepoDescriptors,
+  resolvePrimaryRepoDescriptorForEvent,
 } from '../../core/repoAttribution';
 import {
   computeDailyStats,
@@ -27,6 +28,8 @@ import {
   buildShareSnapshot,
 } from './payload';
 import {
+  NON_PUBLIC_REPO_LABEL,
+  resolveShareRepoRefForRemote,
   resolveShareRepoRuns,
   resolveShareRepoRef,
 } from './repoRef';
@@ -51,6 +54,8 @@ import {
   ShareHistoryEntry,
   ShareHistoryStatus,
   ShareModelInput,
+  ShareRepoRefInput,
+  ShareRunInput,
 } from './types';
 
 const BASE_RETRY_MS = 60 * 1000;
@@ -157,6 +162,137 @@ function dailyPremiumByDate(events: RequestEvent[]): Map<string, number> {
   }
 
   return map;
+}
+
+function dateKeyFromTimestampMs(timestampMs: number): string {
+  const date = new Date(timestampMs);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function runRepoKey(repoRef: ShareRepoRefInput | undefined): string {
+  if (!repoRef) {
+    return '';
+  }
+
+  if (repoRef.mode === 'github') {
+    return `github:${repoRef.githubRepo}`;
+  }
+
+  if (repoRef.mode === 'alias') {
+    return `alias:${repoRef.aliasLabel}`;
+  }
+
+  return 'redacted';
+}
+
+interface RunBucket {
+  date: string;
+  repoRef?: ShareRepoRefInput;
+  repoSortKey: string;
+  modelById: Map<string, ShareModelInput>;
+  toolCallRounds: number;
+}
+
+async function buildExplicitRunsFromEvents(
+  events: RequestEvent[],
+  includeRepoAttribution: boolean,
+  includeActionCounts: boolean,
+  repos: Awaited<ReturnType<typeof discoverRepoDescriptors>>,
+): Promise<ShareRunInput[]> {
+  const buckets = new Map<string, RunBucket>();
+  const repoRefCache = new Map<string, ShareRepoRefInput>();
+
+  for (const event of events) {
+    if (!event.timestampMs) {
+      continue;
+    }
+
+    const date = dateKeyFromTimestampMs(event.timestampMs);
+
+    let repoRef: ShareRepoRefInput | undefined;
+    if (includeRepoAttribution) {
+      const repo = resolvePrimaryRepoDescriptorForEvent(event, repos);
+      if (repo) {
+        const cached = repoRefCache.get(repo.id);
+        if (cached) {
+          repoRef = cached;
+        } else {
+          const resolved = await resolveShareRepoRefForRemote(repo.remoteUrl, repo.remoteSlug);
+          repoRefCache.set(repo.id, resolved);
+          repoRef = resolved;
+        }
+      } else {
+        repoRef = {
+          mode: 'alias',
+          aliasLabel: NON_PUBLIC_REPO_LABEL,
+        };
+      }
+    }
+
+    const repoKey = runRepoKey(repoRef);
+    const bucketKey = `${date}|${repoKey}`;
+
+    let bucket = buckets.get(bucketKey);
+    if (!bucket) {
+      bucket = {
+        date,
+        repoRef,
+        repoSortKey: repoKey,
+        modelById: new Map(),
+        toolCallRounds: 0,
+      };
+      buckets.set(bucketKey, bucket);
+    }
+
+    const modelId = event.modelId || 'unknown';
+    const hasTokenUsage = event.promptTokens > 0 || event.outputTokens > 0;
+    const premium = hasTokenUsage ? getMultiplier(modelId) : 0;
+    const current = bucket.modelById.get(modelId);
+    if (current) {
+      current.requestCount += 1;
+      current.inputTokens += toNonNegativeInt(event.promptTokens);
+      current.outputTokens += toNonNegativeInt(event.outputTokens);
+      current.premiumRequests = toNonNegativePremium((current.premiumRequests || 0) + premium);
+    } else {
+      bucket.modelById.set(modelId, {
+        modelId,
+        requestCount: 1,
+        inputTokens: toNonNegativeInt(event.promptTokens),
+        outputTokens: toNonNegativeInt(event.outputTokens),
+        premiumRequests: toNonNegativePremium(premium),
+      });
+    }
+
+    if (includeActionCounts) {
+      bucket.toolCallRounds += toNonNegativeInt(event.toolCallRounds);
+    }
+  }
+
+  const runs: ShareRunInput[] = [...buckets.values()]
+    .map(bucket => {
+      const actions: ShareRunInput['actions'] = includeActionCounts && bucket.toolCallRounds > 0
+        ? [{
+          type: 'tool_call',
+          count: bucket.toolCallRounds,
+          filesTouched: 0,
+        }]
+        : undefined;
+
+      return {
+        date: bucket.date,
+        repoRef: includeRepoAttribution ? bucket.repoRef : undefined,
+        modelCalls: [...bucket.modelById.values()].sort((a, b) => a.modelId.localeCompare(b.modelId)),
+        actions,
+      };
+    })
+    .sort((a, b) => {
+      if (a.date !== b.date) {
+        return a.date.localeCompare(b.date);
+      }
+      return runRepoKey(a.repoRef).localeCompare(runRepoKey(b.repoRef));
+    });
+
+  return runs;
 }
 
 function actionInputsFromEvents(events: RequestEvent[]): ShareActionInput[] {
@@ -444,11 +580,18 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
       const workspaces = await discoverWorkspaces();
       const parsed = workspaces.length > 0 ? await parseAllFiles(workspaces) : [];
       const events = flattenEvents(parsed);
+      const repos = workspaces.length > 0 ? await discoverRepoDescriptors(workspaces) : [];
       const kpis = computeKpis(parsed, events);
       const daily = computeDailyStats(events);
       const dailyPremium = dailyPremiumByDate(events);
       const modelInputs = modelInputsFromEvents(events);
       const actionInputs = actionInputsFromEvents(events);
+      const explicitRuns = await buildExplicitRunsFromEvents(
+        events,
+        settings.fields.includeRepoAttribution,
+        settings.fields.includeActionCounts,
+        repos,
+      );
       const dailyBuckets: ShareDailyBucketInput[] = daily.map(d => ({
         date: d.date,
         requests: toNonNegativeInt(d.requests),
@@ -459,7 +602,7 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
       const repoRows = settings.fields.includeRepoAttribution
         ? computeRepoAttributionStats(
           events,
-          await discoverRepoDescriptors(workspaces),
+          repos,
         ).rows
         : [];
       const repoRuns = settings.fields.includeRepoAttribution
@@ -483,6 +626,7 @@ export class PromptstreakShareSyncService implements vscode.Disposable {
         models: modelInputs,
         actions: actionInputs,
         dailyBuckets,
+        runs: explicitRuns,
         repoRef,
         repoRuns,
       });

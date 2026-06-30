@@ -93,6 +93,13 @@ export interface ShareRepoRunInput {
   topModel?: string;
 }
 
+export interface ShareRunInput {
+  date: string;
+  repoRef?: ShareRepoRefInput;
+  modelCalls: ShareModelInput[];
+  actions?: ShareActionInput[];
+}
+
 export interface SharePayloadInput {
   adapterVersion: string;
   observedAtIso: string;
@@ -102,6 +109,7 @@ export interface SharePayloadInput {
   models: ShareModelInput[];
   actions: ShareActionInput[];
   dailyBuckets: ShareDailyBucketInput[];
+  runs?: ShareRunInput[];
   repoRef?: ShareRepoRefInput;
   repoRuns?: ShareRepoRunInput[];
 }

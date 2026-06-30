@@ -216,6 +216,28 @@ function resolveRepoWeights(event: RequestEvent, repos: RepoDescriptor[]): RepoW
   return [];
 }
 
+export function resolvePrimaryRepoDescriptorForEvent(
+  event: RequestEvent,
+  repos: RepoDescriptor[],
+): RepoDescriptor | undefined {
+  const weights = resolveRepoWeights(event, repos);
+  if (weights.length === 0) {
+    return undefined;
+  }
+
+  let best = weights[0];
+  for (const current of weights.slice(1)) {
+    if (
+      current.weight > best.weight
+      || (current.weight === best.weight && current.repoId.localeCompare(best.repoId) < 0)
+    ) {
+      best = current;
+    }
+  }
+
+  return repos.find(repo => repo.id === best.repoId);
+}
+
 export function computeRepoAttributionStats(
   events: RequestEvent[],
   repos: RepoDescriptor[],

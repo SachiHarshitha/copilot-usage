@@ -127,28 +127,36 @@ function sanitizeTopModel(model: string | undefined): string | undefined {
   return model;
 }
 
-async function resolveRepoRefForRow(
-  row: RepoAttributionRow,
-  visibilityChecker: GithubRepoVisibilityChecker,
+export async function resolveShareRepoRefForRemote(
+  remoteUrl: string | undefined,
+  remoteSlug: string | undefined,
+  visibilityChecker: GithubRepoVisibilityChecker = isPublicGithubRepoViaApi,
 ): Promise<ShareRepoRefInput> {
-  if (!row.remoteSlug) {
+  if (!remoteSlug) {
     return asNonPublicAlias();
   }
 
-  const remoteHost = row.remoteUrl ? parseRemoteHost(row.remoteUrl) : undefined;
+  const remoteHost = remoteUrl ? parseRemoteHost(remoteUrl) : undefined;
   if (remoteHost !== GITHUB_PUBLIC_HOST) {
     return asNonPublicAlias();
   }
 
-  const isPublic = await visibilityChecker(row.remoteSlug);
+  const isPublic = await visibilityChecker(remoteSlug);
   if (!isPublic) {
     return asNonPublicAlias();
   }
 
   return {
     mode: 'github',
-    githubRepo: row.remoteSlug,
+    githubRepo: remoteSlug,
   };
+}
+
+async function resolveRepoRefForRow(
+  row: RepoAttributionRow,
+  visibilityChecker: GithubRepoVisibilityChecker,
+): Promise<ShareRepoRefInput> {
+  return resolveShareRepoRefForRemote(row.remoteUrl, row.remoteSlug, visibilityChecker);
 }
 
 export async function resolveShareRepoRuns(

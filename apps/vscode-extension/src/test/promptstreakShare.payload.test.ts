@@ -230,6 +230,122 @@ suite('PromptStreak Share: payload', () => {
     assert.strictEqual(payload.runs?.[0]?.modelCalls?.[0]?.premiumRequests, 5);
   });
 
+  test('uses explicit day-scoped runs when provided', () => {
+    const input: SharePayloadInput = {
+      adapterVersion: '0.1.0',
+      observedAtIso: '2026-05-09T10:00:00.000Z',
+      idempotencySeed: 'seed-a',
+      fields: {
+        includeDailyBuckets: true,
+        includeModelBreakdown: true,
+        includeActionCounts: true,
+        includeRepoAttribution: true,
+      },
+      totals: {
+        totalRequests: 9,
+        totalPromptTokens: 300,
+        totalOutputTokens: 90,
+      },
+      models: [],
+      actions: [],
+      dailyBuckets: [
+        { date: '2026-05-08', requests: 4, inputTokens: 140, outputTokens: 45 },
+        { date: '2026-05-09', requests: 5, inputTokens: 160, outputTokens: 45 },
+      ],
+      runs: [
+        {
+          date: '2026-05-08',
+          repoRef: { mode: 'github', githubRepo: 'octocat/repo-a' },
+          modelCalls: [
+            { modelId: 'copilot/gpt-5.3-codex', requestCount: 3, inputTokens: 100, outputTokens: 30, premiumRequests: 3 },
+            { modelId: 'copilot/gpt-4.1', requestCount: 1, inputTokens: 40, outputTokens: 15, premiumRequests: 1 },
+          ],
+          actions: [
+            { type: 'tool_call', count: 2, filesTouched: 0 },
+          ],
+        },
+        {
+          date: '2026-05-09',
+          repoRef: { mode: 'alias', aliasLabel: 'Non-Public' },
+          modelCalls: [
+            { modelId: 'copilot/o3', requestCount: 5, inputTokens: 160, outputTokens: 45, premiumRequests: 15 },
+          ],
+        },
+      ],
+    };
+
+    const payload = buildShareSnapshot(input);
+
+    assert.strictEqual(payload.runs?.length, 2);
+    assert.strictEqual(payload.runs?.[0]?.startedAt, '2026-05-08T00:00:00.000Z');
+    assert.strictEqual(payload.runs?.[1]?.startedAt, '2026-05-09T00:00:00.000Z');
+    assert.deepStrictEqual(payload.runs?.[0]?.repoRef, {
+      mode: 'github',
+      githubRepo: 'octocat/repo-a',
+    });
+    assert.strictEqual(payload.runs?.[0]?.modelCalls?.length, 2);
+    assert.strictEqual(payload.runs?.[0]?.modelCalls?.[0]?.modelId, 'gpt-4.1');
+    assert.strictEqual(payload.runs?.[0]?.modelCalls?.[1]?.modelId, 'gpt-5.3-codex');
+    assert.strictEqual(payload.runs?.[0]?.actions?.[0]?.count, 2);
+  });
+
+  test('keeps idempotency stable when explicit runs are reordered', () => {
+    const base: SharePayloadInput = {
+      adapterVersion: '0.1.0',
+      observedAtIso: '2026-05-09T10:00:00.000Z',
+      idempotencySeed: 'seed-a',
+      fields: {
+        includeDailyBuckets: true,
+        includeModelBreakdown: true,
+        includeActionCounts: true,
+        includeRepoAttribution: true,
+      },
+      totals: {
+        totalRequests: 9,
+        totalPromptTokens: 300,
+        totalOutputTokens: 90,
+      },
+      models: [],
+      actions: [],
+      dailyBuckets: [
+        { date: '2026-05-08', requests: 4, inputTokens: 140, outputTokens: 45 },
+        { date: '2026-05-09', requests: 5, inputTokens: 160, outputTokens: 45 },
+      ],
+      runs: [
+        {
+          date: '2026-05-09',
+          repoRef: { mode: 'alias', aliasLabel: 'Non-Public' },
+          modelCalls: [
+            { modelId: 'copilot/o3', requestCount: 5, inputTokens: 160, outputTokens: 45, premiumRequests: 15 },
+          ],
+        },
+        {
+          date: '2026-05-08',
+          repoRef: { mode: 'github', githubRepo: 'octocat/repo-a' },
+          modelCalls: [
+            { modelId: 'copilot/gpt-5.3-codex', requestCount: 3, inputTokens: 100, outputTokens: 30, premiumRequests: 3 },
+            { modelId: 'copilot/gpt-4.1', requestCount: 1, inputTokens: 40, outputTokens: 15, premiumRequests: 1 },
+          ],
+          actions: [
+            { type: 'tool_call', count: 2, filesTouched: 0 },
+          ],
+        },
+      ],
+    };
+
+    const reordered: SharePayloadInput = {
+      ...base,
+      observedAtIso: '2026-05-09T11:00:00.000Z',
+      idempotencySeed: 'seed-b',
+      runs: [...(base.runs || [])].reverse(),
+    };
+
+    const payloadBase = buildShareSnapshot(base);
+    const payloadReordered = buildShareSnapshot(reordered);
+
+    assert.strictEqual(payloadBase.idempotencyKey, payloadReordered.idempotencyKey);
+  });
+
   test('generates stable idempotency key for identical usage snapshots', () => {
     const inputA: SharePayloadInput = {
       adapterVersion: '0.1.0',
