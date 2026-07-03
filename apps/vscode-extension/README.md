@@ -2,7 +2,14 @@
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/SachiHarshitha/copilot-usage?style=social)](https://github.com/SachiHarshitha/copilot-usage/stargazers)
 
+**Supported versions:** VS Code Stable, VS Code Insiders — usage is automatically discovered and aggregated across both.
+
 **Local-first** analytics for your GitHub Copilot Chat token usage in VS Code. All processing happens on your machine — no data is sent externally.
+
+## Contributors
+
+- Sachi Harshitha Liyanagama — project creator and maintainer
+- [Steven Maglio](https://github.com/smaglio81) — VS Code Insiders support foundation (originated in [PR #4](https://github.com/SachiHarshitha/copilot-usage/pull/4))
 
 ## Features
 

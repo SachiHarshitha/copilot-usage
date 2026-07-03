@@ -1,7 +1,7 @@
 /** Status bar item showing workspace token count, split by input/output. */
 
 import * as vscode from 'vscode';
-import { findCurrentWorkspace } from '../core/discovery';
+import { findCurrentWorkspace, getWorkspaceStorageRoots } from '../core/discovery';
 import { parseAllFiles, flattenEvents } from '../core/aggregator';
 import { RequestEvent } from '../core/types';
 import { didAffectCopilotDebugLogSetting, isCopilotDebugLogEnabled } from '../core/copilotDebugLog';
@@ -12,6 +12,7 @@ export class StatusBarManager implements vscode.Disposable {
   private item: vscode.StatusBarItem;
   private debugLogItem: vscode.StatusBarItem;
   private disposables: vscode.Disposable[] = [];
+  private storageRoots?: string[];
 
   constructor() {
     this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
@@ -34,7 +35,8 @@ export class StatusBarManager implements vscode.Disposable {
     this.refresh();
   }
 
-  async refresh(): Promise<void> {
+  async refresh(storageRoots?: string[]): Promise<void> {
+    this.storageRoots ??= storageRoots ?? getWorkspaceStorageRoots(vscode.env.appName);
     if (isCopilotDebugLogEnabled()) {
       this.debugLogItem.hide();
     } else {
@@ -51,7 +53,7 @@ export class StatusBarManager implements vscode.Disposable {
     try {
       const wsFileUri = vscode.workspace.workspaceFile?.toString();
       const folderPaths = folders.map(f => f.uri.fsPath);
-      const ws = await findCurrentWorkspace(wsFileUri, folderPaths);
+      const ws = await findCurrentWorkspace(wsFileUri, folderPaths, this.storageRoots);
       if (!ws) {
         this.item.text = '$(copilot) No data';
         this.item.tooltip = 'Copilot Usage — No session data found for this workspace';
