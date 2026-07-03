@@ -11,7 +11,7 @@ A **local-first** analytics dashboard that parses your VS Code Copilot chat sess
 ## Contributors
 
 - Sachi Harshitha Liyanagama — project creator and maintainer
-- Steven Maglio — VS Code Insiders support foundation (originated in PR #4)
+- [Steven Maglio](https://github.com/smaglio81) — VS Code Insiders support foundation (originated in [PR #4](https://github.com/SachiHarshitha/copilot-usage/pull/4))
 
 ## Why I Built This
 
