@@ -15,7 +15,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { MODEL_PRICING } from '../features/costEstimator/pricing/models';
 import { normalizeModelId } from '../features/costEstimator/calc/modelSelection';
-import { getWorkspaceStorageRoot } from './discovery';
+import { getWorkspaceStorageRoots } from './discovery';
 
 /** USD value of a single AI credit. */
 export const AI_CREDIT_USD_VALUE = 0.01;
@@ -92,36 +92,38 @@ export function parseCreditRatesFromCatalog(raw: string): CreditRateMap {
   return map;
 }
 
-/** Locate the most recently written `models.json` catalog across all workspaces. */
-async function findNewestCatalog(storageRoot: string): Promise<string | undefined> {
-  let workspaceDirs: string[];
-  try {
-    workspaceDirs = await fs.readdir(storageRoot);
-  } catch {
-    return undefined;
-  }
-
+/** Locate the most recently written `models.json` catalog across all workspaces and roots. */
+async function findNewestCatalog(storageRoots: string[]): Promise<string | undefined> {
   let newestPath: string | undefined;
   let newestMtime = -Infinity;
 
-  for (const wsDir of workspaceDirs) {
-    const logsDir = path.join(storageRoot, wsDir, 'GitHub.copilot-chat', 'debug-logs');
-    let sessions: string[];
+  for (const storageRoot of storageRoots) {
+    let workspaceDirs: string[];
     try {
-      sessions = await fs.readdir(logsDir);
+      workspaceDirs = await fs.readdir(storageRoot);
     } catch {
       continue;
     }
-    for (const session of sessions) {
-      const candidate = path.join(logsDir, session, 'models.json');
+
+    for (const wsDir of workspaceDirs) {
+      const logsDir = path.join(storageRoot, wsDir, 'GitHub.copilot-chat', 'debug-logs');
+      let sessions: string[];
       try {
-        const stat = await fs.stat(candidate);
-        if (stat.isFile() && stat.mtimeMs > newestMtime) {
-          newestMtime = stat.mtimeMs;
-          newestPath = candidate;
-        }
+        sessions = await fs.readdir(logsDir);
       } catch {
-        // not present for this session
+        continue;
+      }
+      for (const session of sessions) {
+        const candidate = path.join(logsDir, session, 'models.json');
+        try {
+          const stat = await fs.stat(candidate);
+          if (stat.isFile() && stat.mtimeMs > newestMtime) {
+            newestMtime = stat.mtimeMs;
+            newestPath = candidate;
+          }
+        } catch {
+          // not present for this session
+        }
       }
     }
   }
@@ -129,9 +131,9 @@ async function findNewestCatalog(storageRoot: string): Promise<string | undefine
 }
 
 /** Load real credit rates from the Copilot catalog; empty map when unavailable. */
-export async function loadCreditRates(storageRoot?: string): Promise<CreditRateMap> {
-  const root = storageRoot ?? getWorkspaceStorageRoot();
-  const catalogPath = await findNewestCatalog(root);
+export async function loadCreditRates(storageRoots?: string[]): Promise<CreditRateMap> {
+  const roots = storageRoots ?? getWorkspaceStorageRoots();
+  const catalogPath = await findNewestCatalog(roots);
   if (!catalogPath) { return new Map(); }
   try {
     const raw = await fs.readFile(catalogPath, 'utf-8');

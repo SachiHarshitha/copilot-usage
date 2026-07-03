@@ -5,18 +5,32 @@ import * as path from 'path';
 import * as os from 'os';
 import { WorkspaceInfo } from './types';
 
-/** Return platform-specific VS Code workspace storage root. */
-export function getWorkspaceStorageRoot(): string {
+/**
+ * Return platform-specific VS Code workspace storage roots.
+ *
+ * When `appName` contains "Insiders" (e.g. `vscode.env.appName`), the Insiders
+ * root is returned first so that workspace lookups prefer the current host's
+ * storage over the stable installation's storage.
+ */
+export function getWorkspaceStorageRoots(appName?: string): string[] {
+  const isInsiders = appName?.toLowerCase().includes('insiders') ?? false;
   switch (process.platform) {
     case 'win32': {
       const appdata = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-      return path.join(appdata, 'Code', 'User', 'workspaceStorage');
+      const stable = path.join(appdata, 'Code', 'User', 'workspaceStorage');
+      const insiders = path.join(appdata, 'Code - Insiders', 'User', 'workspaceStorage');
+      return isInsiders ? [insiders, stable] : [stable, insiders];
     }
-    case 'darwin':
-      return path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User', 'workspaceStorage');
+    case 'darwin': {
+      const stable = path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User', 'workspaceStorage');
+      const insiders = path.join(os.homedir(), 'Library', 'Application Support', 'Code - Insiders', 'User', 'workspaceStorage');
+      return isInsiders ? [insiders, stable] : [stable, insiders];
+    }
     default: {
       const config = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-      return path.join(config, 'Code', 'User', 'workspaceStorage');
+      const stable = path.join(config, 'Code', 'User', 'workspaceStorage');
+      const insiders = path.join(config, 'Code - Insiders', 'User', 'workspaceStorage');
+      return isInsiders ? [insiders, stable] : [stable, insiders];
     }
   }
 }
@@ -81,52 +95,77 @@ async function resolveWorkspace(workspaceDir: string): Promise<{ id: string; pat
 
 /** Discover all workspaces that have chatSessions with JSONL or JSON files. */
 export async function discoverWorkspaces(
-  storageRoot?: string,
+  storageRoots?: string[],
 ): Promise<WorkspaceInfo[]> {
-  const root = storageRoot || getWorkspaceStorageRoot();
+  const roots = storageRoots || getWorkspaceStorageRoots();
   const results: WorkspaceInfo[] = [];
 
-  let dirs: string[];
-  try {
-    dirs = await fs.readdir(root);
-  } catch {
-    return results;
-  }
-
-  for (const dirName of dirs) {
-    const wsDir = path.join(root, dirName);
-    const sessionsDir = path.join(wsDir, 'chatSessions');
+  for (const root of roots) {
+    let dirs: string[];
     try {
-      const stat = await fs.stat(sessionsDir);
-      if (!stat.isDirectory()) { continue; }
+      dirs = await fs.readdir(root);
     } catch {
-      continue;
+      continue; // root doesn't exist or is unreadable — skip it
     }
 
-    const ws = await resolveWorkspace(wsDir);
-    const files: string[] = [];
-    try {
-      for (const f of await fs.readdir(sessionsDir)) {
-        const ext = path.extname(f).toLowerCase();
-        if (ext === '.jsonl' || ext === '.json') {
-          files.push(path.join(sessionsDir, f));
-        }
+    for (const dirName of dirs) {
+      const wsDir = path.join(root, dirName);
+      const sessionsDir = path.join(wsDir, 'chatSessions');
+      try {
+        const stat = await fs.stat(sessionsDir);
+        if (!stat.isDirectory()) { continue; }
+      } catch {
+        continue;
       }
-    } catch {
-      continue;
-    }
 
-    if (files.length > 0) {
-      results.push({
-        workspaceId: ws.id,
-        workspacePath: ws.path,
-        referencedFolders: ws.referencedFolders,
-        sessionFiles: files,
-      });
+      const ws = await resolveWorkspace(wsDir);
+      const files: string[] = [];
+      try {
+        for (const f of await fs.readdir(sessionsDir)) {
+          const ext = path.extname(f).toLowerCase();
+          if (ext === '.jsonl' || ext === '.json') {
+            files.push(path.join(sessionsDir, f));
+          }
+        }
+      } catch {
+        continue;
+      }
+
+      if (files.length > 0) {
+        results.push({
+          workspaceId: ws.id,
+          workspacePath: ws.path,
+          referencedFolders: ws.referencedFolders,
+          sessionFiles: files,
+        });
+      }
     }
   }
 
-  return results;
+  // De-duplicate by workspaceId: when both stable and Insiders roots contain
+  // entries for the same workspace, merge their session files and referenced
+  // folders so downstream sees a unified view across all installations.
+  const merged = new Map<string, WorkspaceInfo>();
+  for (const ws of results) {
+    const existing = merged.get(ws.workspaceId);
+    if (existing) {
+      existing.sessionFiles = [...new Set([...existing.sessionFiles, ...ws.sessionFiles])];
+      if (!existing.workspacePath && ws.workspacePath) {
+        existing.workspacePath = ws.workspacePath;
+      }
+      if (ws.referencedFolders) {
+        existing.referencedFolders = [
+          ...new Set([
+            ...(existing.referencedFolders ?? []),
+            ...ws.referencedFolders,
+          ]),
+        ];
+      }
+    } else {
+      merged.set(ws.workspaceId, { ...ws });
+    }
+  }
+  return [...merged.values()];
 }
 
 /**
@@ -136,44 +175,46 @@ export async function discoverWorkspaces(
  * changes when the number of tracked files changes, file sizes change, or
  * newest modification time changes.
  */
-export async function computeChatSessionsSignature(storageRoot?: string): Promise<string> {
-  const root = storageRoot || getWorkspaceStorageRoot();
-
-  let dirs: string[];
-  try {
-    dirs = await fs.readdir(root);
-  } catch {
-    return '0:0:0';
-  }
+export async function computeChatSessionsSignature(storageRoots?: string[]): Promise<string> {
+  const roots = storageRoots || getWorkspaceStorageRoots();
 
   let fileCount = 0;
   let totalBytes = 0;
   let newestMtimeMs = 0;
 
-  for (const dirName of dirs) {
-    const sessionsDir = path.join(root, dirName, 'chatSessions');
-
-    let files: string[];
+  for (const root of roots) {
+    let dirs: string[];
     try {
-      files = await fs.readdir(sessionsDir);
+      dirs = await fs.readdir(root);
     } catch {
-      continue;
+      continue; // root doesn't exist — skip
     }
 
-    for (const fileName of files) {
-      const ext = path.extname(fileName).toLowerCase();
-      if (ext !== '.jsonl' && ext !== '.json') { continue; }
+    for (const dirName of dirs) {
+      const sessionsDir = path.join(root, dirName, 'chatSessions');
 
+      let files: string[];
       try {
-        const stat = await fs.stat(path.join(sessionsDir, fileName));
-        if (!stat.isFile()) { continue; }
-
-        fileCount++;
-        totalBytes += stat.size;
-        const mtimeMs = Number(stat.mtimeMs) || 0;
-        if (mtimeMs > newestMtimeMs) { newestMtimeMs = mtimeMs; }
+        files = await fs.readdir(sessionsDir);
       } catch {
-        // File may disappear during scan; safe to ignore.
+        continue;
+      }
+
+      for (const fileName of files) {
+        const ext = path.extname(fileName).toLowerCase();
+        if (ext !== '.jsonl' && ext !== '.json') { continue; }
+
+        try {
+          const stat = await fs.stat(path.join(sessionsDir, fileName));
+          if (!stat.isFile()) { continue; }
+
+          fileCount++;
+          totalBytes += stat.size;
+          const mtimeMs = Number(stat.mtimeMs) || 0;
+          if (mtimeMs > newestMtimeMs) { newestMtimeMs = mtimeMs; }
+        } catch {
+          // File may disappear during scan; safe to ignore.
+        }
       }
     }
   }
@@ -184,9 +225,9 @@ export async function computeChatSessionsSignature(storageRoot?: string): Promis
 /** Find workspace info for a specific workspace folder path. */
 export async function findWorkspaceByPath(
   folderPath: string,
-  storageRoot?: string,
+  storageRoots?: string[],
 ): Promise<WorkspaceInfo | undefined> {
-  const workspaces = await discoverWorkspaces(storageRoot);
+  const workspaces = await discoverWorkspaces(storageRoots);
   const normTarget = normalizePath(folderPath);
   return workspaces.find(ws => normalizePath(ws.workspacePath) === normTarget);
 }
@@ -198,9 +239,9 @@ export async function findWorkspaceByPath(
  */
 export async function findWorkspaceByFile(
   workspaceFilePath: string,
-  storageRoot?: string,
+  storageRoots?: string[],
 ): Promise<WorkspaceInfo | undefined> {
-  const workspaces = await discoverWorkspaces(storageRoot);
+  const workspaces = await discoverWorkspaces(storageRoots);
   const normTarget = normalizePath(workspaceFilePath);
   return workspaces.find(ws => normalizePath(ws.workspacePath) === normTarget);
 }
@@ -214,9 +255,9 @@ export async function findWorkspaceByFile(
 export async function findCurrentWorkspace(
   workspaceFileUri: string | undefined,
   folderPaths: string[],
-  storageRoot?: string,
+  storageRoots?: string[],
 ): Promise<WorkspaceInfo | undefined> {
-  const workspaces = await discoverWorkspaces(storageRoot);
+  const workspaces = await discoverWorkspaces(storageRoots);
 
   // Strategy 1: match by .code-workspace file path
   if (workspaceFileUri) {

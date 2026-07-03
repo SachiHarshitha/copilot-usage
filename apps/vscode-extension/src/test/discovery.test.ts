@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
-import { findCurrentWorkspace, computeChatSessionsSignature } from '../core/discovery';
+import { findCurrentWorkspace, computeChatSessionsSignature, getWorkspaceStorageRoots, discoverWorkspaces } from '../core/discovery';
 
 async function withTempStorage(run: (storageRoot: string, folderA: string, folderB: string, wsFilePath: string) => Promise<void>): Promise<void> {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-usage-discovery-'));
@@ -100,7 +100,7 @@ suite('Discovery: current workspace matching', () => {
       );
       await fs.writeFile(path.join(multiDir, 'chatSessions', 'multi.jsonl'), '{"kind":0,"v":{"sessionId":"multi"}}\n', 'utf-8');
 
-      const match = await findCurrentWorkspace(undefined, [folderA, folderB], storageRoot);
+      const match = await findCurrentWorkspace(undefined, [folderA, folderB], [storageRoot]);
       assert.ok(match);
       assert.strictEqual(match!.workspaceId, 'multi-root-workspace-id');
       assert.deepStrictEqual(match!.referencedFolders?.map(p => p.toLowerCase()).sort(), [folderA.toLowerCase(), folderB.toLowerCase()].sort());
@@ -111,7 +111,7 @@ suite('Discovery: current workspace matching', () => {
 
   test('prefers multi-root storage entry by referenced folders when workspaceFileUri is unavailable', async () => {
     await withTempStorage(async (storageRoot, folderA, folderB) => {
-      const match = await findCurrentWorkspace(undefined, [folderA, folderB], storageRoot);
+      const match = await findCurrentWorkspace(undefined, [folderA, folderB], [storageRoot]);
       assert.ok(match);
       assert.strictEqual(match!.workspaceId, 'multi-root-workspace-id');
     });
@@ -119,7 +119,7 @@ suite('Discovery: current workspace matching', () => {
 
   test('still matches single-folder entry when only one folder is open', async () => {
     await withTempStorage(async (storageRoot, folderA) => {
-      const match = await findCurrentWorkspace(undefined, [folderA], storageRoot);
+      const match = await findCurrentWorkspace(undefined, [folderA], [storageRoot]);
       assert.ok(match);
       assert.strictEqual(match!.workspaceId, 'single-folder-workspace-id');
     });
@@ -127,7 +127,7 @@ suite('Discovery: current workspace matching', () => {
 
   test('matches multi-root entry when workspaceFileUri is available', async () => {
     await withTempStorage(async (storageRoot, folderA, folderB, wsFilePath) => {
-      const match = await findCurrentWorkspace(pathToFileURL(wsFilePath).toString(), [folderA, folderB], storageRoot);
+      const match = await findCurrentWorkspace(pathToFileURL(wsFilePath).toString(), [folderA, folderB], [storageRoot]);
       assert.ok(match);
       assert.strictEqual(match!.workspaceId, 'multi-root-workspace-id');
     });
@@ -135,17 +135,69 @@ suite('Discovery: current workspace matching', () => {
 
   test('chat session signature changes when tracked files change', async () => {
     await withTempStorage(async (storageRoot) => {
-      const before = await computeChatSessionsSignature(storageRoot);
+      const before = await computeChatSessionsSignature([storageRoot]);
 
       const jsonlPath = path.join(storageRoot, 'single-folder-workspace-id', 'chatSessions', 'single.jsonl');
       await fs.appendFile(jsonlPath, '{"kind":1,"k":["requests",0,"completionTokens"],"v":42}\n', 'utf-8');
-      const afterJsonlAppend = await computeChatSessionsSignature(storageRoot);
+      const afterJsonlAppend = await computeChatSessionsSignature([storageRoot]);
       assert.notStrictEqual(afterJsonlAppend, before);
 
       const jsonPath = path.join(storageRoot, 'single-folder-workspace-id', 'chatSessions', 'legacy.json');
       await fs.writeFile(jsonPath, '{"requests":[]}', 'utf-8');
-      const afterJsonCreate = await computeChatSessionsSignature(storageRoot);
+      const afterJsonCreate = await computeChatSessionsSignature([storageRoot]);
       assert.notStrictEqual(afterJsonCreate, afterJsonlAppend);
     });
+  });
+});
+
+suite('Discovery: getWorkspaceStorageRoots ordering', () => {
+  test('returns the stable root first by default', () => {
+    const roots = getWorkspaceStorageRoots(undefined);
+    assert.strictEqual(roots.length, 2);
+    assert.ok(!roots[0].toLowerCase().includes('insiders'), 'stable root should not contain "insiders"');
+    assert.ok(roots[1].toLowerCase().includes('insiders'), 'second root should be the Insiders root');
+  });
+
+  test('returns the Insiders root first when appName indicates Insiders', () => {
+    const roots = getWorkspaceStorageRoots('Visual Studio Code - Insiders');
+    assert.strictEqual(roots.length, 2);
+    assert.ok(roots[0].toLowerCase().includes('insiders'), 'first root should be the Insiders root');
+    assert.ok(!roots[1].toLowerCase().includes('insiders'), 'second root should be the stable root');
+  });
+
+  test('detects the Insiders marker case-insensitively', () => {
+    const roots = getWorkspaceStorageRoots('code - INSIDERS');
+    assert.ok(roots[0].toLowerCase().includes('insiders'));
+  });
+});
+
+suite('Discovery: merged workspace entries across roots', () => {
+  test('merges session files for the same workspace id across roots', async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-usage-discovery-merge-'));
+    try {
+      const rootStable = path.join(tempRoot, 'stable');
+      const rootInsiders = path.join(tempRoot, 'insiders');
+      const folderA = path.join(tempRoot, 'repo-a');
+      await fs.mkdir(folderA, { recursive: true });
+      const wsId = 'shared-workspace-id';
+
+      for (const [root, file] of [[rootStable, 'stable.jsonl'], [rootInsiders, 'insiders.jsonl']] as const) {
+        const wsDir = path.join(root, wsId);
+        await fs.mkdir(path.join(wsDir, 'chatSessions'), { recursive: true });
+        await fs.writeFile(
+          path.join(wsDir, 'workspace.json'),
+          JSON.stringify({ folder: pathToFileURL(folderA).toString() }),
+          'utf-8',
+        );
+        await fs.writeFile(path.join(wsDir, 'chatSessions', file), '{"kind":0,"v":{"sessionId":"x"}}\n', 'utf-8');
+      }
+
+      const workspaces = await discoverWorkspaces([rootStable, rootInsiders]);
+      const shared = workspaces.filter(w => w.workspaceId === wsId);
+      assert.strictEqual(shared.length, 1, 'the same workspace id should appear once after merging');
+      assert.strictEqual(shared[0].sessionFiles.length, 2, 'session files from both roots should be merged');
+    } finally {
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
   });
 });
