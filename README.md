@@ -8,6 +8,11 @@
 
 A **local-first** analytics dashboard that parses your VS Code Copilot chat session data and visualises token usage, premium request estimates, and model distribution — all without sending any data externally.
 
+## Contributors
+
+- Sachi Harshitha Liyanagama — project creator and maintainer
+- Steven Maglio — VS Code Insiders support foundation (originated in PR #4)
+
 ## Why I Built This
 
 I built this tool to make GitHub Copilot usage more transparent and actionable in real development work. Beyond showing token usage over time, it helps estimate and allocate AI costs at repository level — something that is difficult today when developers work across multiple systems in parallel. By turning persisted Copilot session data into a timeline tied to projects, the tool makes it easier to understand usage patterns, compare workflows, and assign clearer estimated costs to each repo.

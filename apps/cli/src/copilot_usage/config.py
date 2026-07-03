@@ -6,10 +6,10 @@ import pathlib
 import platform
 
 # ---------------------------------------------------------------------------
-# VS Code workspace storage root
+# VS Code workspace storage roots (stable + Insiders)
 # ---------------------------------------------------------------------------
 
-def _default_vscode_storage() -> pathlib.Path:
+def _vscode_storage_candidates() -> list[pathlib.Path]:
     sys = platform.system()
     if sys == "Windows":
         base = pathlib.Path(os.environ.get("APPDATA", "") or str(pathlib.Path.home() / "AppData" / "Roaming"))
@@ -17,10 +17,26 @@ def _default_vscode_storage() -> pathlib.Path:
         base = pathlib.Path.home() / "Library" / "Application Support"
     else:  # Linux / other
         base = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", "") or str(pathlib.Path.home() / ".config"))
-    return base / "Code" / "User" / "workspaceStorage"
+    return [
+        base / "Code" / "User" / "workspaceStorage",
+        base / "Code - Insiders" / "User" / "workspaceStorage",
+    ]
 
 
-VSCODE_STORAGE_ROOT = _default_vscode_storage()
+def _default_vscode_storage_roots() -> list[pathlib.Path]:
+    """Return existing VS Code storage roots (stable + Insiders).
+
+    Falls back to the stable-channel candidate when neither directory exists yet
+    so callers always receive at least one path to scan.
+    """
+    candidates = _vscode_storage_candidates()
+    existing = [c for c in candidates if c.exists()]
+    return existing or [candidates[0]]
+
+
+VSCODE_STORAGE_ROOTS: list[pathlib.Path] = _default_vscode_storage_roots()
+# Backwards-compatible single-root alias (first configured root).
+VSCODE_STORAGE_ROOT: pathlib.Path = VSCODE_STORAGE_ROOTS[0]
 
 # ---------------------------------------------------------------------------
 # App data directory (writable; holds DuckDB, layout JSON, badge exports)
