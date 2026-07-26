@@ -1,0 +1,39 @@
+flowchart TD
+    A["extension.activate()"] --> B["getWorkspaceStorageRoots(appName)<br/>stable + Insiders roots"]
+    B --> C["Register FileSystemWatchers on<br/>chatSessions jsonl and json<br/>+ 15s polling signature fallback"]
+    C --> D{"Change detected?"}
+    D -->|"debounce 250ms"| E["refreshAll()"]
+    E --> F["WorkspacePanel.loadData()<br/>this window"]
+    E --> G["DashboardPanel.loadData()<br/>all workspaces"]
+
+    subgraph DISC["Discovery — discovery.ts"]
+      H["discoverWorkspaces(roots)"] --> H1["Scan each storage dir for<br/>chatSessions jsonl or json"]
+      H1 --> H2["resolveWorkspace(): read workspace.json<br/>then folder/workspace URI<br/>then referencedFolders from .code-workspace"]
+      H2 --> H3["Merge duplicate workspaceIds<br/>across stable + Insiders"]
+    end
+
+    F --> I["findCurrentWorkspace(wsFileUri, folderPaths)<br/>S1 .code-workspace file<br/>S2 referenced folders<br/>S3 single-folder path<br/>S4 last-resort referenced"]
+    I --> DISC
+    G --> DISC
+    DISC --> J["WorkspaceInfo array<br/>workspaceId, workspacePath,<br/>referencedFolders, sessionFiles"]
+
+    J --> K["parseAllFiles()<br/>parseJsonl / parseLegacyJson"]
+    K --> L["RequestEvent array<br/>modelId, promptTokens, outputTokens,<br/>timestampMs, evidencePaths, workspaceId"]
+    L --> M["flattenEvents(): dedup by<br/>chatSessionId : requestIndex"]
+
+    M --> N["Aggregation — aggregator.ts"]
+    N --> N1["computeKpis()"]
+    N --> N2["computeModelStats()"]
+    N --> N3["computeDailyStats()"]
+    N --> N4["computeWorkspaceStats() dashboard only"]
+
+    M --> O["Repo attribution — repoAttribution.ts"]
+    O --> O1["discoverRepoDescriptors(ws, openFolderPaths)"]
+    O1 --> O2["computeRepoAttributionStats(events, repos, opts)"]
+
+    N1 --> P["getWorkspaceHtml / getDashboardHtml"]
+    N2 --> P
+    N3 --> P
+    N4 --> P
+    O2 --> P
+    P --> Q["Webview render:<br/>KPIs, daily chart, model donut,<br/>Models table, Repositories table"]

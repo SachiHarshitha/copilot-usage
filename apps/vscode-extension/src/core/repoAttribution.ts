@@ -209,44 +209,45 @@ function addRepoDescriptor(
   });
 }
 
-export async function discoverRepoDescriptors(workspaces: WorkspaceInfo[]): Promise<RepoDescriptor[]> {
+export async function discoverRepoDescriptors(
+  workspaces: WorkspaceInfo[],
+  openFolderPaths?: string[],
+): Promise<RepoDescriptor[]> {
   const rows = new Map<string, RepoDescriptor>();
 
   for (const ws of workspaces) {
-    const candidates: string[] = [];
-    const referenced = ws.referencedFolders ?? [];
-    let singleFolderRoot: string | undefined;
+    const candidateFolders = new Set<string>();
 
-    if (referenced.length > 0) {
-      for (const folder of referenced) {
-        candidates.push(folder);
-      }
-    } else if (ws.workspacePath && !isWorkspaceFilePath(ws.workspacePath)) {
-      candidates.push(ws.workspacePath);
-      singleFolderRoot = ws.workspacePath;
+    for (const folder of ws.referencedFolders ?? []) {
+      candidateFolders.add(folder);
     }
 
-    let discoveredAny = false;
+    // Folders currently open in the window. This covers untitled / ad-hoc multi-root
+    // workspaces where a folder was added without saving a `.code-workspace` file, so
+    // the stored workspace.json does not list every open folder.
+    for (const folder of openFolderPaths ?? []) {
+      candidateFolders.add(folder);
+    }
 
-    for (const candidate of candidates) {
-      const repo = await discoverRepoForFolder(candidate);
-      if (!repo) {
+    if (candidateFolders.size === 0 && ws.workspacePath && !isWorkspaceFilePath(ws.workspacePath)) {
+      candidateFolders.add(ws.workspacePath);
+    }
+
+    for (const folder of candidateFolders) {
+      const repo = await discoverRepoForFolder(folder);
+      if (repo) {
+        addRepoDescriptor(rows, ws, repo);
         continue;
       }
-      discoveredAny = true;
-      addRepoDescriptor(rows, ws, repo);
-    }
 
-    // In single-folder windows, users can open a non-git parent directory that contains
-    // multiple child repos. If the root itself is not a repo, fall back to a bounded scan.
-    if (!discoveredAny && singleFolderRoot) {
-      const nestedCandidates = await discoverNestedRepoCandidates(singleFolderRoot);
+      // The folder root is not a Git repo — it may be a non-git parent that contains
+      // multiple child repos. Fall back to a bounded scan of nested repositories.
+      const nestedCandidates = await discoverNestedRepoCandidates(folder);
       for (const nested of nestedCandidates) {
-        const repo = await discoverRepoForFolder(nested);
-        if (!repo) {
-          continue;
+        const nestedRepo = await discoverRepoForFolder(nested);
+        if (nestedRepo) {
+          addRepoDescriptor(rows, ws, nestedRepo);
         }
-        addRepoDescriptor(rows, ws, repo);
       }
     }
   }
@@ -310,6 +311,7 @@ function resolveRepoWeights(event: RequestEvent, repos: RepoDescriptor[]): RepoW
 export function computeRepoAttributionStats(
   events: RequestEvent[],
   repos: RepoDescriptor[],
+  options?: { includeEmptyRepos?: boolean },
 ): RepoAttributionStats {
   const rowsById = new Map<string, RepoAttributionRow>();
   const reposById = new Map<string, RepoDescriptor>(repos.map(repo => [repo.id, repo]));
@@ -399,6 +401,14 @@ export function computeRepoAttributionStats(
   let totalRequests = 0;
   let totalPromptTokens = 0;
   let totalOutputTokens = 0;
+
+  // When requested, surface every discovered repo — including those without any
+  // attributed usage — so all open folders are visible in the breakdown.
+  if (options?.includeEmptyRepos) {
+    for (const repo of repos) {
+      getOrCreateRow(repo);
+    }
+  }
 
   for (const event of events) {
     totalRequests += 1;

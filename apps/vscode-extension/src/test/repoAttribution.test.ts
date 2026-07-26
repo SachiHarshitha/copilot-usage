@@ -149,6 +149,88 @@ suite('Repo attribution', () => {
     assert.strictEqual(Math.round(summedOutput * 1000) / 1000, 60);
     assert.strictEqual(Math.round(summedPremium * 1000) / 1000, 2);
   });
+
+  test('omits repos without attributed usage by default', () => {
+    const repos: RepoDescriptor[] = [
+      {
+        id: 'repo-used',
+        workspaceId: 'ws-1',
+        workspacePath: 'c:/workspace/root',
+        rootPath: 'c:/workspace/repo-used',
+        displayName: 'owner/repo-used',
+      },
+      {
+        id: 'repo-idle',
+        workspaceId: 'ws-1',
+        workspacePath: 'c:/workspace/root',
+        rootPath: 'c:/workspace/repo-idle',
+        displayName: 'owner/repo-idle',
+      },
+    ];
+
+    const events: RequestEvent[] = [
+      {
+        chatSessionId: 's1',
+        requestIndex: 0,
+        timestampMs: Date.UTC(2026, 0, 15),
+        modelId: 'copilot/gpt-4.1',
+        promptTokens: 10,
+        outputTokens: 5,
+        toolCallRounds: 0,
+        tokensEstimated: false,
+        workspaceId: 'ws-1',
+        workspacePath: 'c:/workspace/root',
+        evidencePaths: ['c:/workspace/repo-used/src/a.ts'],
+      },
+    ];
+
+    const stats = computeRepoAttributionStats(events, repos);
+    assert.ok(stats.rows.find(r => r.id === 'repo-used'));
+    assert.strictEqual(stats.rows.find(r => r.id === 'repo-idle'), undefined);
+  });
+
+  test('renders every discovered repo when includeEmptyRepos is set', () => {
+    const repos: RepoDescriptor[] = [
+      {
+        id: 'repo-used',
+        workspaceId: 'ws-1',
+        workspacePath: 'c:/workspace/root',
+        rootPath: 'c:/workspace/repo-used',
+        displayName: 'owner/repo-used',
+      },
+      {
+        id: 'repo-idle',
+        workspaceId: 'ws-1',
+        workspacePath: 'c:/workspace/root',
+        rootPath: 'c:/workspace/repo-idle',
+        displayName: 'owner/repo-idle',
+      },
+    ];
+
+    const events: RequestEvent[] = [
+      {
+        chatSessionId: 's1',
+        requestIndex: 0,
+        timestampMs: Date.UTC(2026, 0, 15),
+        modelId: 'copilot/gpt-4.1',
+        promptTokens: 10,
+        outputTokens: 5,
+        toolCallRounds: 0,
+        tokensEstimated: false,
+        workspaceId: 'ws-1',
+        workspacePath: 'c:/workspace/root',
+        evidencePaths: ['c:/workspace/repo-used/src/a.ts'],
+      },
+    ];
+
+    const stats = computeRepoAttributionStats(events, repos, { includeEmptyRepos: true });
+    const idle = stats.rows.find(r => r.id === 'repo-idle');
+    assert.ok(idle);
+    assert.strictEqual(idle?.requests, 0);
+    assert.strictEqual(idle?.promptTokens, 0);
+    assert.strictEqual(idle?.outputTokens, 0);
+    assert.strictEqual(idle?.topModel, '–');
+  });
 });
 
 suite('Repo descriptor discovery', () => {
@@ -216,6 +298,76 @@ suite('Repo descriptor discovery', () => {
       assert.deepStrictEqual(
         repos.map(r => r.displayName).sort(),
         ['octocat/repo-a', 'octocat/repo-b'],
+      );
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('discovers all live open folders for untitled multi-root workspaces', async function () {
+    if (!(await hasGit())) {
+      this.skip();
+      return;
+    }
+
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-usage-repos-untitled-'));
+    try {
+      const repoAPath = path.join(tempDir, 'repo-a');
+      const repoBPath = path.join(tempDir, 'repo-b');
+      await initGitRepo(repoAPath, 'https://github.com/octocat/repo-a.git');
+      await initGitRepo(repoBPath, 'https://github.com/octocat/repo-b.git');
+
+      // Simulate an untitled workspace whose stored workspace.json only knew about the
+      // first folder (the second folder was added later without saving a workspace file).
+      const workspaces: WorkspaceInfo[] = [
+        {
+          workspaceId: 'ws-untitled',
+          workspacePath: '',
+          referencedFolders: [repoAPath],
+          sessionFiles: [],
+        },
+      ];
+
+      const repos = await discoverRepoDescriptors(workspaces, [repoAPath, repoBPath]);
+      assert.strictEqual(repos.length, 2);
+      assert.deepStrictEqual(
+        repos.map(r => r.displayName).sort(),
+        ['octocat/repo-a', 'octocat/repo-b'],
+      );
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('scans nested repos inside a non-git open folder', async function () {
+    if (!(await hasGit())) {
+      this.skip();
+      return;
+    }
+
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-usage-repos-nested-open-'));
+    try {
+      const gitFolder = path.join(tempDir, 'plain-repo');
+      const parentFolder = path.join(tempDir, 'parent');
+      const nestedRepoPath = path.join(parentFolder, 'nested-repo');
+
+      await initGitRepo(gitFolder, 'https://github.com/octocat/plain-repo.git');
+      await fs.mkdir(parentFolder, { recursive: true });
+      await initGitRepo(nestedRepoPath, 'https://github.com/octocat/nested-repo.git');
+
+      const workspaces: WorkspaceInfo[] = [
+        {
+          workspaceId: 'ws-mixed',
+          workspacePath: '',
+          sessionFiles: [],
+        },
+      ];
+
+      const repos = await discoverRepoDescriptors(workspaces, [gitFolder, parentFolder]);
+      assert.strictEqual(repos.length, 2);
+      assert.deepStrictEqual(
+        repos.map(r => r.displayName).sort(),
+        ['octocat/nested-repo', 'octocat/plain-repo'],
       );
     } finally {
       await fs.rm(tempDir, { recursive: true, force: true });

@@ -115,8 +115,8 @@ export class WorkspacePanel {
     const kpis = computeKpis(parsed, events, rates);
     const models = computeModelStats(events, rates);
     const daily = computeDailyStats(events);
-    const repos = await discoverRepoDescriptors([ws]);
-    const repoStats = computeRepoAttributionStats(events, repos);
+    const repos = await discoverRepoDescriptors([ws], folderPaths);
+    const repoStats = computeRepoAttributionStats(events, repos, { includeEmptyRepos: true });
 
     this.setHtml(getWorkspaceHtml(kpis, models, daily, ws.workspacePath, undefined, false, autoRefreshSeconds, monthsCovered(dateRange, events), showDebugLogBanner, repoStats));
   }
