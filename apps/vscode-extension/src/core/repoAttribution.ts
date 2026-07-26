@@ -1,10 +1,26 @@
 import { execFile } from 'child_process';
+import * as fs from 'fs/promises';
 import { promisify } from 'util';
 import * as path from 'path';
 import { RequestEvent, WorkspaceInfo } from './types';
 import { getMultiplier } from './config';
 
 const execFileAsync = promisify(execFile);
+const NESTED_REPO_SCAN_MAX_DEPTH = 3;
+const NESTED_REPO_SCAN_MAX_DIRS = 600;
+const NESTED_REPO_SCAN_SKIP_DIRS = new Set([
+  '.git',
+  'node_modules',
+  '.venv',
+  'venv',
+  'dist',
+  'build',
+  'out',
+  'target',
+  '.next',
+  '.nuxt',
+  '.turbo',
+]);
 
 export interface RepoDescriptor {
   id: string;
@@ -122,12 +138,84 @@ async function discoverRepoForFolder(folderPath: string): Promise<{ rootPath: st
   };
 }
 
+async function discoverNestedRepoCandidates(rootPath: string): Promise<string[]> {
+  const queue: Array<{ dir: string; depth: number }> = [{ dir: rootPath, depth: 0 }];
+  const seen = new Set<string>([normalizePath(rootPath)]);
+  const candidates: string[] = [];
+  let visitedDirs = 0;
+
+  while (queue.length > 0 && visitedDirs < NESTED_REPO_SCAN_MAX_DIRS) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    visitedDirs += 1;
+
+    try {
+      const entries = await fs.readdir(current.dir, { withFileTypes: true });
+
+      if (entries.some(entry => entry.name === '.git')) {
+        candidates.push(current.dir);
+        continue;
+      }
+
+      if (current.depth >= NESTED_REPO_SCAN_MAX_DEPTH) {
+        continue;
+      }
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) {
+          continue;
+        }
+
+        if (NESTED_REPO_SCAN_SKIP_DIRS.has(entry.name)) {
+          continue;
+        }
+
+        const childDir = path.join(current.dir, entry.name);
+        const normChild = normalizePath(childDir);
+        if (seen.has(normChild)) {
+          continue;
+        }
+        seen.add(normChild);
+        queue.push({ dir: childDir, depth: current.depth + 1 });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return candidates;
+}
+
+function addRepoDescriptor(
+  rows: Map<string, RepoDescriptor>,
+  workspace: WorkspaceInfo,
+  repo: { rootPath: string; remoteUrl?: string; remoteSlug?: string },
+): void {
+  const key = `${workspace.workspaceId}|${repo.rootPath}`;
+  if (rows.has(key)) {
+    return;
+  }
+
+  rows.set(key, {
+    id: key,
+    workspaceId: workspace.workspaceId,
+    workspacePath: workspace.workspacePath,
+    rootPath: repo.rootPath,
+    displayName: repo.remoteSlug || path.basename(repo.rootPath),
+    remoteUrl: repo.remoteUrl,
+    remoteSlug: repo.remoteSlug,
+  });
+}
+
 export async function discoverRepoDescriptors(workspaces: WorkspaceInfo[]): Promise<RepoDescriptor[]> {
   const rows = new Map<string, RepoDescriptor>();
 
   for (const ws of workspaces) {
     const candidates: string[] = [];
     const referenced = ws.referencedFolders ?? [];
+    let singleFolderRoot: string | undefined;
 
     if (referenced.length > 0) {
       for (const folder of referenced) {
@@ -135,28 +223,31 @@ export async function discoverRepoDescriptors(workspaces: WorkspaceInfo[]): Prom
       }
     } else if (ws.workspacePath && !isWorkspaceFilePath(ws.workspacePath)) {
       candidates.push(ws.workspacePath);
+      singleFolderRoot = ws.workspacePath;
     }
+
+    let discoveredAny = false;
 
     for (const candidate of candidates) {
       const repo = await discoverRepoForFolder(candidate);
       if (!repo) {
         continue;
       }
+      discoveredAny = true;
+      addRepoDescriptor(rows, ws, repo);
+    }
 
-      const key = `${ws.workspaceId}|${repo.rootPath}`;
-      if (rows.has(key)) {
-        continue;
+    // In single-folder windows, users can open a non-git parent directory that contains
+    // multiple child repos. If the root itself is not a repo, fall back to a bounded scan.
+    if (!discoveredAny && singleFolderRoot) {
+      const nestedCandidates = await discoverNestedRepoCandidates(singleFolderRoot);
+      for (const nested of nestedCandidates) {
+        const repo = await discoverRepoForFolder(nested);
+        if (!repo) {
+          continue;
+        }
+        addRepoDescriptor(rows, ws, repo);
       }
-
-      rows.set(key, {
-        id: key,
-        workspaceId: ws.workspaceId,
-        workspacePath: ws.workspacePath,
-        rootPath: repo.rootPath,
-        displayName: repo.remoteSlug || path.basename(repo.rootPath),
-        remoteUrl: repo.remoteUrl,
-        remoteSlug: repo.remoteSlug,
-      });
     }
   }
 
