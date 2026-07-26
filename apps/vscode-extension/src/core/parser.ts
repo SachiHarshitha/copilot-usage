@@ -155,7 +155,7 @@ export async function parseLegacyJson(
     state.requests.push({
       chatSessionId: sessionId,
       requestIndex: idx,
-      modelId: reqModel || modelId,
+      modelId: preferredModelId(reqModel, modelId),
       timestampMs,
       promptTokens,
       outputTokens,
@@ -182,9 +182,15 @@ function processLine(state: ParseState, obj: Record<string, unknown>): void {
     return;
   }
 
-  if (kind === 2 && Array.isArray(k) && k.length === 1 && k[0] === 'requests' && Array.isArray(v)) {
-    handleNewRequests(state, v);
-    return;
+  if (kind === 2 && Array.isArray(k) && k.length === 1 && k[0] === 'requests') {
+    if (Array.isArray(v)) {
+      handleNewRequests(state, v);
+      return;
+    }
+    if (typeof v === 'object' && v !== null) {
+      handleNewRequests(state, [v]);
+      return;
+    }
   }
 
   if (kind === 1 && Array.isArray(k) && k.length === 3 && k[0] === 'requests') {
@@ -309,10 +315,8 @@ function handleResult(state: ParseState, v: Record<string, unknown>, requestInde
   const chatSessionId = state.anchor?.chatSessionId || '';
 
   // resolvedModel uses dashes and no prefix (e.g. "claude-opus-4-7") — normalise to "copilot/claude-opus-4.7"
-  const rawResolved = str(md.resolvedModel);
-  const resolvedModel = rawResolved
-    ? 'copilot/' + rawResolved.replace(/(?<=-\d+)-(\d+)$/, '.$1')  // only last -minor patch: dash → dot
-    : undefined;
+  const resolvedModel = normalizeResolvedModel(str(md.resolvedModel));
+  const metadataModelId = str(md.modelId);
 
   const evidencePaths = uniquePaths([
     ...(state.requestEvidencePaths.get(requestIndex) || []),
@@ -326,7 +330,7 @@ function handleResult(state: ParseState, v: Record<string, unknown>, requestInde
     chatSessionId,
     requestIndex,
     requestId: state.requestIds.get(requestIndex),
-    modelId: str(md.modelId) || resolvedModel,
+    modelId: preferredModelId(metadataModelId, resolvedModel),
     timestampMs,
     promptTokens,
     outputTokens,
@@ -358,8 +362,11 @@ function finalize(
     if (!req.chatSessionId) { req.chatSessionId = state.anchor.chatSessionId; }
     req.workspaceId = workspaceId;
     req.workspacePath = workspacePath;
-    if (!req.modelId) { req.modelId = state.requestModels.get(req.requestIndex); }
-    if (!req.modelId && state.anchor) { req.modelId = state.anchor.modelId; }
+    req.modelId = preferredModelId(
+      state.requestModels.get(req.requestIndex),
+      req.modelId,
+      state.anchor?.modelId,
+    );
     if (!req.requestId) { req.requestId = state.requestIds.get(req.requestIndex); }
     if (!req.promptTokens) {
       req.promptTokens = state.requestPromptTokens.get(req.requestIndex) || 0;
@@ -674,6 +681,39 @@ function firstNumber(...values: unknown[]): number | undefined {
   for (const value of values) {
     if (typeof value === 'number') {
       return value;
+    }
+  }
+  return undefined;
+}
+
+function normalizeResolvedModel(rawResolved: string | undefined): string | undefined {
+  if (!rawResolved) {
+    return undefined;
+  }
+
+  // Convert version markers like "4-8" to "4.8" even when a suffix follows,
+  // e.g. "claude-opus-4-8-fast" -> "claude-opus-4.8-fast".
+  const normalized = rawResolved.replace(/(?<=-\d+)-(\d+)(?=-|$)/, '.$1');
+  return `copilot/${normalized}`;
+}
+
+function isAutoModelId(modelId: string | undefined): boolean {
+  if (!modelId) {
+    return false;
+  }
+  const normalized = modelId.trim().toLowerCase();
+  return normalized === 'copilot/auto' || normalized === 'auto';
+}
+
+function preferredModelId(...candidates: Array<string | undefined>): string | undefined {
+  for (const candidate of candidates) {
+    if (candidate && !isAutoModelId(candidate)) {
+      return candidate;
+    }
+  }
+  for (const candidate of candidates) {
+    if (candidate) {
+      return candidate;
     }
   }
   return undefined;

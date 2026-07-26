@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { WorkspacePanel, DashboardPanel } from './views/panels';
 import { StatusBarManager } from './views/statusBar';
-import { getWorkspaceStorageRoot, computeChatSessionsSignature } from './core/discovery';
+import { getWorkspaceStorageRoots, computeChatSessionsSignature } from './core/discovery';
 import { openCopilotDebugLogSettings } from './core/copilotDebugLog';
 import { CostEstimatorPanel, enableCostEstimator } from './features/costEstimator';
 import {
@@ -34,9 +34,9 @@ export function activate(context: vscode.ExtensionContext) {
 	/** Refresh status bar + any open panels. */
 	const refreshAll = async () => {
 		const tasks: Promise<unknown>[] = [
-			statusBar.refresh(),
-			WorkspacePanel.refresh(),
-			DashboardPanel.refresh(),
+			statusBar.refresh(storageRoots),
+			WorkspacePanel.refresh(storageRoots),
+			DashboardPanel.refresh(storageRoots),
 			PromptstreakSharePanel.refresh(),
 		];
 		if (enableCostEstimator) {
@@ -45,13 +45,13 @@ export function activate(context: vscode.ExtensionContext) {
 		await Promise.all(tasks);
 	};
 
-	const storageRoot = getWorkspaceStorageRoot();
+	const storageRoots = getWorkspaceStorageRoots(vscode.env.appName);
 	let lastSignature: string | undefined;
 	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 	const updateSignature = async () => {
 		try {
-			lastSignature = await computeChatSessionsSignature(storageRoot);
+			lastSignature = await computeChatSessionsSignature(storageRoots);
 		} catch {
 			// Ignore transient IO errors; next scan will retry.
 		}
@@ -80,33 +80,37 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}));
 
-	// Watch the actual VS Code workspaceStorage directory for chat session changes.
+	// Watch the actual VS Code workspaceStorage directories for chat session changes.
 	// createFileSystemWatcher with RelativePattern(absolute path) works outside
 	// the current workspace — this is the correct way to watch AppData files.
-	const watcherJsonl = vscode.workspace.createFileSystemWatcher(
-		new vscode.RelativePattern(vscode.Uri.file(storageRoot), '**/chatSessions/*.jsonl'),
-	);
-	const watcherJson = vscode.workspace.createFileSystemWatcher(
-		new vscode.RelativePattern(vscode.Uri.file(storageRoot), '**/chatSessions/*.json'),
-	);
+	// One watcher pair per storage root (stable + Insiders when present).
 	const onSessionFilesChanged = () => scheduleRefresh();
 
-	context.subscriptions.push(
-		watcherJsonl,
-		watcherJson,
-		watcherJsonl.onDidCreate(onSessionFilesChanged),
-		watcherJsonl.onDidChange(onSessionFilesChanged),
-		watcherJsonl.onDidDelete(onSessionFilesChanged),
-		watcherJson.onDidCreate(onSessionFilesChanged),
-		watcherJson.onDidChange(onSessionFilesChanged),
-		watcherJson.onDidDelete(onSessionFilesChanged),
-	);
+	for (const storageRoot of storageRoots) {
+		const watcherJsonl = vscode.workspace.createFileSystemWatcher(
+			new vscode.RelativePattern(vscode.Uri.file(storageRoot), '**/chatSessions/*.jsonl'),
+		);
+		const watcherJson = vscode.workspace.createFileSystemWatcher(
+			new vscode.RelativePattern(vscode.Uri.file(storageRoot), '**/chatSessions/*.json'),
+		);
+
+		context.subscriptions.push(
+			watcherJsonl,
+			watcherJson,
+			watcherJsonl.onDidCreate(onSessionFilesChanged),
+			watcherJsonl.onDidChange(onSessionFilesChanged),
+			watcherJsonl.onDidDelete(onSessionFilesChanged),
+			watcherJson.onDidCreate(onSessionFilesChanged),
+			watcherJson.onDidChange(onSessionFilesChanged),
+			watcherJson.onDidDelete(onSessionFilesChanged),
+		);
+	}
 
 	// Fallback polling closes gaps on platforms/setups where external watcher
 	// notifications are delayed or dropped.
 	const pollForMissedChanges = async () => {
 		try {
-			const nextSignature = await computeChatSessionsSignature(storageRoot);
+			const nextSignature = await computeChatSessionsSignature(storageRoots);
 			if (lastSignature === undefined) {
 				lastSignature = nextSignature;
 				return;

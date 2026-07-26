@@ -1,0 +1,31 @@
+flowchart TD
+    A["computeRepoAttributionStats(events, repos, opts)"] --> B{"opts.includeEmptyRepos?"}
+    B -->|"yes (Workspace panel)"| B1["Pre-create a row for every discovered repo<br/>so all open folders show, even 0 usage"]
+    B -->|"no (Dashboard)"| C["Start with no repo rows"]
+    B1 --> C
+
+    C --> D["For each RequestEvent"]
+    D --> PR["premiumRequests = hasTokenUsage ?<br/>getMultiplier(modelId, timestampMs) : 0<br/>table chosen by 2026-06-01 rebase cutoff"]
+    PR --> E["resolveRepoWeights(event, repos)"]
+
+    E --> F["workspaceRepos = repos filtered<br/>by event.workspaceId"]
+    F --> G{"workspaceRepos.length == 0?"}
+    G -->|"yes"| H["weights = empty"]
+    G -->|"no"| I{"event has evidencePaths?"}
+    I -->|"yes"| J["For each evidence path:<br/>longest-prefix match to a repo rootPath"]
+    J --> K{"any prefix matches?"}
+    K -->|"yes"| L["weights = hitCount / totalHits<br/>split across matched repos"]
+    K -->|"no"| Mq{"exactly 1 repo in workspace?"}
+    I -->|"no"| Mq
+    Mq -->|"yes"| Nq["weights = one repo at weight 1.0"]
+    Mq -->|"no"| H
+
+    H --> O["Add whole event to Unattributed row"]
+    L --> P["Distribute prompt / output / premium<br/>times weight into each matched repo row"]
+    Nq --> P
+
+    O --> Q["Accumulate workspace totals<br/>requests, prompt, output"]
+    P --> Q
+    Q --> R["resolveTopModel per row:<br/>most requests, tie → tokens → name"]
+    R --> SS["rows sorted by total tokens desc<br/>Unattributed appended when &gt; 0"]
+    SS --> UU["RepoAttributionStats<br/>workspaceTotals + rows"]

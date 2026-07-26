@@ -24,32 +24,70 @@ function settings(partial: Partial<CostEstimatorSettings>): CostEstimatorSetting
     extraBudgetUsd: 0,
     selectedModelId: 'claude-sonnet-4.6',
     defaultRange: 'last_30_days',
+    includeFlexAllowance: true,
     ...partial,
   };
 }
 
 suite('Cost Estimator: computePlanImpact', () => {
-  test('Spec §28.2 — 5750 credits on Pro+ → overage 1850, extra $18.50', () => {
-    const r = computePlanImpact(cost(5750), settings({ selectedPlan: 'pro_plus' }));
+  test('Spec §28.2 — flex OFF: 5750 credits on Pro+ → base 3900, overage 1850, extra $18.50', () => {
+    const r = computePlanImpact(cost(5750), settings({ selectedPlan: 'pro_plus', includeFlexAllowance: false }));
     assert.strictEqual(r.includedCredits, 3900);
+    assert.strictEqual(r.includedBaseCredits, 3900);
+    assert.strictEqual(r.includedFlexCredits, 3100);
+    assert.strictEqual(r.flexApplied, false);
     assert.strictEqual(r.overageCredits, 1850);
     assert.strictEqual(Math.round(r.estimatedExtraUsd! * 100) / 100, 18.5);
     assert.strictEqual(r.isWithinIncludedAllowance, false);
   });
 
-  test('Spec §28.3 — extra budget $25 covers 1850-credit overage', () => {
-    const r = computePlanImpact(cost(5750), settings({ selectedPlan: 'pro_plus', extraBudgetUsd: 25 }));
+  test('Flex ON: 5750 credits on Pro+ → within total allowance (7000)', () => {
+    const r = computePlanImpact(cost(5750), settings({ selectedPlan: 'pro_plus', includeFlexAllowance: true }));
+    assert.strictEqual(r.includedCredits, 7000);
+    assert.strictEqual(r.flexApplied, true);
+    assert.strictEqual(r.overageCredits, 0);
+    assert.strictEqual(r.isWithinIncludedAllowance, true);
+    assert.strictEqual(r.status, 'within_allowance');
+  });
+
+  test('Spec §28.3 — extra budget $25 covers 1850-credit overage (flex OFF)', () => {
+    const r = computePlanImpact(cost(5750), settings({ selectedPlan: 'pro_plus', includeFlexAllowance: false, extraBudgetUsd: 25 }));
     assert.strictEqual(r.extraBudgetCredits, 2500);
     assert.strictEqual(r.isCoveredByExtraBudget, true);
     assert.strictEqual(r.status, 'over_allowance_within_budget');
   });
 
-  test('Within Pro allowance', () => {
-    const r = computePlanImpact(cost(500), settings({ selectedPlan: 'pro' }));
-    assert.strictEqual(r.includedCredits, 1000);
+  test('Within Pro allowance (flex ON → 1500 total)', () => {
+    const r = computePlanImpact(cost(1200), settings({ selectedPlan: 'pro' }));
+    assert.strictEqual(r.includedCredits, 1500);
+    assert.strictEqual(r.includedBaseCredits, 1000);
+    assert.strictEqual(r.includedFlexCredits, 500);
     assert.strictEqual(r.overageCredits, 0);
     assert.strictEqual(r.isWithinIncludedAllowance, true);
     assert.strictEqual(r.status, 'within_allowance');
+  });
+
+  test('Pro flex OFF → base 1000 only', () => {
+    const r = computePlanImpact(cost(1200), settings({ selectedPlan: 'pro', includeFlexAllowance: false }));
+    assert.strictEqual(r.includedCredits, 1000);
+    assert.strictEqual(r.overageCredits, 200);
+    assert.strictEqual(r.isWithinIncludedAllowance, false);
+  });
+
+  test('Copilot Max — flex ON → 20000 total allowance', () => {
+    const r = computePlanImpact(cost(15000), settings({ selectedPlan: 'max' }));
+    assert.strictEqual(r.includedCredits, 20000);
+    assert.strictEqual(r.includedBaseCredits, 10000);
+    assert.strictEqual(r.includedFlexCredits, 10000);
+    assert.strictEqual(r.isWithinIncludedAllowance, true);
+    assert.strictEqual(r.status, 'within_allowance');
+  });
+
+  test('Copilot Max — flex OFF → base 10000, overage applies', () => {
+    const r = computePlanImpact(cost(15000), settings({ selectedPlan: 'max', includeFlexAllowance: false }));
+    assert.strictEqual(r.includedCredits, 10000);
+    assert.strictEqual(r.overageCredits, 5000);
+    assert.strictEqual(r.status, 'over_allowance_exceeds_budget');
   });
 
   test('Spec §28.5 — Business plan emits pooled-allowance warning', () => {
@@ -73,8 +111,8 @@ suite('Cost Estimator: computePlanImpact', () => {
     assert.ok(r.warnings.some(w => w.toLowerCase().includes('annual')));
   });
 
-  test('Over allowance + insufficient budget → exceeds_budget status', () => {
-    const r = computePlanImpact(cost(5750), settings({ selectedPlan: 'pro_plus', extraBudgetUsd: 5 }));
+  test('Over allowance + insufficient budget → exceeds_budget status (flex OFF)', () => {
+    const r = computePlanImpact(cost(5750), settings({ selectedPlan: 'pro_plus', includeFlexAllowance: false, extraBudgetUsd: 5 }));
     assert.strictEqual(r.status, 'over_allowance_exceeds_budget');
     assert.strictEqual(r.isCoveredByExtraBudget, false);
   });

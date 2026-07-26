@@ -241,6 +241,7 @@ class CopilotTUI(App):
             yield KpiCard("Prompt Tokens", id="kpi-prompt")
             yield KpiCard("Output Tokens", id="kpi-output")
             yield KpiCard("Premium",       id="kpi-premium")
+            yield KpiCard("Credits",       id="kpi-credits")
             yield KpiCard("Workspaces",    id="kpi-workspaces")
             yield KpiCard("Sessions",      id="kpi-sessions")
             yield KpiCard("Est. Cost/mo",  id="kpi-cost")
@@ -263,11 +264,11 @@ class CopilotTUI(App):
 
     def _setup_tables(self) -> None:
         mt = self.query_one("#model-table", DataTable)
-        mt.add_columns("Model", "Requests", "Tokens", "Premium")
+        mt.add_columns("Model", "Requests", "Tokens", "Premium", "Credits")
         mt.cursor_type = "row"
 
         wt = self.query_one("#workspace-table", DataTable)
-        wt.add_columns("Workspace", "Requests", "Prompt", "Output", "Premium", "Top Model")
+        wt.add_columns("Workspace", "Requests", "Prompt", "Output", "Premium", "Credits", "Top Model")
         wt.cursor_type = "row"
 
     def _load_data(self) -> None:
@@ -308,6 +309,7 @@ class CopilotTUI(App):
         self.query_one("#kpi-prompt",    KpiCard).update_value(_fmt_tokens(kpi["total_prompt"]))
         self.query_one("#kpi-output",    KpiCard).update_value(_fmt_tokens(kpi["total_output"]))
         self.query_one("#kpi-premium",   KpiCard).update_value(_fmt_prem(kpi["total_premium"]))
+        self.query_one("#kpi-credits",   KpiCard).update_value(_fmt_tokens(kpi.get("total_credits", 0)))
         self.query_one("#kpi-workspaces",KpiCard).update_value(str(kpi["workspaces"]))
         self.query_one("#kpi-sessions",  KpiCard).update_value(str(kpi["sessions"]))
         if summary is not None:
@@ -322,6 +324,7 @@ class CopilotTUI(App):
                 _fmt_tokens(m["requests"]),
                 _fmt_tokens(m["total_tokens"]),
                 _fmt_prem(m["premium"]),
+                _fmt_tokens(m.get("credits", 0)),
             )
 
         # Workspace table
@@ -339,6 +342,7 @@ class CopilotTUI(App):
                 _fmt_tokens(w["prompt_tokens"]),
                 _fmt_tokens(w["output_tokens"]),
                 _fmt_prem(w["premium"]),
+                _fmt_tokens(w.get("credits", 0)),
                 w.get("top_model", "–"),
             )
 

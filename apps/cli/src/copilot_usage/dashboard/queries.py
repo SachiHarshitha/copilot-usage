@@ -5,6 +5,7 @@ import threading
 import time
 from functools import wraps
 
+from copilot_usage.credits import credits_for_request, load_credit_rates
 from copilot_usage.db import get_connection
 
 _local = threading.local()
@@ -64,6 +65,12 @@ def _con():
 
 
 @_ttl_cache
+def _credit_rates() -> dict:
+    """Real per-model credit rates from the Copilot catalog (empty when unavailable)."""
+    return load_credit_rates()
+
+
+@_ttl_cache
 def kpi_totals() -> dict:
     con = _con()
     row = con.execute("""
@@ -77,11 +84,25 @@ def kpi_totals() -> dict:
                SUM(CASE WHEN tokens_estimated THEN 1 ELSE 0 END) AS estimated_events
         FROM events
     """).fetchone()
+    # Credits are token-metered per model, so sum them from a per-model rollup.
+    rates = _credit_rates()
+    model_rows = con.execute("""
+        SELECT COALESCE(model_id, 'unknown') AS model,
+               COALESCE(SUM(prompt_tokens), 0) AS prompt,
+               COALESCE(SUM(output_tokens), 0) AS output
+        FROM events
+        GROUP BY 1
+    """).fetchall()
+    total_credits = sum(
+        credits_for_request(mid, prompt, output, rates)
+        for mid, prompt, output in model_rows
+    )
     return {
         "total_requests": row[0],
         "total_prompt": row[1],
         "total_output": row[2],
         "total_premium": row[3],
+        "total_credits": round(total_credits),
         "workspaces": row[4],
         "sessions": row[5],
         "legacy_events": row[6],
@@ -171,12 +192,24 @@ def model_mix() -> list[dict]:
         SELECT COALESCE(model_id, 'unknown') AS model,
                COUNT(*) AS requests,
                SUM(prompt_tokens + output_tokens) AS total_tokens,
-               SUM(premium_estimate) AS premium
+               SUM(premium_estimate) AS premium,
+               COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+               COALESCE(SUM(output_tokens), 0) AS output_tokens
         FROM events
         GROUP BY 1
         ORDER BY total_tokens DESC
     """).fetchall()
-    return [{"model": r[0], "requests": r[1], "total_tokens": r[2], "premium": r[3]} for r in rows]
+    rates = _credit_rates()
+    return [
+        {
+            "model": r[0],
+            "requests": r[1],
+            "total_tokens": r[2],
+            "premium": r[3],
+            "credits": round(credits_for_request(r[0], r[4], r[5], rates)),
+        }
+        for r in rows
+    ]
 
 
 @_ttl_cache
@@ -189,6 +222,21 @@ def workspace_table() -> list[dict]:
         FROM badge_metrics b
         ORDER BY b.total_prompt + b.total_output DESC
     """).fetchall()
+    # Credits need the per-(workspace, model) token split, which the badge
+    # rollup collapses to a single top_model — recompute it from events.
+    rates = _credit_rates()
+    credit_rows = con.execute("""
+        SELECT workspace_id, COALESCE(model_id, 'unknown') AS model,
+               COALESCE(SUM(prompt_tokens), 0) AS prompt,
+               COALESCE(SUM(output_tokens), 0) AS output
+        FROM events
+        GROUP BY 1, 2
+    """).fetchall()
+    credits_by_ws: dict[str, float] = {}
+    for wsid, mid, prompt, output in credit_rows:
+        credits_by_ws[wsid] = credits_by_ws.get(wsid, 0.0) + credits_for_request(
+            mid, prompt, output, rates
+        )
     return [
         {
             "workspace_id": r[0],
@@ -197,6 +245,7 @@ def workspace_table() -> list[dict]:
             "prompt_tokens": r[3],
             "output_tokens": r[4],
             "premium": r[5],
+            "credits": round(credits_by_ws.get(r[0], 0.0)),
             "top_model": r[6],
         }
         for r in rows

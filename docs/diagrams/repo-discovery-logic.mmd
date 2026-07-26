@@ -1,0 +1,24 @@
+flowchart TD
+    S["discoverRepoDescriptors(workspaces, openFolderPaths)"] --> A["For each WorkspaceInfo"]
+    A --> B["candidateFolders =<br/>referencedFolders  UNION  openFolderPaths"]
+    B --> C{"candidateFolders empty?"}
+    C -->|"yes"| D{"workspacePath set AND not a<br/>.code-workspace / workspace.json?"}
+    D -->|"yes"| E["Add workspacePath as candidate<br/>single-folder window"]
+    D -->|"no"| F["No candidates for this workspace"]
+    C -->|"no"| G["Use referenced + live open folders"]
+
+    E --> H["For each candidate folder"]
+    G --> H
+    H --> I["discoverRepoForFolder(folder):<br/>git rev-parse --show-toplevel"]
+    I --> J{"Folder root is a git repo?"}
+    J -->|"yes"| K["git remote get-url origin<br/>then parseRemoteRepoSlug → owner/repo"]
+    K --> L["addRepoDescriptor:<br/>displayName = remoteSlug OR basename<br/>rootPath = git toplevel"]
+    J -->|"no"| M["discoverNestedRepoCandidates(folder)<br/>BFS: depth &le; 3, &le; 600 dirs,<br/>skip node_modules/dist/build/out/..."]
+    M --> NN["For each dir containing .git"]
+    NN --> OO["discoverRepoForFolder(nested)"]
+    OO --> PP{"git repo?"}
+    PP -->|"yes"| L
+    PP -->|"no"| QQ["skip"]
+
+    L --> R["Dedup key = workspaceId | rootPath"]
+    R --> T["RepoDescriptor[]<br/>sorted by displayName"]

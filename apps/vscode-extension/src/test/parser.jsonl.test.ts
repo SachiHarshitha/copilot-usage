@@ -436,4 +436,136 @@ suite('Core Parser: JSONL request token updates', () => {
       },
     );
   });
+
+  test('prefers resolved fast model over generic copilot/auto metadata model id', async () => {
+    await withTempJsonl(
+      [
+        {
+          kind: 0,
+          v: {
+            sessionId: 'session-10',
+            creationDate: 1700009000000,
+            inputState: {
+              selectedModel: {
+                identifier: 'copilot/auto',
+              },
+            },
+          },
+        },
+        {
+          kind: 2,
+          k: ['requests'],
+          v: [
+            {
+              requestId: 'request-10',
+              timestamp: 1700009001234,
+              modelId: 'copilot/auto',
+            },
+          ],
+        },
+        {
+          kind: 1,
+          k: ['requests', 0, 'result'],
+          v: {
+            metadata: {
+              modelId: 'copilot/auto',
+              resolvedModel: 'claude-opus-4-8-fast',
+              promptTokens: 200,
+              outputTokens: 50,
+            },
+          },
+        },
+      ],
+      async filePath => {
+        const parsed = await parseJsonl(filePath, 'ws-id', 'c:/repo');
+        assert.strictEqual(parsed.requests.length, 1);
+        assert.strictEqual(parsed.requests[0].modelId, 'copilot/claude-opus-4.8-fast');
+      },
+    );
+  });
+
+  test('keeps copilot/auto when no specific model id is available', async () => {
+    await withTempJsonl(
+      [
+        {
+          kind: 0,
+          v: {
+            sessionId: 'session-11',
+            creationDate: 1700010000000,
+            inputState: {
+              selectedModel: {
+                identifier: 'copilot/auto',
+              },
+            },
+          },
+        },
+        {
+          kind: 2,
+          k: ['requests'],
+          v: [
+            {
+              requestId: 'request-11',
+              timestamp: 1700010001234,
+              modelId: 'copilot/auto',
+            },
+          ],
+        },
+        {
+          kind: 1,
+          k: ['requests', 0, 'result'],
+          v: {
+            metadata: {
+              modelId: 'copilot/auto',
+              promptTokens: 120,
+              outputTokens: 33,
+            },
+          },
+        },
+      ],
+      async filePath => {
+        const parsed = await parseJsonl(filePath, 'ws-id', 'c:/repo');
+        assert.strictEqual(parsed.requests.length, 1);
+        assert.strictEqual(parsed.requests[0].modelId, 'copilot/auto');
+      },
+    );
+  });
+
+  test('reads single-object request appends and preserves explicit fast model ids', async () => {
+    await withTempJsonl(
+      [
+        {
+          kind: 0,
+          v: {
+            sessionId: 'session-12',
+            creationDate: 1700011000000,
+          },
+        },
+        {
+          kind: 2,
+          k: ['requests'],
+          v: {
+            requestId: 'request-12',
+            timestamp: 1700011001234,
+            modelId: 'copilot/claude-opus-4.8-fast',
+          },
+        },
+        {
+          kind: 1,
+          k: ['requests', 0, 'result'],
+          v: {
+            metadata: {
+              resolvedModel: 'claude-opus-4-8',
+              promptTokens: 90,
+              outputTokens: 45,
+            },
+          },
+        },
+      ],
+      async filePath => {
+        const parsed = await parseJsonl(filePath, 'ws-id', 'c:/repo');
+        assert.strictEqual(parsed.requests.length, 1);
+        assert.strictEqual(parsed.requests[0].modelId, 'copilot/claude-opus-4.8-fast');
+      },
+    );
+  });
 });

@@ -1,10 +1,26 @@
 import { execFile } from 'child_process';
+import * as fs from 'fs/promises';
 import { promisify } from 'util';
 import * as path from 'path';
 import { RequestEvent, WorkspaceInfo } from './types';
 import { getMultiplier } from './config';
 
 const execFileAsync = promisify(execFile);
+const NESTED_REPO_SCAN_MAX_DEPTH = 3;
+const NESTED_REPO_SCAN_MAX_DIRS = 600;
+const NESTED_REPO_SCAN_SKIP_DIRS = new Set([
+  '.git',
+  'node_modules',
+  '.venv',
+  'venv',
+  'dist',
+  'build',
+  'out',
+  'target',
+  '.next',
+  '.nuxt',
+  '.turbo',
+]);
 
 export interface RepoDescriptor {
   id: string;
@@ -122,41 +138,117 @@ async function discoverRepoForFolder(folderPath: string): Promise<{ rootPath: st
   };
 }
 
-export async function discoverRepoDescriptors(workspaces: WorkspaceInfo[]): Promise<RepoDescriptor[]> {
+async function discoverNestedRepoCandidates(rootPath: string): Promise<string[]> {
+  const queue: Array<{ dir: string; depth: number }> = [{ dir: rootPath, depth: 0 }];
+  const seen = new Set<string>([normalizePath(rootPath)]);
+  const candidates: string[] = [];
+  let visitedDirs = 0;
+
+  while (queue.length > 0 && visitedDirs < NESTED_REPO_SCAN_MAX_DIRS) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    visitedDirs += 1;
+
+    try {
+      const entries = await fs.readdir(current.dir, { withFileTypes: true });
+
+      if (entries.some(entry => entry.name === '.git')) {
+        candidates.push(current.dir);
+        continue;
+      }
+
+      if (current.depth >= NESTED_REPO_SCAN_MAX_DEPTH) {
+        continue;
+      }
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) {
+          continue;
+        }
+
+        if (NESTED_REPO_SCAN_SKIP_DIRS.has(entry.name)) {
+          continue;
+        }
+
+        const childDir = path.join(current.dir, entry.name);
+        const normChild = normalizePath(childDir);
+        if (seen.has(normChild)) {
+          continue;
+        }
+        seen.add(normChild);
+        queue.push({ dir: childDir, depth: current.depth + 1 });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return candidates;
+}
+
+function addRepoDescriptor(
+  rows: Map<string, RepoDescriptor>,
+  workspace: WorkspaceInfo,
+  repo: { rootPath: string; remoteUrl?: string; remoteSlug?: string },
+): void {
+  const key = `${workspace.workspaceId}|${repo.rootPath}`;
+  if (rows.has(key)) {
+    return;
+  }
+
+  rows.set(key, {
+    id: key,
+    workspaceId: workspace.workspaceId,
+    workspacePath: workspace.workspacePath,
+    rootPath: repo.rootPath,
+    displayName: repo.remoteSlug || path.basename(repo.rootPath),
+    remoteUrl: repo.remoteUrl,
+    remoteSlug: repo.remoteSlug,
+  });
+}
+
+export async function discoverRepoDescriptors(
+  workspaces: WorkspaceInfo[],
+  openFolderPaths?: string[],
+): Promise<RepoDescriptor[]> {
   const rows = new Map<string, RepoDescriptor>();
 
   for (const ws of workspaces) {
-    const candidates: string[] = [];
-    const referenced = ws.referencedFolders ?? [];
+    const candidateFolders = new Set<string>();
 
-    if (referenced.length > 0) {
-      for (const folder of referenced) {
-        candidates.push(folder);
-      }
-    } else if (ws.workspacePath && !isWorkspaceFilePath(ws.workspacePath)) {
-      candidates.push(ws.workspacePath);
+    for (const folder of ws.referencedFolders ?? []) {
+      candidateFolders.add(folder);
     }
 
-    for (const candidate of candidates) {
-      const repo = await discoverRepoForFolder(candidate);
-      if (!repo) {
+    // Folders currently open in the window. This covers untitled / ad-hoc multi-root
+    // workspaces where a folder was added without saving a `.code-workspace` file, so
+    // the stored workspace.json does not list every open folder.
+    for (const folder of openFolderPaths ?? []) {
+      candidateFolders.add(folder);
+    }
+
+    if (candidateFolders.size === 0 && ws.workspacePath && !isWorkspaceFilePath(ws.workspacePath)) {
+      candidateFolders.add(ws.workspacePath);
+    }
+
+    for (const folder of candidateFolders) {
+      const repo = await discoverRepoForFolder(folder);
+      if (repo) {
+        addRepoDescriptor(rows, ws, repo);
         continue;
       }
 
-      const key = `${ws.workspaceId}|${repo.rootPath}`;
-      if (rows.has(key)) {
-        continue;
+      // The folder root is not a Git repo — it may be a non-git parent that contains
+      // multiple child repos. Fall back to a bounded scan of nested repositories.
+      const nestedCandidates = await discoverNestedRepoCandidates(folder);
+      for (const nested of nestedCandidates) {
+        const nestedRepo = await discoverRepoForFolder(nested);
+        if (nestedRepo) {
+          addRepoDescriptor(rows, ws, nestedRepo);
+        }
       }
-
-      rows.set(key, {
-        id: key,
-        workspaceId: ws.workspaceId,
-        workspacePath: ws.workspacePath,
-        rootPath: repo.rootPath,
-        displayName: repo.remoteSlug || path.basename(repo.rootPath),
-        remoteUrl: repo.remoteUrl,
-        remoteSlug: repo.remoteSlug,
-      });
     }
   }
 
@@ -241,6 +333,7 @@ export function resolvePrimaryRepoDescriptorForEvent(
 export function computeRepoAttributionStats(
   events: RequestEvent[],
   repos: RepoDescriptor[],
+  options?: { includeEmptyRepos?: boolean },
 ): RepoAttributionStats {
   const rowsById = new Map<string, RepoAttributionRow>();
   const reposById = new Map<string, RepoDescriptor>(repos.map(repo => [repo.id, repo]));
@@ -331,12 +424,20 @@ export function computeRepoAttributionStats(
   let totalPromptTokens = 0;
   let totalOutputTokens = 0;
 
+  // When requested, surface every discovered repo — including those without any
+  // attributed usage — so all open folders are visible in the breakdown.
+  if (options?.includeEmptyRepos) {
+    for (const repo of repos) {
+      getOrCreateRow(repo);
+    }
+  }
+
   for (const event of events) {
     totalRequests += 1;
     totalPromptTokens += event.promptTokens;
     totalOutputTokens += event.outputTokens;
     const hasTokenUsage = event.promptTokens > 0 || event.outputTokens > 0;
-    const premiumRequests = hasTokenUsage ? getMultiplier(event.modelId || '') : 0;
+    const premiumRequests = hasTokenUsage ? getMultiplier(event.modelId || '', event.timestampMs) : 0;
 
     const weights = resolveRepoWeights(event, repos);
     if (weights.length === 0) {

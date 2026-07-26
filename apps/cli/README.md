@@ -4,7 +4,7 @@
 [![VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/emagin8.copilot-usage?label=vscode%20extension&logo=visual-studio-code&logoColor=white&color=007ACC)](https://marketplace.visualstudio.com/items?itemName=emagin8.copilot-usage)
 [![GitHub release](https://img.shields.io/github/v/release/SachiHarshitha/copilot-usage?logo=github)](https://github.com/SachiHarshitha/copilot-usage/releases/latest)
 [![Python](https://img.shields.io/pypi/pyversions/copilot-usage?logo=python&logoColor=white)](https://pypi.org/project/copilot-usage/)
-[![License](https://img.shields.io/github/license/SachiHarshitha/copilot-usage)](LICENSE)
+[![License](https://img.shields.io/github/license/SachiHarshitha/copilot-usage)](https://github.com/SachiHarshitha/copilot-usage/blob/master/LICENSE)
 
 A **local-first** analytics dashboard that parses your VS Code Copilot chat session data and visualises token usage, premium request estimates, and model distribution — all without sending any data externally.
 
@@ -17,8 +17,8 @@ A **local-first** analytics dashboard that parses your VS Code Copilot chat sess
 
 I built this tool to make GitHub Copilot usage more transparent and actionable in real development work. Beyond showing token usage over time, it helps estimate and allocate AI costs at repository level — something that is difficult today when developers work across multiple systems in parallel. By turning persisted Copilot session data into a timeline tied to projects, the tool makes it easier to understand usage patterns, compare workflows, and assign clearer estimated costs to each repo.
 
-![Dashboard Overview](docs/images/dashboard.png)
-![Dashboard Charts](docs/images/dashboard_2.png)
+![Dashboard Overview](https://raw.githubusercontent.com/SachiHarshitha/copilot-usage/master/docs/images/dashboard.png)
+![Dashboard Charts](https://raw.githubusercontent.com/SachiHarshitha/copilot-usage/master/docs/images/dashboard_2.png)
 
 ## Features
 
@@ -34,6 +34,12 @@ I built this tool to make GitHub Copilot usage more transparent and actionable i
 ## Quick Start
 
 ### Install
+
+```bash
+pip install copilot-usage
+```
+
+Or from source:
 
 ```bash
 cd apps/cli
@@ -78,7 +84,7 @@ copilot-usage
 copilot-usage tui
 ```
 
-![CLI Dashboard](docs/images/cli.png)
+![CLI Dashboard](https://raw.githubusercontent.com/SachiHarshitha/copilot-usage/master/docs/images/cli.png)
 
 
 ## Web Dashboard
@@ -98,25 +104,25 @@ A dedicated search & filter page where you can:
 - **Sort** results by any column
 - Browse the full event-level detail
 
-![Explorer](docs/images/explorer.png)
+![Explorer](https://raw.githubusercontent.com/SachiHarshitha/copilot-usage/master/docs/images/explorer.png)
 
 ### Pipeline
 
 Run the data ingestion pipeline directly from the dashboard with a real-time console output.
 
-![Pipeline](docs/images/pipeline.png)
+![Pipeline](https://raw.githubusercontent.com/SachiHarshitha/copilot-usage/master/docs/images/pipeline.png)
 
 ### Badges
 
 Generate Shields.io-compatible JSON badges for your workspaces.
 
-![Badges](docs/images/badges.png)
+![Badges](https://raw.githubusercontent.com/SachiHarshitha/copilot-usage/master/docs/images/badges.png)
 
 ### Settings
 
 Manage appearance (dark/light theme toggle), view system info, and erase the database.
 
-![Settings](docs/images/settings.png)
+![Settings](https://raw.githubusercontent.com/SachiHarshitha/copilot-usage/master/docs/images/settings.png)
 
 ## How It Works
 
@@ -158,46 +164,6 @@ Premium request estimates use GitHub's published multiplier table:
 | O4-mini, Gemini 2.5 Pro, Claude Sonnet 4 Thinking | 1× |
 | Claude Opus 4.6, O3 | 3× |
 
-## Project Structure
-
-```
-copilot-usage/
-├─ apps/
-│  ├─ cli/                        # Python CLI + Dash dashboard (PyPI package)
-│  │  ├─ src/copilot_usage/
-│  │  │  ├── __main__.py         # CLI entrypoint (interactive + classic)
-│  │  │  ├── config.py           # Paths, model multipliers
-│  │  │  ├── db.py               # DuckDB schema & connection
-│  │  │  ├── discovery.py        # JSONL file discovery
-│  │  │  ├── parser.py           # JSONL parsing
-│  │  │  ├── ingest.py           # Event ingestion
-│  │  │  ├── aggregator.py       # Pre-aggregation
-│  │  │  ├── pipeline.py         # Scan orchestrator
-│  │  │  ├── badges.py           # Shields.io badge export
-│  │  │  ├── logging.py          # Loguru logging config
-│  │  │  ├── tui.py              # Textual terminal dashboard
-│  │  │  └── dashboard/
-│  │  │      ├── app.py          # Dash multi-page app
-│  │  │      ├── queries.py      # DB queries
-│  │  │      ├── assets/         # CSS & favicon
-│  │  │      └── pages/          # Overview, Explorer, Pipeline, Badges, Settings
-│  │  ├─ pyproject.toml
-│  │  └─ copilot-usage.spec
-│  └─ vscode-extension/           # VS Code extension
-│     ├─ src/                     # TypeScript source
-│     ├─ package.json
-│     └─ ...
-├─ packages/
-│  └─ shared-schema/              # (future) JSON schema, scoring rules
-├─ docs/
-├─ scripts/
-│  ├─ build.ps1                   # Build standalone executable
-│  ├─ build-vsix.ps1              # Build VS Code extension
-│  └─ release.ps1                 # Version bump + tag + push
-├─ .github/workflows/
-└─ README.md
-```
-
 ## Limitations
 
 Token counts shown by this tool are **estimates** and may not match GitHub's official billing figures. Key reasons:
@@ -219,45 +185,6 @@ Token counts shown by this tool are **estimates** and may not match GitHub's off
 - Python ≥ 3.10
 - VS Code with GitHub Copilot Chat extension
 
-## VS Code Extension
-
-A standalone VS Code extension is included under `apps/vscode-extension/`. It provides the same analytics directly inside the editor — no Python, no browser, no external server.
-
-- **Workspace View** — Token usage, model distribution, and daily chart scoped to the current project
-- **Global Dashboard** — Aggregated stats across all discovered workspaces with a workspaces breakdown table
-- **One-click navigation** — Switch between workspace and global views from the header buttons
-- **Status bar** — Quick token count always visible in the bottom bar
-
-![VS Code — Workspace View](docs/images/vscode_workspace.png)
-![VS Code — Global Dashboard](docs/images/vscode_global.png)
-
-### Install
-
-```bash
-cd apps/vscode-extension
-npm install
-npx @vscode/vsce package --allow-missing-repository --skip-license
-```
-
-Then install the generated `.vsix` via **Extensions → ··· → Install from VSIX**.
-
-### Troubleshooting: Numbers Not Showing
-
-If the status bar or dashboards show `No data`, `0`, or unexpectedly low numbers:
-
-1. Open the setting `github.copilot.chat.agentDebugLog.fileLogging.enabled`.
-2. Enable **GitHub › Copilot › Chat › Agent Debug Log › File Logging**.
-3. Reload VS Code (required for the setting to fully take effect).
-4. Run **Copilot Usage: Refresh Data**.
-5. Send at least one Copilot Chat request in the workspace, then refresh again.
-
-![Enable Copilot debug file logging](docs/images/vscode_setting.png)
-
-Notes:
-
-- The extension includes compatibility parsing for JSONL and legacy JSON sessions, but requests without token metadata may still be estimated from text.
-- If a legacy setting was previously enabled, use the command **Copilot Usage: Open Copilot Debug Log Setting** to verify the canonical setting shown above.
-
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE).
+Apache 2.0 — see [LICENSE](https://github.com/SachiHarshitha/copilot-usage/blob/master/LICENSE).

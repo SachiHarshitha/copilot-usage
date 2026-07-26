@@ -87,6 +87,8 @@ export class CostEstimatorPanel {
     if (key === 'extraBudgetUsd') {
       const n = Number(value);
       this.settings.extraBudgetUsd = Number.isFinite(n) && n >= 0 ? n : 0;
+    } else if (key === 'includeFlexAllowance') {
+      this.settings.includeFlexAllowance = value === true || value === 'true';
     } else if (key === 'selectedPlan' || key === 'billingModel' || key === 'selectedModelId') {
       (this.settings as unknown as Record<string, unknown>)[key] = String(value);
     } else {

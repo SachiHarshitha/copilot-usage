@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { MODEL_PRICING } from '../features/costEstimator/pricing/models';
+import { MODEL_PRICING, MODEL_PRICING_LIST } from '../features/costEstimator/pricing/models';
 
 suite('Cost Estimator: model pricing coverage', () => {
   test('includes expanded model set from GitHub pricing reference', () => {
@@ -30,6 +30,46 @@ suite('Cost Estimator: model pricing coverage', () => {
     assert.ok(MODEL_PRICING['grok-code-fast-1']);
     assert.ok(MODEL_PRICING['raptor-mini']);
     assert.ok(MODEL_PRICING['goldeneye']);
+  });
+
+  test('includes newly added models', () => {
+    assert.ok(MODEL_PRICING['claude-opus-4.8']);
+    assert.ok(MODEL_PRICING['claude-opus-4.8-fast']);
+    assert.ok(MODEL_PRICING['claude-fable-5']);
+    assert.ok(MODEL_PRICING['gemini-3.5-flash']);
+    assert.ok(MODEL_PRICING['mai-code-1-flash']);
+
+    // New Microsoft provider
+    assert.strictEqual(MODEL_PRICING['mai-code-1-flash'].provider, 'Microsoft');
+  });
+
+  test('marks retired models with status, date, and (where known) successor', () => {
+    const retired: Record<string, string | undefined> = {
+      'gpt-4.1': 'gpt-5.5',
+      'gpt-5.2': 'gpt-5.5',
+      'gpt-5.2-codex': 'gpt-5.3-codex',
+      'grok-code-fast-1': 'gpt-5-mini',
+      'claude-sonnet-4': 'claude-sonnet-4.6',
+      'goldeneye': undefined,
+    };
+    for (const [id, successor] of Object.entries(retired)) {
+      assert.strictEqual(MODEL_PRICING[id].releaseStatus, 'Retired', `${id} should be Retired`);
+      assert.ok(MODEL_PRICING[id].retiredDate, `${id} should have a retiredDate`);
+      if (successor) {
+        assert.strictEqual(MODEL_PRICING[id].successorId, successor, `${id} successor`);
+      }
+    }
+  });
+
+  test('raptor-mini is GA', () => {
+    assert.strictEqual(MODEL_PRICING['raptor-mini'].releaseStatus, 'GA');
+  });
+
+  test('MODEL_PRICING_LIST sorts retired models last', () => {
+    const firstRetiredIndex = MODEL_PRICING_LIST.findIndex(m => m.releaseStatus === 'Retired');
+    const lastActiveIndex = MODEL_PRICING_LIST.map(m => m.releaseStatus !== 'Retired')
+      .lastIndexOf(true);
+    assert.ok(firstRetiredIndex > lastActiveIndex, 'all active models should precede retired ones');
   });
 
   test('contains at least 20 billable model entries', () => {
