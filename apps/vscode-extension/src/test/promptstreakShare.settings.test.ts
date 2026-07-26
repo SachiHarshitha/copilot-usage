@@ -51,7 +51,7 @@ suite('PromptStreak Share: settings', () => {
         includeDailyBuckets: true,
         includeModelBreakdown: false,
         includeActionCounts: false,
-        includeRepoAttribution: false,
+        includeRepoAttribution: true,
       },
       promptstreakBaseUrl: 'https://promptstreak.dev',
     };
@@ -64,6 +64,26 @@ suite('PromptStreak Share: settings', () => {
     });
   });
 
+  test('loadShareSettings re-derives fields from the stored recipe', async () => {
+    const ctx = { globalState: new InMemoryMemento() };
+    // Simulate a device linked before public-repo attribution was enabled:
+    // persisted fields still carry the stale flags.
+    await ctx.globalState.update('promptstreakShare.settings.v1', {
+      ...DEFAULT_SHARE_SETTINGS,
+      recipe: 'standard' as ShareRecipe,
+      fields: {
+        includeDailyBuckets: true,
+        includeModelBreakdown: true,
+        includeActionCounts: true,
+        includeRepoAttribution: false,
+      },
+    });
+
+    const loaded = loadShareSettings(ctx as never);
+    assert.strictEqual(loaded.recipe, 'standard');
+    assert.strictEqual(loaded.fields.includeRepoAttribution, true);
+  });
+
   test('applyRecipe maps privacy_first to minimum-share field set', () => {
     const mapped = applyRecipe(DEFAULT_SHARE_SETTINGS, 'privacy_first');
     assert.strictEqual(mapped.recipe, 'privacy_first');
@@ -71,7 +91,7 @@ suite('PromptStreak Share: settings', () => {
       includeDailyBuckets: true,
       includeModelBreakdown: false,
       includeActionCounts: false,
-      includeRepoAttribution: false,
+      includeRepoAttribution: true,
     });
   });
 
@@ -82,7 +102,7 @@ suite('PromptStreak Share: settings', () => {
       includeDailyBuckets: true,
       includeModelBreakdown: true,
       includeActionCounts: true,
-      includeRepoAttribution: false,
+      includeRepoAttribution: true,
     });
   });
 

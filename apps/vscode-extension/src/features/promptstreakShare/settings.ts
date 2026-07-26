@@ -37,13 +37,13 @@ const RECIPE_FIELDS: Record<ShareRecipe, ShareFieldConfig> = {
     includeDailyBuckets: true,
     includeModelBreakdown: false,
     includeActionCounts: false,
-    includeRepoAttribution: false,
+    includeRepoAttribution: true,
   },
   standard: {
     includeDailyBuckets: true,
     includeModelBreakdown: true,
     includeActionCounts: true,
-    includeRepoAttribution: false,
+    includeRepoAttribution: true,
   },
   full: {
     includeDailyBuckets: true,
@@ -63,11 +63,10 @@ export const DEFAULT_SHARE_SETTINGS: PromptstreakShareSettings = {
   deviceAlias: '',
 };
 
-function mergeFields(raw?: Partial<ShareFieldConfig>): ShareFieldConfig {
-  return {
-    ...DEFAULT_SHARE_SETTINGS.fields,
-    ...(raw || {}),
-  };
+function resolveRecipe(raw?: ShareRecipe): ShareRecipe {
+  return raw === 'privacy_first' || raw === 'standard' || raw === 'full'
+    ? raw
+    : DEFAULT_SHARE_SETTINGS.recipe;
 }
 
 export function applyRecipe(
@@ -83,10 +82,16 @@ export function applyRecipe(
 
 export function loadShareSettings(ctx: ExtensionContext): PromptstreakShareSettings {
   const raw = ctx.globalState.get<Partial<PromptstreakShareSettings>>(KEY) || {};
+  const recipe = resolveRecipe(raw.recipe);
   return {
     ...DEFAULT_SHARE_SETTINGS,
     ...raw,
-    fields: mergeFields(raw.fields),
+    recipe,
+    // Fields are a projection of the recipe (the panel only edits them through
+    // recipe buttons), so always derive them. This also migrates already-linked
+    // users onto recipe changes such as public-repo attribution without
+    // requiring them to re-apply their recipe by hand.
+    fields: { ...RECIPE_FIELDS[recipe] },
     // Keep base URL pinned for the current staging rollout.
     promptstreakBaseUrl: PROMPTSTREAK_BASE_URL,
   };
