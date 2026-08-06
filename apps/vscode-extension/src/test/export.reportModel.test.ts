@@ -1,5 +1,12 @@
 import * as assert from 'assert';
-import { KpiTotals, ModelStats, WorkspaceStats, DailyStats } from '../core/types';
+import {
+  DailyStats,
+  KpiTotals,
+  MeteredDailyStat,
+  MeteredModelStat,
+  ModelStats,
+  WorkspaceStats,
+} from '../core/types';
 import { RepoAttributionStats } from '../core/repoAttribution';
 import {
   DashboardSnapshot,
@@ -66,6 +73,32 @@ function workspace(path: string, prompt: number, output: number): WorkspaceStats
     credits: 3,
     topModel: 'copilot/gpt-5',
   } as WorkspaceStats;
+}
+
+function meteredModel(modelId: string, rounds: number, input: number, output: number, cached: number, credits: number, coverage: number): MeteredModelStat {
+  return {
+    modelId,
+    rounds,
+    inputTokens: input,
+    outputTokens: output,
+    cachedTokens: cached,
+    credits,
+    roundsWithCredits: Math.round(rounds * coverage),
+    coverage,
+  };
+}
+
+function meteredDay(date: string, rounds: number, input: number, output: number, cached: number, credits: number, coverage: number): MeteredDailyStat {
+  return {
+    date,
+    rounds,
+    inputTokens: input,
+    outputTokens: output,
+    cachedTokens: cached,
+    credits,
+    roundsWithCredits: Math.round(rounds * coverage),
+    coverage,
+  };
 }
 
 const META = {
@@ -172,5 +205,63 @@ suite('Export: report model', () => {
 
     const report = buildReportModel(snapshot, { ...META, shortenWorkspacePaths: false });
     assert.strictEqual(report.workspaces[0].workspace, 'C:\\code\\alpha\\deep');
+  });
+
+  test('merges metered model stats into local rows and includes metered-only models', () => {
+    const snapshot: DashboardSnapshot = {
+      kpis: kpis({ sessionCount: 1 }),
+      models: [model('copilot/gpt-5', 100, 20, 2)],
+      workspaces: [],
+      repos: emptyRepos(),
+      daily: [],
+      meteredModels: [
+        meteredModel('copilot/gpt-5', 12, 500, 60, 300, 14.2, 1),
+        meteredModel('copilot/claude-opus-5', 6, 420, 40, 200, 9.5, 0.5),
+      ],
+    };
+
+    const report = buildReportModel(snapshot, META);
+    const gpt = report.models.find(m => m.model === 'gpt-5');
+    const claude = report.models.find(m => m.model === 'claude-opus-5');
+
+    assert.ok(gpt);
+    assert.strictEqual(gpt!.requests, 2);
+    assert.strictEqual(gpt!.meteredRounds, 12);
+    assert.strictEqual(gpt!.meteredInputTokens, 500);
+    assert.strictEqual(gpt!.meteredCredits, 14.2);
+    assert.strictEqual(gpt!.meteredCoveragePct, 100);
+
+    assert.ok(claude);
+    assert.strictEqual(claude!.requests, 0);
+    assert.strictEqual(claude!.promptTokens, 0);
+    assert.strictEqual(claude!.meteredRounds, 6);
+    assert.strictEqual(claude!.meteredCoveragePct, 50);
+  });
+
+  test('merges metered daily rows by date and preserves chronological order', () => {
+    const snapshot: DashboardSnapshot = {
+      kpis: kpis({ sessionCount: 1 }),
+      models: [],
+      workspaces: [],
+      repos: emptyRepos(),
+      daily: [day('2025-06-02', 200, 20)],
+      meteredDaily: [
+        meteredDay('2025-06-01', 3, 1000, 100, 600, 8.4, 1),
+        meteredDay('2025-06-02', 4, 1100, 120, 700, 9.1, 0.75),
+      ],
+    };
+
+    const report = buildReportModel(snapshot, META);
+    assert.strictEqual(report.daily.length, 2);
+    assert.strictEqual(report.daily[0].date.getDate(), 1);
+    assert.strictEqual(report.daily[1].date.getDate(), 2);
+
+    assert.strictEqual(report.daily[0].requests, 0);
+    assert.strictEqual(report.daily[0].meteredRounds, 3);
+    assert.strictEqual(report.daily[0].meteredCoveragePct, 100);
+
+    assert.strictEqual(report.daily[1].requests, 1);
+    assert.strictEqual(report.daily[1].meteredInputTokens, 1100);
+    assert.strictEqual(report.daily[1].meteredCoveragePct, 75);
   });
 });

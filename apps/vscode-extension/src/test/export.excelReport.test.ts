@@ -77,6 +77,13 @@ function lastRowOfRef(ref: string): number {
   return Number(ref.split(':')[1].replace(/[A-Z]+/, ''));
 }
 
+function chartParts(parts: Record<string, Uint8Array>): string[] {
+  return Object.keys(parts).filter(p => /^xl\/(?:drawings\/)?charts\/chart\d+\.xml$/.test(p));
+}
+
+/** The calculation chain is intentionally dropped: it indexes formulas the exporter moves. */
+const DROPPED_PARTS = ['xl/calcChain.xml'];
+
 suite('Export: workbook round trip', () => {
   test('the template resource ships with the extension', () => {
     assert.ok(fs.existsSync(TEMPLATE_PATH), `missing template at ${TEMPLATE_PATH}`);
@@ -88,8 +95,20 @@ suite('Export: workbook round trip', () => {
     const original = readXlsx(template);
 
     for (const part of Object.keys(original)) {
+      if (DROPPED_PARTS.includes(part)) {
+        assert.ok(!output[part], `${part} should have been dropped`);
+        continue;
+      }
       assert.ok(output[part], `output is missing part ${part}`);
     }
+  });
+
+  test('a dropped part leaves no dangling content type or relationship behind', () => {
+    const template = loadTemplate();
+    const parts = readXlsx(buildExcelReport(template, makeModel({ models: 2, repos: 2, workspaces: 2, daily: 5 })));
+
+    assert.ok(!decode(parts['[Content_Types].xml']).includes('calcChain'), 'calcChain content type still declared');
+    assert.ok(!decode(parts['xl/_rels/workbook.xml.rels']).includes('calcChain'), 'calcChain relationship still declared');
   });
 
   test('styles, theme and drawings are copied through byte for byte', () => {
@@ -100,8 +119,7 @@ suite('Export: workbook round trip', () => {
     const untouched = Object.keys(original).filter(part =>
       part === 'xl/styles.xml'
       || part.startsWith('xl/theme/')
-      || part.startsWith('xl/drawings/drawing')
-      || part === '[Content_Types].xml',
+      || part.startsWith('xl/drawings/drawing'),
     );
     assert.ok(untouched.length >= 3, 'expected styles, theme and at least one drawing');
 
@@ -119,7 +137,7 @@ suite('Export: workbook round trip', () => {
     const original = readXlsx(template);
     const output = readXlsx(buildExcelReport(template, makeModel({ models: 3, repos: 2, workspaces: 2, daily: 10 })));
 
-    const charts = Object.keys(original).filter(p => p.startsWith('xl/drawings/charts/chart') && p.endsWith('.xml'));
+    const charts = chartParts(original);
     assert.strictEqual(charts.length, 4, 'expected the template to define four charts');
 
     const stripRanges = (xml: string) => xml.replace(/\$[A-Z]+\$\d+:\$[A-Z]+\$\d+/g, '<range>');
@@ -172,9 +190,9 @@ suite('Export: workbook round trip', () => {
     const models = decode(parts['xl/worksheets/sheet2.xml']);
 
     // 3 data rows → rows 5-7, spacer on 8, total on 9.
-    assert.ok(/<x:row r="9"[\s\S]*?<x:f>/.test(models), 'no total row formula found');
+    assert.ok(/<(?:x:)?row r="9"[\s\S]*?<(?:x:)?f>/.test(models), 'no total row formula found');
     const totalRequests = 10 + 11 + 12;
-    assert.ok(models.includes(`<x:v>${totalRequests}</x:v>`), 'total row is not showing a cached sum');
+    assert.ok(new RegExp(`<(?:x:)?v>${totalRequests}</(?:x:)?v>`).test(models), 'total row is not showing a cached sum');
   });
 
   test('conditional formatting is extended to the last data row', () => {
@@ -182,7 +200,7 @@ suite('Export: workbook round trip', () => {
     const parts = readXlsx(buildExcelReport(template, makeModel({ models: 20, repos: 2, workspaces: 2, daily: 4 })));
     const models = decode(parts['xl/worksheets/sheet2.xml']);
 
-    const sqrefs = models.match(/<x:conditionalFormatting sqref="[A-Z]+\d+:[A-Z]+(\d+)"/g) ?? [];
+    const sqrefs = models.match(/<(?:x:)?conditionalFormatting sqref="[A-Z]+\d+:[A-Z]+(\d+)"/g) ?? [];
     assert.ok(sqrefs.length > 0, 'template no longer has conditional formatting on the Models sheet');
     for (const sqref of sqrefs) {
       assert.ok(sqref.endsWith('24"'), `conditional formatting was not extended: ${sqref}`);
@@ -196,12 +214,12 @@ suite('Export: workbook round trip', () => {
 
     const lastRow = 4 + dailyCount;
     const expectedStart = lastRow - DAILY_CHART_WINDOW + 1;
-    const chartXml = Object.keys(parts)
-      .filter(p => p.startsWith('xl/drawings/charts/chart'))
-      .map(p => decode(parts[p]))
-      .join('');
+    const chartXml = chartParts(parts).map(p => decode(parts[p])).join('');
 
-    assert.ok(chartXml.includes(`'DailyData'!$A$${expectedStart}:$A$${lastRow}`), 'daily chart window was not capped');
+    assert.ok(
+      new RegExp(`'?DailyData'?!\\$A\\$${expectedStart}:\\$A\\$${lastRow}`).test(chartXml),
+      'daily chart window was not capped',
+    );
     // The table itself keeps all rows.
     assert.strictEqual(lastRowOfRef(tableRef(parts, 'xl/tables/table4.xml')), lastRow);
   });
@@ -215,7 +233,7 @@ suite('Export: workbook round trip', () => {
     assert.ok(metadata.includes(REPORT_SCHEMA_VERSION), 'schema version missing');
     assert.ok(metadata.includes('Europe/Berlin (+02:00)'), 'timezone missing');
     assert.ok(metadata.includes('Shortened'), 'path policy missing');
-    assert.ok(metadata.includes('<x:v>42</x:v>'), 'session count missing');
+    assert.ok(new RegExp('<(?:x:)?v>42</(?:x:)?v>').test(metadata), 'session count missing');
   });
 
   test('the dashboard carries no stale cached formula results', () => {
@@ -223,7 +241,7 @@ suite('Export: workbook round trip', () => {
     const parts = readXlsx(buildExcelReport(template, makeModel({ models: 2, repos: 2, workspaces: 2, daily: 5 })));
     const dashboard = decode(parts['xl/worksheets/sheet1.xml']);
 
-    assert.ok(!/<\/x:f><x:v>/.test(dashboard), 'a dashboard formula still carries a cached value');
+    assert.ok(!/<\/(?:x:)?f><(?:x:)?v>/.test(dashboard), 'a dashboard formula still carries a cached value');
     assert.ok(dashboard.includes('Range: all'), 'the dashboard subtitle was not written');
   });
 
@@ -239,5 +257,50 @@ suite('Export: workbook round trip', () => {
     const models = decode(parts['xl/worksheets/sheet2.xml']);
     assert.ok(models.includes('model-0 &amp; co'), 'ampersand was not escaped');
     assert.ok(!models.includes('model-0 & co'), 'raw ampersand leaked into the sheet');
+  });
+
+  test('writes metered columns into existing Models and DailyData sheets', () => {
+    const template = loadTemplate();
+    const report = makeModel({ models: 1, repos: 1, workspaces: 1, daily: 1 });
+    report.models[0].meteredRounds = 9;
+    report.models[0].meteredInputTokens = 1000;
+    report.models[0].meteredOutputTokens = 120;
+    report.models[0].meteredCachedTokens = 800;
+    report.models[0].meteredCredits = 12.5;
+    report.models[0].meteredCoveragePct = 100;
+
+    report.daily[0].meteredRounds = 3;
+    report.daily[0].meteredInputTokens = 220;
+    report.daily[0].meteredOutputTokens = 44;
+    report.daily[0].meteredCachedTokens = 100;
+    report.daily[0].meteredCredits = 2.5;
+    report.daily[0].meteredCoveragePct = 66.7;
+
+    const parts = readXlsx(buildExcelReport(template, report));
+    const models = decode(parts['xl/worksheets/sheet2.xml']);
+    const daily = decode(parts['xl/worksheets/sheet5.xml']);
+
+    assert.ok(models.includes('Metered Rounds'), 'models metered header missing');
+    assert.ok(models.includes('Metered Coverage %'), 'models metered coverage header missing');
+    assert.ok(models.includes('r="I5"'), 'models metered rounds column missing');
+    assert.ok(models.includes('r="N5"'), 'models metered coverage column missing');
+
+    assert.ok(daily.includes('Metered Rounds'), 'daily metered header missing');
+    assert.ok(daily.includes('r="I5"'), 'daily metered rounds column missing');
+    assert.ok(daily.includes('r="N5"'), 'daily metered coverage column missing');
+  });
+
+  test('metered columns stay empty when no metered data was collected', () => {
+    const template = loadTemplate();
+    const parts = readXlsx(buildExcelReport(template, makeModel({ models: 2, repos: 1, workspaces: 1, daily: 2 })));
+
+    for (const sheet of ['xl/worksheets/sheet2.xml', 'xl/worksheets/sheet5.xml']) {
+      const xml = decode(parts[sheet]);
+      for (const ref of ['I5', 'J5', 'K5', 'L5', 'M5', 'N5']) {
+        const cell = xml.match(new RegExp(`<(?:x:)?c r="${ref}"(?:[^>]*\\/>|[^>]*>[\\s\\S]*?<\\/(?:x:)?c>)`));
+        assert.ok(cell, `${sheet} is missing cell ${ref}`);
+        assert.ok(cell![0].endsWith('/>'), `${sheet} leaked template sample data into ${ref}: ${cell![0]}`);
+      }
+    }
   });
 });

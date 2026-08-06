@@ -1,6 +1,6 @@
 import * as assert from 'assert';
-import { buildUsageEstimate } from '../features/costEstimator/calc/usage';
-import { RequestEvent } from '../core/types';
+import { buildMeteredUsageEstimate, buildUsageEstimate } from '../features/costEstimator/calc/usage';
+import { MeteredRound, RequestEvent } from '../core/types';
 
 function ev(timestampMs: number, prompt: number, output: number): RequestEvent {
   return {
@@ -11,6 +11,19 @@ function ev(timestampMs: number, prompt: number, output: number): RequestEvent {
     toolCallRounds: 0,
     tokensEstimated: false,
     timestampMs,
+  };
+}
+
+function meteredRound(timestampMs: number, input: number, output: number, cached: number): MeteredRound {
+  return {
+    chatSessionId: 'metered-session',
+    workspaceId: 'ws',
+    timestampMs,
+    inputTokens: input,
+    outputTokens: output,
+    cachedTokens: cached,
+    credits: 1,
+    hasCredits: true,
   };
 }
 
@@ -76,5 +89,28 @@ suite('Cost Estimator: buildUsageEstimate', () => {
     const u = buildUsageEstimate(events, 'all_time', NOW);
     assert.strictEqual(u.daysInRange, 50);
     assert.strictEqual(u.rangeEnd, new Date(NOW - 450 * DAY).toISOString().slice(0, 10));
+  });
+
+  test('Metered mode excludes cached tokens from input to avoid double-counting', () => {
+    const rounds = [meteredRound(NOW - 1 * DAY, 1_000_000, 250_000, 200_000)];
+    const u = buildMeteredUsageEstimate(rounds, 'last_7_days', NOW);
+
+    // inputTokens in debug logs include cachedTokens, so observed input should be net non-cached.
+    assert.strictEqual(u.observedInputTokens, 800_000);
+    assert.strictEqual(u.observedCachedInputTokens, 200_000);
+    assert.strictEqual(u.observedOutputTokens, 250_000);
+    assert.ok(Math.abs(u.monthlyInputTokens - 3_428_571) <= 1);
+  });
+
+  test('Metered all_time uses observed metered span', () => {
+    const rounds = [
+      meteredRound(NOW - 40 * DAY, 1000, 100, 50),
+      meteredRound(NOW - 10 * DAY, 2000, 200, 100),
+    ];
+    const u = buildMeteredUsageEstimate(rounds, 'all_time', NOW);
+
+    assert.strictEqual(u.daysInRange, 30);
+    assert.strictEqual(u.rangeStart, new Date(NOW - 40 * DAY).toISOString().slice(0, 10));
+    assert.strictEqual(u.rangeEnd, new Date(NOW - 10 * DAY).toISOString().slice(0, 10));
   });
 });

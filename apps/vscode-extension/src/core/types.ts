@@ -37,6 +37,7 @@ export interface WorkspaceInfo {
   workspacePath: string;
   referencedFolders?: string[];  // folder paths listed in a multi-root workspace.json
   sessionFiles: string[];  // absolute paths
+  debugLogFiles?: string[];  // absolute paths to GitHub.copilot-chat/debug-logs/*/main.jsonl
 }
 
 export interface KpiTotals {
@@ -80,4 +81,75 @@ export interface DailyStats {
   premium: number;
   credits: number;
   sessions: number;       // distinct chat sessions active on this date
+}
+
+export interface MeteredRound {
+  chatSessionId: string;
+  workspaceId: string;
+  modelId?: string;
+  timestampMs?: number;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  credits: number;
+  hasCredits: boolean;
+}
+
+export interface MeteredParsedFile {
+  sourcePath: string;
+  workspaceId: string;
+  chatSessionId: string;
+  copilotVersion?: string;
+  rounds: MeteredRound[];
+  userMessages: number;
+}
+
+export interface MeteredTotals {
+  rounds: number;
+  userMessages: number;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  credits: number;
+  roundsWithCredits: number;
+  coverage: number;
+  copilotVersions: string[];
+}
+
+export interface MeteredModelStat {
+  modelId: string;
+  rounds: number;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  credits: number;
+  roundsWithCredits: number;
+  coverage: number;
+}
+
+export interface MeteredDailyStat {
+  date: string;
+  rounds: number;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  credits: number;
+  roundsWithCredits: number;
+  coverage: number;
+}
+
+export type MeteredConfidence = 'exact' | 'partial' | 'unavailable';
+
+export interface ReconciliationStats {
+  visibleRequests: number;
+  meteredRounds: number;
+  roundsPerRequest: number;
+  visibleTokens: number;
+  meteredTokens: number;
+  tokenAmplification: number;
+  estimatedCredits: number;
+  meteredCredits: number;
+  creditDelta: number;
+  coverage: number;
+  confidence: MeteredConfidence;
 }

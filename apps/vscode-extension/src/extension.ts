@@ -59,7 +59,8 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}));
 
-	// Watch the actual VS Code workspaceStorage directories for chat session changes.
+	// Watch the actual VS Code workspaceStorage directories for usage-source changes
+	// (chat sessions + debug logs).
 	// createFileSystemWatcher with RelativePattern(absolute path) works outside
 	// the current workspace — this is the correct way to watch AppData files.
 	// One watcher pair per storage root (stable + Insiders when present).
@@ -72,16 +73,23 @@ export function activate(context: vscode.ExtensionContext) {
 		const watcherJson = vscode.workspace.createFileSystemWatcher(
 			new vscode.RelativePattern(vscode.Uri.file(storageRoot), '**/chatSessions/*.json'),
 		);
+		const watcherDebugMain = vscode.workspace.createFileSystemWatcher(
+			new vscode.RelativePattern(vscode.Uri.file(storageRoot), '**/GitHub.copilot-chat/debug-logs/*/main.jsonl'),
+		);
 
 		context.subscriptions.push(
 			watcherJsonl,
 			watcherJson,
+			watcherDebugMain,
 			watcherJsonl.onDidCreate(onSessionFilesChanged),
 			watcherJsonl.onDidChange(onSessionFilesChanged),
 			watcherJsonl.onDidDelete(onSessionFilesChanged),
 			watcherJson.onDidCreate(onSessionFilesChanged),
 			watcherJson.onDidChange(onSessionFilesChanged),
 			watcherJson.onDidDelete(onSessionFilesChanged),
+			watcherDebugMain.onDidCreate(onSessionFilesChanged),
+			watcherDebugMain.onDidChange(onSessionFilesChanged),
+			watcherDebugMain.onDidDelete(onSessionFilesChanged),
 		);
 	}
 

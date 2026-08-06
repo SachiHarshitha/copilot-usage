@@ -93,7 +93,61 @@ async function resolveWorkspace(workspaceDir: string): Promise<{ id: string; pat
   return { id, path: wsPath, referencedFolders };
 }
 
-/** Discover all workspaces that have chatSessions with JSONL or JSON files. */
+async function discoverSessionFiles(workspaceDir: string): Promise<string[]> {
+  const sessionsDir = path.join(workspaceDir, 'chatSessions');
+  try {
+    const stat = await fs.stat(sessionsDir);
+    if (!stat.isDirectory()) {
+      return [];
+    }
+  } catch {
+    return [];
+  }
+
+  const files: string[] = [];
+  try {
+    for (const fileName of await fs.readdir(sessionsDir)) {
+      const ext = path.extname(fileName).toLowerCase();
+      if (ext === '.jsonl' || ext === '.json') {
+        files.push(path.join(sessionsDir, fileName));
+      }
+    }
+  } catch {
+    return [];
+  }
+  return files;
+}
+
+/** Discover all debug-log main JSONL files under one workspace storage directory. */
+export async function discoverDebugLogFiles(workspaceDir: string): Promise<string[]> {
+  const debugLogsRoot = path.join(workspaceDir, 'GitHub.copilot-chat', 'debug-logs');
+  let sessionDirs: string[];
+  try {
+    const stat = await fs.stat(debugLogsRoot);
+    if (!stat.isDirectory()) {
+      return [];
+    }
+    sessionDirs = await fs.readdir(debugLogsRoot);
+  } catch {
+    return [];
+  }
+
+  const files: string[] = [];
+  for (const sessionDir of sessionDirs) {
+    const candidate = path.join(debugLogsRoot, sessionDir, 'main.jsonl');
+    try {
+      const stat = await fs.stat(candidate);
+      if (stat.isFile()) {
+        files.push(candidate);
+      }
+    } catch {
+      // Session folder without a main log yet — ignore.
+    }
+  }
+  return files;
+}
+
+/** Discover all workspaces that have chatSessions and/or Copilot debug logs. */
 export async function discoverWorkspaces(
   storageRoots?: string[],
 ): Promise<WorkspaceInfo[]> {
@@ -110,35 +164,23 @@ export async function discoverWorkspaces(
 
     for (const dirName of dirs) {
       const wsDir = path.join(root, dirName);
-      const sessionsDir = path.join(wsDir, 'chatSessions');
-      try {
-        const stat = await fs.stat(sessionsDir);
-        if (!stat.isDirectory()) { continue; }
-      } catch {
+      const [sessionFiles, debugLogFiles] = await Promise.all([
+        discoverSessionFiles(wsDir),
+        discoverDebugLogFiles(wsDir),
+      ]);
+
+      if (sessionFiles.length === 0 && debugLogFiles.length === 0) {
         continue;
       }
 
       const ws = await resolveWorkspace(wsDir);
-      const files: string[] = [];
-      try {
-        for (const f of await fs.readdir(sessionsDir)) {
-          const ext = path.extname(f).toLowerCase();
-          if (ext === '.jsonl' || ext === '.json') {
-            files.push(path.join(sessionsDir, f));
-          }
-        }
-      } catch {
-        continue;
-      }
-
-      if (files.length > 0) {
-        results.push({
-          workspaceId: ws.id,
-          workspacePath: ws.path,
-          referencedFolders: ws.referencedFolders,
-          sessionFiles: files,
-        });
-      }
+      results.push({
+        workspaceId: ws.id,
+        workspacePath: ws.path,
+        referencedFolders: ws.referencedFolders,
+        sessionFiles,
+        debugLogFiles,
+      });
     }
   }
 
@@ -150,6 +192,9 @@ export async function discoverWorkspaces(
     const existing = merged.get(ws.workspaceId);
     if (existing) {
       existing.sessionFiles = [...new Set([...existing.sessionFiles, ...ws.sessionFiles])];
+      existing.debugLogFiles = [
+        ...new Set([...(existing.debugLogFiles ?? []), ...(ws.debugLogFiles ?? [])]),
+      ];
       if (!existing.workspacePath && ws.workspacePath) {
         existing.workspacePath = ws.workspacePath;
       }
@@ -169,7 +214,7 @@ export async function discoverWorkspaces(
 }
 
 /**
- * Compute a lightweight signature of tracked chat session files.
+ * Compute a lightweight signature of tracked usage source files.
  *
  * Used as a polling fallback when file watchers miss events. The signature
  * changes when the number of tracked files changes, file sizes change, or
@@ -206,6 +251,29 @@ export async function computeChatSessionsSignature(storageRoots?: string[]): Pro
 
         try {
           const stat = await fs.stat(path.join(sessionsDir, fileName));
+          if (!stat.isFile()) { continue; }
+
+          fileCount++;
+          totalBytes += stat.size;
+          const mtimeMs = Number(stat.mtimeMs) || 0;
+          if (mtimeMs > newestMtimeMs) { newestMtimeMs = mtimeMs; }
+        } catch {
+          // File may disappear during scan; safe to ignore.
+        }
+      }
+
+      const debugLogsDir = path.join(root, dirName, 'GitHub.copilot-chat', 'debug-logs');
+      let debugSessions: string[];
+      try {
+        debugSessions = await fs.readdir(debugLogsDir);
+      } catch {
+        continue;
+      }
+
+      for (const debugSession of debugSessions) {
+        const debugMain = path.join(debugLogsDir, debugSession, 'main.jsonl');
+        try {
+          const stat = await fs.stat(debugMain);
           if (!stat.isFile()) { continue; }
 
           fileCount++;

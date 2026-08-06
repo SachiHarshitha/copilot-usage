@@ -1,7 +1,7 @@
 /** Build a UsageEstimate by aggregating RequestEvent[] over a date range and
  *  normalizing observed tokens to a 30-day monthly projection. */
 
-import { RequestEvent } from '../../../core/types';
+import { MeteredRound, RequestEvent } from '../../../core/types';
 import { CostRangeKey, UsageEstimate } from '../types';
 import { ESTIMATION_MONTH_DAYS } from '../pricing/metadata';
 
@@ -14,7 +14,19 @@ export interface RangeBounds {
   rangeLabel: string;
 }
 
+interface Timestamped {
+  timestampMs?: number;
+}
+
 export function rangeBoundsFor(range: CostRangeKey, events: RequestEvent[], now = Date.now()): RangeBounds {
+  return rangeBoundsForTimestamped(range, events, now);
+}
+
+export function rangeBoundsForMetered(range: CostRangeKey, rounds: MeteredRound[], now = Date.now()): RangeBounds {
+  return rangeBoundsForTimestamped(range, rounds, now);
+}
+
+function rangeBoundsForTimestamped(range: CostRangeKey, rows: Timestamped[], now = Date.now()): RangeBounds {
   switch (range) {
     case 'last_7_days':
       return { startMs: now - 7 * DAY_MS, endMs: now, daysInRange: 7, rangeLabel: 'Last 7 days' };
@@ -25,13 +37,13 @@ export function rangeBoundsFor(range: CostRangeKey, events: RequestEvent[], now 
     case 'all_time': {
       let earliest: number | undefined;
       let latest: number | undefined;
-      for (const e of events) {
-        if (typeof e.timestampMs !== 'number') { continue; }
-        if (earliest === undefined || e.timestampMs < earliest) {
-          earliest = e.timestampMs;
+      for (const row of rows) {
+        if (typeof row.timestampMs !== 'number') { continue; }
+        if (earliest === undefined || row.timestampMs < earliest) {
+          earliest = row.timestampMs;
         }
-        if (latest === undefined || e.timestampMs > latest) {
-          latest = e.timestampMs;
+        if (latest === undefined || row.timestampMs > latest) {
+          latest = row.timestampMs;
         }
       }
 
@@ -87,6 +99,55 @@ export function buildUsageEstimate(
     monthlyInputTokens: Math.round(observedInputTokens * scale),
     monthlyOutputTokens: Math.round(observedOutputTokens * scale),
     monthlyCachedInputTokens: undefined,
+    monthlyCacheWriteTokens: undefined,
+
+    dataCompleteness: count === 0 ? 'missing_cache_data' : 'partial',
+  };
+}
+
+export function buildMeteredUsageEstimate(
+  rounds: MeteredRound[],
+  range: CostRangeKey,
+  now: number = Date.now(),
+): UsageEstimate {
+  const bounds = rangeBoundsForMetered(range, rounds, now);
+
+  let observedInputTokensInclusive = 0;
+  let observedOutputTokens = 0;
+  let observedCachedInputTokens = 0;
+  let count = 0;
+
+  for (const round of rounds) {
+    if (typeof round.timestampMs !== 'number') { continue; }
+    if (round.timestampMs < bounds.startMs || round.timestampMs > bounds.endMs) { continue; }
+
+    observedInputTokensInclusive += round.inputTokens || 0;
+    observedOutputTokens += round.outputTokens || 0;
+    observedCachedInputTokens += round.cachedTokens || 0;
+    count++;
+  }
+
+  // Debug logs report inputTokens inclusive of cachedTokens, so compute
+  // billable non-cached input for pricing and keep cached tokens separate.
+  const observedInputTokens = Math.max(0, observedInputTokensInclusive - observedCachedInputTokens);
+
+  const days = Math.max(1, bounds.daysInRange);
+  const scale = ESTIMATION_MONTH_DAYS / days;
+
+  return {
+    rangeLabel: bounds.rangeLabel,
+    rangeStart: isoDate(bounds.startMs),
+    rangeEnd: isoDate(bounds.endMs),
+    daysInRange: bounds.daysInRange,
+
+    observedInputTokens,
+    observedOutputTokens,
+    observedCachedInputTokens,
+    observedCacheWriteTokens: undefined,
+
+    monthlyInputTokens: Math.round(observedInputTokens * scale),
+    monthlyOutputTokens: Math.round(observedOutputTokens * scale),
+    monthlyCachedInputTokens: Math.round(observedCachedInputTokens * scale),
     monthlyCacheWriteTokens: undefined,
 
     dataCompleteness: count === 0 ? 'missing_cache_data' : 'partial',

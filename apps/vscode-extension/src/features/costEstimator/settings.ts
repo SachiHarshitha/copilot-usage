@@ -11,6 +11,7 @@ export const DEFAULT_SETTINGS: CostEstimatorSettings = {
   extraBudgetUsd: 0,
   selectedModelId: 'claude-sonnet-4.6',
   defaultRange: 'last_30_days',
+  usageSource: 'local',
   includeFlexAllowance: true,
 };
 

@@ -200,4 +200,27 @@ suite('Discovery: merged workspace entries across roots', () => {
       await fs.rm(tempRoot, { recursive: true, force: true });
     }
   });
+
+  test('keeps a workspace when debug logs exist but chatSessions is missing', async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'copilot-usage-discovery-debug-only-'));
+    try {
+      const storageRoot = path.join(tempRoot, 'workspaceStorage');
+      await fs.mkdir(storageRoot, { recursive: true });
+
+      const wsId = 'debug-only-workspace-id';
+      const wsDir = path.join(storageRoot, wsId);
+      const debugSessionDir = path.join(wsDir, 'GitHub.copilot-chat', 'debug-logs', 'session-1');
+      await fs.mkdir(debugSessionDir, { recursive: true });
+      await fs.writeFile(path.join(debugSessionDir, 'main.jsonl'), '{"type":"llm_request","ts":1,"attrs":{"model":"claude-opus-5","inputTokens":1,"outputTokens":1}}\n', 'utf-8');
+
+      const workspaces = await discoverWorkspaces([storageRoot]);
+      const match = workspaces.find(w => w.workspaceId === wsId);
+      assert.ok(match, 'workspace with debug logs should be discoverable');
+      assert.strictEqual(match?.sessionFiles.length ?? 0, 0, 'no chat session files should be present');
+      assert.strictEqual(match?.debugLogFiles?.length ?? 0, 1, 'debug log files should be collected');
+      assert.ok(match?.debugLogFiles?.[0].endsWith(path.join('session-1', 'main.jsonl')));
+    } finally {
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
 });

@@ -6,7 +6,16 @@
  * so the spreadsheet can never disagree with the screen.
  */
 
-import { KpiTotals, ModelStats, WorkspaceStats, DailyStats } from '../core/types';
+import {
+  DailyStats,
+  KpiTotals,
+  MeteredDailyStat,
+  MeteredModelStat,
+  MeteredTotals,
+  ModelStats,
+  ReconciliationStats,
+  WorkspaceStats,
+} from '../core/types';
 import { RepoAttributionStats } from '../core/repoAttribution';
 
 export interface ReportMetaInput {
@@ -32,6 +41,12 @@ export interface ReportModelRow {
   outputTokens: number;
   premiumUnits: number;
   credits: number;
+  meteredRounds?: number;
+  meteredInputTokens?: number;
+  meteredOutputTokens?: number;
+  meteredCachedTokens?: number;
+  meteredCredits?: number;
+  meteredCoveragePct?: number;
 }
 
 export interface ReportRepoRow {
@@ -63,6 +78,12 @@ export interface ReportDailyRow {
   premiumUnits: number;
   credits: number;
   sessions: number;
+  meteredRounds?: number;
+  meteredInputTokens?: number;
+  meteredOutputTokens?: number;
+  meteredCachedTokens?: number;
+  meteredCredits?: number;
+  meteredCoveragePct?: number;
 }
 
 export interface ReportModel {
@@ -81,6 +102,10 @@ export interface DashboardSnapshot {
   workspaces: WorkspaceStats[];
   repos: RepoAttributionStats;
   daily: DailyStats[];
+  metered?: MeteredTotals;
+  meteredModels?: MeteredModelStat[];
+  meteredDaily?: MeteredDailyStat[];
+  reconciliation?: ReconciliationStats;
 }
 
 /** `…/parent/leaf` — the privacy default, matching how the dashboard displays paths. */
@@ -106,30 +131,99 @@ function parseDayKey(key: string): Date {
   return new Date(year, month - 1, day);
 }
 
-export function buildReportModel(snapshot: DashboardSnapshot, meta: ReportMetaInput): ReportModel {
-  const daily: ReportDailyRow[] = snapshot.daily
-    .map(d => ({
-      date: parseDayKey(d.date),
-      requests: d.requests,
-      promptTokens: d.promptTokens,
-      outputTokens: d.outputTokens,
-      toolRounds: d.toolCallRounds,
-      premiumUnits: d.premium,
-      credits: d.credits,
-      sessions: d.sessions,
-    }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+function normalizeModelKey(value: string): string {
+  return value.replace(/^copilot\//, '').trim().toLowerCase();
+}
 
-  const models: ReportModelRow[] = snapshot.models
-    .map(m => ({
-      model: m.modelId.replace(/^copilot\//, ''),
-      requests: m.requests,
-      promptTokens: m.promptTokens,
-      outputTokens: m.outputTokens,
-      premiumUnits: m.premium,
-      credits: m.credits,
-    }))
-    .sort((a, b) => (b.promptTokens + b.outputTokens) - (a.promptTokens + a.outputTokens));
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+export function buildReportModel(snapshot: DashboardSnapshot, meta: ReportMetaInput): ReportModel {
+  const localModels = snapshot.models.map(m => ({
+    model: m.modelId.replace(/^copilot\//, ''),
+    requests: m.requests,
+    promptTokens: m.promptTokens,
+    outputTokens: m.outputTokens,
+    premiumUnits: m.premium,
+    credits: m.credits,
+  }));
+
+  const localModelsByKey = new Map(localModels.map(m => [normalizeModelKey(m.model), m]));
+  const meteredModelsByKey = new Map(
+    (snapshot.meteredModels || []).map(m => [normalizeModelKey(m.modelId), m]),
+  );
+
+  const modelKeys = new Set<string>([
+    ...localModelsByKey.keys(),
+    ...meteredModelsByKey.keys(),
+  ]);
+
+  const models: ReportModelRow[] = [...modelKeys].map((key) => {
+    const local = localModelsByKey.get(key);
+    const metered = meteredModelsByKey.get(key);
+
+    return {
+      model: local?.model || key,
+      requests: local?.requests ?? 0,
+      promptTokens: local?.promptTokens ?? 0,
+      outputTokens: local?.outputTokens ?? 0,
+      premiumUnits: local?.premiumUnits ?? 0,
+      credits: local?.credits ?? 0,
+      meteredRounds: metered?.rounds,
+      meteredInputTokens: metered?.inputTokens,
+      meteredOutputTokens: metered?.outputTokens,
+      meteredCachedTokens: metered?.cachedTokens,
+      meteredCredits: metered?.credits,
+      meteredCoveragePct: metered ? round1(metered.coverage * 100) : undefined,
+    };
+  }).sort((a, b) => {
+    const aLocalTokens = a.promptTokens + a.outputTokens;
+    const bLocalTokens = b.promptTokens + b.outputTokens;
+    if (bLocalTokens !== aLocalTokens) {
+      return bLocalTokens - aLocalTokens;
+    }
+
+    const aMeteredTokens = (a.meteredInputTokens ?? 0) + (a.meteredOutputTokens ?? 0);
+    const bMeteredTokens = (b.meteredInputTokens ?? 0) + (b.meteredOutputTokens ?? 0);
+    if (bMeteredTokens !== aMeteredTokens) {
+      return bMeteredTokens - aMeteredTokens;
+    }
+
+    return a.model.localeCompare(b.model);
+  });
+
+  const localDailyByDate = new Map(snapshot.daily.map(d => [d.date, d]));
+  const meteredDailyByDate = new Map((snapshot.meteredDaily || []).map(d => [d.date, d]));
+  const dailyKeys = new Set<string>([
+    ...localDailyByDate.keys(),
+    ...meteredDailyByDate.keys(),
+  ]);
+
+  const daily: ReportDailyRow[] = [...dailyKeys]
+    .sort((a, b) => a.localeCompare(b))
+    .map((dateKey) => {
+      const local = localDailyByDate.get(dateKey);
+      const metered = meteredDailyByDate.get(dateKey);
+
+      return {
+        date: parseDayKey(dateKey),
+        requests: local?.requests ?? 0,
+        promptTokens: local?.promptTokens ?? 0,
+        outputTokens: local?.outputTokens ?? 0,
+        toolRounds: local?.toolCallRounds ?? 0,
+        premiumUnits: local?.premium ?? 0,
+        credits: local?.credits ?? 0,
+        sessions: local?.sessions ?? 0,
+        meteredRounds: metered?.rounds,
+        meteredInputTokens: metered?.inputTokens,
+        meteredOutputTokens: metered?.outputTokens,
+        meteredCachedTokens: metered?.cachedTokens,
+        meteredCredits: metered?.credits,
+        meteredCoveragePct: metered ? round1(metered.coverage * 100) : undefined,
+      };
+    })
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const repos: ReportRepoRow[] = snapshot.repos.rows
     .map(r => ({

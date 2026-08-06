@@ -24,6 +24,7 @@ function settings(partial: Partial<CostEstimatorSettings>): CostEstimatorSetting
     extraBudgetUsd: 0,
     selectedModelId: 'claude-sonnet-4.6',
     defaultRange: 'last_30_days',
+    usageSource: 'local',
     includeFlexAllowance: true,
     ...partial,
   };

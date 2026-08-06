@@ -127,12 +127,26 @@ export interface PlanImpactEstimate {
 
 export type CostRangeKey = 'last_7_days' | 'last_30_days' | 'last_3_months' | 'all_time';
 
+export type CostUsageSource = 'local' | 'metered';
+
+export type MeteredAvailabilityConfidence = 'exact' | 'partial' | 'unavailable';
+
+export interface MeteredModeStatus {
+  available: boolean;
+  rounds: number;
+  userMessages: number;
+  coverage: number;
+  confidence: MeteredAvailabilityConfidence;
+  note?: string;
+}
+
 export interface CostEstimatorSettings {
   selectedPlan: CopilotPlan;
   billingModel: CopilotBillingModel;
   extraBudgetUsd: number;
   selectedModelId: string;
   defaultRange: CostRangeKey;
+  usageSource: CostUsageSource;
   /** Include the flex allotment on top of base credits in the included allowance. */
   includeFlexAllowance: boolean;
 }

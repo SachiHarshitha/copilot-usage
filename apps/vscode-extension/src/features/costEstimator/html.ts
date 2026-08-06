@@ -10,7 +10,9 @@ import {
   CandidatePortfolio,
   CostEstimate,
   CostEstimatorSettings,
+  CostUsageSource,
   CostRangeKey,
+  MeteredModeStatus,
   PlanImpactEstimate,
   ProviderDecisionSurface,
   TrendInsight,
@@ -23,6 +25,8 @@ import { PRICING_METADATA } from './pricing/metadata';
 export interface CostEstimatorViewState {
   settings: CostEstimatorSettings;
   usage: UsageEstimate;
+  usageSource: CostUsageSource;
+  meteredStatus?: MeteredModeStatus;
   selectedCost: CostEstimate;
   comparisonCosts: CostEstimate[];
   planImpact: PlanImpactEstimate;
@@ -56,12 +60,18 @@ const BILLINGS: { v: string; l: string }[] = [
   { v: 'organization_managed', l: 'Organization-managed' },
 ];
 
+const USAGE_SOURCES: { v: CostUsageSource; l: string }[] = [
+  { v: 'local', l: 'Local counts (chatSessions)' },
+  { v: 'metered', l: 'Metered mode (debug logs)' },
+];
+
 export function getCostEstimatorHtml(state: CostEstimatorViewState): string {
   const s = state.settings;
   const u = state.usage;
   const c = state.selectedCost;
   const p = state.planImpact;
   const observedWindowSub = observedWindowSubtitle(u);
+  const isMeteredMode = state.usageSource === 'metered';
 
   const noData = !state.hasAnyData;
 
@@ -73,6 +83,9 @@ export function getCostEstimatorHtml(state: CostEstimatorViewState): string {
 
   const billingOptions = BILLINGS.map(o =>
     `<option value="${o.v}"${o.v === s.billingModel ? ' selected' : ''}>${esc(o.l)}</option>`).join('');
+
+  const usageSourceOptions = USAGE_SOURCES.map(o =>
+    `<option value="${o.v}"${o.v === state.usageSource ? ' selected' : ''}>${esc(o.l)}</option>`).join('');
 
   const modelOptions = MODEL_PRICING_LIST.map(m =>
     `<option value="${m.id}"${m.id === s.selectedModelId ? ' selected' : ''}>${esc(m.displayName)}</option>`).join('');
@@ -100,8 +113,10 @@ export function getCostEstimatorHtml(state: CostEstimatorViewState): string {
     : `<div class="trend muted">📈 Trend insight needs at least 30 days of session data.</div>`;
 
   const noDataBanner = noData
-    ? `<div class="warn-banner">No Copilot session data found yet. Use the model comparison table below to explore typical pricing for sample workloads, then come back after you\u2019ve used Copilot for a few days for personalized estimates.</div>`
+    ? `<div class="warn-banner">${esc(noDataMessageForSource(state.usageSource))}</div>`
     : '';
+
+  const sourceModeHtml = renderUsageSourceMessage(state.usageSource, state.meteredStatus);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -143,6 +158,12 @@ ${commonStyles()}
   .warnings { margin-bottom: 14px; }
   .warn { background: rgba(245,158,11,0.08); border-left: 3px solid #f59e0b; padding: 8px 12px; margin-bottom: 6px; border-radius: 4px; font-size: 0.9em; line-height: 1.55; }
   .warn-banner { background: rgba(56,189,248,0.08); border-left: 3px solid #38bdf8; padding: 10px 14px; margin-bottom: 14px; border-radius: 4px; font-size: 0.92em; line-height: 1.55; }
+  .source-note { margin-top: 10px; }
+  .source-badge { display: inline-block; font-size: 0.72em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
+  .source-badge.local { border: 1px solid #38bdf8; color: #38bdf8; background: rgba(56,189,248,0.12); }
+  .source-badge.exact { border: 1px solid #22c55e; color: #22c55e; background: rgba(34,197,94,0.12); }
+  .source-badge.partial { border: 1px solid #f59e0b; color: #f59e0b; background: rgba(245,158,11,0.12); }
+  .source-badge.unavailable { border: 1px solid #ef4444; color: #ef4444; background: rgba(239,68,68,0.12); }
   .trend { background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.96em; }
   .trend.muted { color: var(--vscode-descriptionForeground); }
   .model-compare-box { flex: 0 0 auto; min-height: 320px; }
@@ -302,10 +323,12 @@ ${commonStyles()}
 </div>
 
 <div class="disclaimer">
-  <strong>Independent method disclaimer.</strong> This estimator uses the project's own calculation method based on local usage data and publicly available pricing references.
+  <strong>Independent method disclaimer.</strong> This estimator uses the project's own calculation method based on the selected usage source and publicly available pricing references.
   Copilot Usage is an independent community project and is not affiliated with, endorsed by, sponsored by, or approved by Microsoft or GitHub.
   This is not an official Microsoft or GitHub billing calculator and should not be treated as billing, accounting, tax, legal, or financial advice.
 </div>
+
+${sourceModeHtml}
 
 ${noDataBanner}
 
@@ -320,6 +343,9 @@ ${noDataBanner}
     </label>
     <label>Model used most
       <select id="modelSelect" onchange="setSetting('selectedModelId', this.value)">${modelOptions}</select>
+    </label>
+    <label>Usage source
+      <select id="usageSourceSelect" onchange="setSetting('usageSource', this.value)">${usageSourceOptions}</select>
     </label>
     <label>Extra budget per month (USD)
       <input id="budgetInput" type="number" min="0" step="1" value="${s.extraBudgetUsd}" onchange="setSetting('extraBudgetUsd', this.value)">
@@ -345,14 +371,19 @@ ${trendHtml}
 
 <div class="kpi-row">
   ${kpi('Estimated monthly cost', '$' + c.estimatedMonthlyUsd.toFixed(2), `${fmt(c.estimatedMonthlyCredits)} AI Credits @ ${esc(c.modelDisplayName)}`)}
-  ${kpi('Observed input tokens', fmt(u.observedInputTokens), observedWindowSub)}
+  ${kpi(isMeteredMode ? 'Observed non-cached input tokens' : 'Observed input tokens', fmt(u.observedInputTokens), observedWindowSub)}
   ${kpi('Observed output tokens', fmt(u.observedOutputTokens), observedWindowSub)}
   ${kpi('Projected monthly tokens', fmt(u.monthlyInputTokens + u.monthlyOutputTokens), 'normalized to 30 days')}
 </div>
 
-<div class="disclaimer">
+${isMeteredMode
+    ? `<div class="disclaimer">
+  <strong>Metered cache handling.</strong> Debug logs provide cached token counts. Because metered input already includes cached tokens, this estimator separates cached tokens from input before pricing to avoid double-counting.
+  Cache write tokens are still unavailable in debug logs, so costs can still vary from final billing.
+</div>`
+    : `<div class="disclaimer">
   <strong>Cache token data not yet tracked.</strong> Cached input and cache write tokens are billed separately by GitHub but are not currently captured by this extension. The numbers above use only prompt + output tokens, which means actual costs may be slightly higher (or lower, if caching reduces input billing).
-</div>
+</div>`}
 
 <div class="table-box model-compare-box">
   <h3>Model comparison — projected monthly cost (${state.comparisonCosts.length} models)</h3>
@@ -401,6 +432,48 @@ function openSettings() { vscode.postMessage({ command: 'openSettings' }); }
 function kpi(label: string, value: string, sub?: string): string {
   const subHtml = sub ? `<div class="sub">${esc(sub)}</div>` : '';
   return `<div class="kpi"><div class="value">${esc(value)}</div><div class="label">${esc(label)}</div>${subHtml}</div>`;
+}
+
+function renderUsageSourceMessage(source: CostUsageSource, metered?: MeteredModeStatus): string {
+  if (source === 'local') {
+    return `<div class="disclaimer source-note"><strong>Source mode:</strong> Local counts from chatSessions request logs.
+      <span class="source-badge local">Local</span>
+      This reflects request-level usage visible to you and may differ from Copilot-billed internal rounds.</div>`;
+  }
+
+  const status = metered ?? {
+    available: false,
+    rounds: 0,
+    userMessages: 0,
+    coverage: 0,
+    confidence: 'unavailable' as const,
+    note: 'Metered usage status is unavailable.',
+  };
+
+  const badgeClass = status.confidence;
+  const badgeText = status.confidence === 'exact'
+    ? 'Metered exact'
+    : status.confidence === 'partial'
+      ? 'Metered partial'
+      : 'Metered unavailable';
+
+  const coveragePct = (status.coverage * 100).toFixed(1);
+  const availabilityText = status.available
+    ? `${fmt(status.rounds)} llm_request rounds parsed in this window`
+    : 'No metered rounds available in this window';
+
+  const note = status.note ? ` ${esc(status.note)}` : '';
+
+  return `<div class="disclaimer source-note"><strong>Source mode:</strong> Metered debug-log view from llm_request rows.
+    <span class="source-badge ${esc(badgeClass)}">${esc(badgeText)}</span>
+    ${esc(availabilityText)} with ${coveragePct}% credit coverage.${note}</div>`;
+}
+
+function noDataMessageForSource(source: CostUsageSource): string {
+  if (source === 'metered') {
+    return 'No metered debug-log rows were found for this window. Switch to Local counts mode or use Copilot chat first to generate debug-log activity.';
+  }
+  return 'No Copilot session data found yet. Use the model comparison table below to explore typical pricing for sample workloads, then come back after you\'ve used Copilot for a few days for personalized estimates.';
 }
 
 function observedWindowSubtitle(usage: UsageEstimate): string {

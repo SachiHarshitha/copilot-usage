@@ -7,6 +7,7 @@
  */
 
 import { readXlsx, writeXlsx, readPart, writePart, XlsxParts } from './xlsxPackage';
+import { normalizeTemplate } from './normalizeTemplate';
 import {
   CellValue,
   RowValues,
@@ -65,17 +66,38 @@ const DAILY: DataSheetSpec = {
   hasTotalRow: false,
 };
 
+const MODELS_METERED_HEADERS: RowValues = {
+  I: { kind: 'text', value: 'Metered Rounds' },
+  J: { kind: 'text', value: 'Metered Input Tokens' },
+  K: { kind: 'text', value: 'Metered Output Tokens' },
+  L: { kind: 'text', value: 'Metered Cached Tokens' },
+  M: { kind: 'text', value: 'Metered Credits' },
+  N: { kind: 'text', value: 'Metered Coverage %' },
+};
+
+const DAILY_METERED_HEADERS: RowValues = {
+  I: { kind: 'text', value: 'Metered Rounds' },
+  J: { kind: 'text', value: 'Metered Input Tokens' },
+  K: { kind: 'text', value: 'Metered Output Tokens' },
+  L: { kind: 'text', value: 'Metered Cached Tokens' },
+  M: { kind: 'text', value: 'Metered Credits' },
+  N: { kind: 'text', value: 'Metered Coverage %' },
+};
+
 const text = (value: string): CellValue => ({ kind: 'text', value });
 const num = (value: number): CellValue => ({ kind: 'number', value });
 const cached = (value: number): CellValue => ({ kind: 'cached', value });
 const formula = (f: string, result: number): CellValue => ({ kind: 'formula', formula: f, cached: result });
+
+/** Metered columns are blanked when no metered data exists, so template samples cannot show up. */
+const BLANK_METERED: RowValues = { I: { kind: 'blank' }, J: { kind: 'blank' }, K: { kind: 'blank' }, L: { kind: 'blank' }, M: { kind: 'blank' }, N: { kind: 'blank' } };
 
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 
 function maxRowNumber(sheetXml: string): number {
-  const rows = sheetXml.match(/<x:row r="(\d+)"/g) ?? [];
+  const rows = sheetXml.match(/<(?:x:)?row r="(\d+)"/g) ?? [];
   return rows.reduce((max, tag) => Math.max(max, Number(tag.match(/\d+/)![0])), 0);
 }
 
@@ -109,6 +131,7 @@ function writeDataSheet(
   rowCount: number,
   buildRow: (index: number, rowNumber: number, lastDataRow: number) => RowValues,
   totals: RowValues,
+  headerValues: RowValues = {},
 ): { lastDataRow: number } {
   const sheetXml = readPart(parts, spec.sheetPart);
   const tableXml = readPart(parts, spec.tablePart);
@@ -125,7 +148,12 @@ function writeDataSheet(
 
   const out: string[] = [];
   for (let row = 1; row <= range.headerRow; row++) {
-    out.push(findRow(sheetXml, row));
+    const templateRow = findRow(sheetXml, row);
+    if (row === range.headerRow && Object.keys(headerValues).length > 0) {
+      out.push(renderRow(templateRow, row, headerValues));
+    } else {
+      out.push(templateRow);
+    }
   }
   for (let index = 0; index < count; index++) {
     const rowNumber = firstDataRow + index;
@@ -145,7 +173,7 @@ function writeDataSheet(
 
   let patched = replaceSheetData(sheetXml, out.join(''));
   patched = patched.replace(
-    /(<x:conditionalFormatting sqref="[A-Z]+)(\d+)(:[A-Z]+)\d+"/g,
+    /(<(?:x:)?conditionalFormatting sqref="[A-Z]+)(\d+)(:[A-Z]+)\d+"/g,
     (_match, head: string, start: string, mid: string) => `${head}${start}${mid}${lastDataRow}"`,
   );
   writePart(parts, spec.sheetPart, patched);
@@ -165,18 +193,19 @@ function writeDataSheet(
 /** Repoint every chart series that reads `sheetName` at the given row window. */
 function patchChartRanges(parts: XlsxParts, windows: Map<string, { start: number; end: number }>): void {
   for (const partName of Object.keys(parts)) {
-    if (!partName.startsWith('xl/drawings/charts/') || !partName.endsWith('.xml')) {
+    // Excel stores charts under xl/charts/; the authored template used xl/drawings/charts/.
+    if (!/^xl\/(?:drawings\/)?charts\/chart\d+\.xml$/.test(partName)) {
       continue;
     }
     const chartXml = readPart(parts, partName);
     const patched = chartXml.replace(
-      /='([A-Za-z]+)'!\$([A-Z]+)\$\d+:\$([A-Z]+)\$\d+/g,
-      (match, sheetName: string, startCol: string, endCol: string) => {
+      /('?)([A-Za-z][A-Za-z0-9_ ]*?)\1!\$([A-Z]+)\$\d+:\$([A-Z]+)\$\d+/g,
+      (match, quote: string, sheetName: string, startCol: string, endCol: string) => {
         const window = windows.get(sheetName);
         if (!window) {
           return match;
         }
-        return `='${sheetName}'!$${startCol}$${window.start}:$${endCol}$${window.end}`;
+        return `${quote}${sheetName}${quote}!$${startCol}$${window.start}:$${endCol}$${window.end}`;
       },
     );
     writePart(parts, partName, patched);
@@ -244,6 +273,7 @@ function writeDashboardSheet(parts: XlsxParts, model: ReportModel, dailyRows: nu
     sheetXml,
     'A55',
     `${chartNote} Model, repository and workspace charts rank the top ${TOP_N_CHART_ROWS} rows by total tokens.`
+    + ' Models and DailyData include metered columns when debug-log coverage is available.'
     + ' Aggregate counts only — no prompt text or source code is included.',
   );
 
@@ -254,15 +284,36 @@ function writeDashboardSheet(parts: XlsxParts, model: ReportModel, dailyRows: nu
 
 export function buildExcelReport(templateBytes: Uint8Array, model: ReportModel): Uint8Array {
   const parts = readXlsx(templateBytes);
+  normalizeTemplate(parts);
 
   const modelTokens = sum(model.models.map(m => m.promptTokens + m.outputTokens));
+  const meteredModelRounds = sum(model.models.map(m => m.meteredRounds ?? 0));
+  const meteredModelInput = sum(model.models.map(m => m.meteredInputTokens ?? 0));
+  const meteredModelOutput = sum(model.models.map(m => m.meteredOutputTokens ?? 0));
+  const meteredModelCached = sum(model.models.map(m => m.meteredCachedTokens ?? 0));
+  const meteredModelCredits = sum(model.models.map(m => m.meteredCredits ?? 0));
+  const meteredModelCoveragePct = meteredModelRounds > 0
+    ? model.models.reduce((acc, m) => acc + ((m.meteredCoveragePct ?? 0) * (m.meteredRounds ?? 0)), 0) / meteredModelRounds
+    : 0;
+  const hasMeteredModels = model.models.some(m => m.meteredRounds !== undefined);
+
   const models = writeDataSheet(parts, MODELS, model.models.length, (index, row, last) => {
     const m = model.models[index];
     if (!m) {
-      return { A: text('—'), B: num(0), C: num(0), D: num(0), E: formula(`C${row}+D${row}`, 0), F: num(0), G: num(0), H: formula(`E${row}/SUM($E$5:$E$${last})`, 0) };
+      return {
+        A: text('—'),
+        B: num(0),
+        C: num(0),
+        D: num(0),
+        E: formula(`C${row}+D${row}`, 0),
+        F: num(0),
+        G: num(0),
+        H: formula(`E${row}/SUM($E$5:$E$${last})`, 0),
+        ...BLANK_METERED,
+      };
     }
     const tokens = m.promptTokens + m.outputTokens;
-    return {
+    const rowValues: RowValues = {
       A: text(m.model),
       B: num(m.requests),
       C: num(m.promptTokens),
@@ -271,7 +322,17 @@ export function buildExcelReport(templateBytes: Uint8Array, model: ReportModel):
       F: num(m.premiumUnits),
       G: num(m.credits),
       H: formula(`E${row}/SUM($E$5:$E$${last})`, modelTokens > 0 ? tokens / modelTokens : 0),
+      ...BLANK_METERED,
     };
+
+    if (m.meteredRounds !== undefined) { rowValues.I = num(m.meteredRounds); }
+    if (m.meteredInputTokens !== undefined) { rowValues.J = num(m.meteredInputTokens); }
+    if (m.meteredOutputTokens !== undefined) { rowValues.K = num(m.meteredOutputTokens); }
+    if (m.meteredCachedTokens !== undefined) { rowValues.L = num(m.meteredCachedTokens); }
+    if (m.meteredCredits !== undefined) { rowValues.M = num(m.meteredCredits); }
+    if (m.meteredCoveragePct !== undefined) { rowValues.N = num(m.meteredCoveragePct); }
+
+    return rowValues;
   }, {
     B: cached(sum(model.models.map(m => m.requests))),
     C: cached(sum(model.models.map(m => m.promptTokens))),
@@ -280,7 +341,17 @@ export function buildExcelReport(templateBytes: Uint8Array, model: ReportModel):
     F: cached(sum(model.models.map(m => m.premiumUnits))),
     G: cached(sum(model.models.map(m => m.credits))),
     H: cached(model.models.length > 0 ? 1 : 0),
-  });
+    ...(hasMeteredModels
+      ? {
+        I: num(meteredModelRounds),
+        J: num(meteredModelInput),
+        K: num(meteredModelOutput),
+        L: num(meteredModelCached),
+        M: num(meteredModelCredits),
+        N: num(meteredModelCoveragePct),
+      }
+      : BLANK_METERED),
+  }, MODELS_METERED_HEADERS);
 
   const repoTokens = sum(model.repos.map(r => r.promptTokens + r.outputTokens));
   const repos = writeDataSheet(parts, REPOS, model.repos.length, (index, row, last) => {
@@ -341,9 +412,19 @@ export function buildExcelReport(templateBytes: Uint8Array, model: ReportModel):
   const daily = writeDataSheet(parts, DAILY, model.daily.length, (index) => {
     const d = model.daily[index];
     if (!d) {
-      return { A: num(0), B: num(0), C: num(0), D: num(0), E: num(0), F: num(0), G: num(0), H: num(0) };
+      return {
+        A: num(0),
+        B: num(0),
+        C: num(0),
+        D: num(0),
+        E: num(0),
+        F: num(0),
+        G: num(0),
+        H: num(0),
+        ...BLANK_METERED,
+      };
     }
-    return {
+    const rowValues: RowValues = {
       A: num(excelSerialDate(d.date)),
       B: num(d.requests),
       C: num(d.promptTokens),
@@ -352,8 +433,18 @@ export function buildExcelReport(templateBytes: Uint8Array, model: ReportModel):
       F: num(d.premiumUnits),
       G: num(d.credits),
       H: num(d.sessions),
+      ...BLANK_METERED,
     };
-  }, {});
+
+    if (d.meteredRounds !== undefined) { rowValues.I = num(d.meteredRounds); }
+    if (d.meteredInputTokens !== undefined) { rowValues.J = num(d.meteredInputTokens); }
+    if (d.meteredOutputTokens !== undefined) { rowValues.K = num(d.meteredOutputTokens); }
+    if (d.meteredCachedTokens !== undefined) { rowValues.L = num(d.meteredCachedTokens); }
+    if (d.meteredCredits !== undefined) { rowValues.M = num(d.meteredCredits); }
+    if (d.meteredCoveragePct !== undefined) { rowValues.N = num(d.meteredCoveragePct); }
+
+    return rowValues;
+  }, {}, DAILY_METERED_HEADERS);
 
   const topN = (last: number) => ({ start: 5, end: Math.max(5, Math.min(4 + TOP_N_CHART_ROWS, last)) });
   patchChartRanges(parts, new Map([
