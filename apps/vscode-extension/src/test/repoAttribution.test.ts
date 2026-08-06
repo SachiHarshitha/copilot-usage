@@ -229,7 +229,55 @@ suite('Repo attribution', () => {
     assert.strictEqual(idle?.requests, 0);
     assert.strictEqual(idle?.promptTokens, 0);
     assert.strictEqual(idle?.outputTokens, 0);
+    assert.strictEqual(idle?.credits, 0);
     assert.strictEqual(idle?.topModel, '–');
+  });
+
+  test('credits are split by the same weights as tokens and conserve the total', () => {
+    const repos: RepoDescriptor[] = [
+      {
+        id: 'repo-a',
+        workspaceId: 'ws-1',
+        workspacePath: 'c:/workspace/root',
+        rootPath: 'c:/workspace/repo-a',
+        displayName: 'owner/repo-a',
+      },
+      {
+        id: 'repo-b',
+        workspaceId: 'ws-1',
+        workspacePath: 'c:/workspace/root',
+        rootPath: 'c:/workspace/repo-b',
+        displayName: 'owner/repo-b',
+      },
+    ];
+
+    // One request touching both repos, so its credits must be shared, not duplicated.
+    const events: RequestEvent[] = [
+      {
+        chatSessionId: 's1',
+        requestIndex: 0,
+        timestampMs: Date.UTC(2026, 0, 15),
+        modelId: 'copilot/gpt-4.1',
+        promptTokens: 1000,
+        outputTokens: 200,
+        toolCallRounds: 0,
+        tokensEstimated: false,
+        workspaceId: 'ws-1',
+        workspacePath: 'c:/workspace/root',
+        evidencePaths: ['c:/workspace/repo-a/src/a.ts', 'c:/workspace/repo-b/src/b.ts'],
+      },
+    ];
+
+    const stats = computeRepoAttributionStats(events, repos);
+    const distributed = stats.rows.reduce((sum, row) => sum + row.credits, 0);
+
+    assert.ok(stats.rows.every(r => r.credits > 0), 'every touched repo should receive credits');
+    const single = computeRepoAttributionStats(events, [repos[0]]);
+    const wholeRequest = single.rows.reduce((sum, row) => sum + row.credits, 0);
+    assert.ok(
+      Math.abs(distributed - wholeRequest) < 1e-6,
+      `credits were not conserved across repos: ${distributed} vs ${wholeRequest}`,
+    );
   });
 });
 

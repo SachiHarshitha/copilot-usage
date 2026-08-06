@@ -43,13 +43,40 @@ suite('Cost Estimator: model pricing coverage', () => {
     assert.strictEqual(MODEL_PRICING['mai-code-1-flash'].provider, 'Microsoft');
   });
 
+  test('covers the 2026-08-06 pricing table additions', () => {
+    // GPT-5.6 family — the first OpenAI models with a cache write cost.
+    for (const id of ['gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.6-sol']) {
+      assert.ok(MODEL_PRICING[id], `${id} missing`);
+      assert.ok(MODEL_PRICING[id].cacheWritePerMillion, `${id} should price cache writes`);
+    }
+
+    assert.strictEqual(MODEL_PRICING['gpt-5.6-luna'].outputPerMillion, 1.2);
+    assert.strictEqual(MODEL_PRICING['gpt-5.6-terra'].outputPerMillion, 12);
+    assert.strictEqual(MODEL_PRICING['gpt-5.6-sol'].outputPerMillion, 30);
+
+    assert.strictEqual(MODEL_PRICING['claude-opus-5'].outputPerMillion, 25);
+    assert.strictEqual(MODEL_PRICING['claude-sonnet-5'].inputPerMillion, 2);
+    assert.strictEqual(MODEL_PRICING['gemini-3.6-flash'].outputPerMillion, 7.5);
+    assert.strictEqual(MODEL_PRICING['grok-4.5'].outputPerMillion, 6);
+
+    // New Moonshot AI provider
+    assert.strictEqual(MODEL_PRICING['kimi-k2.7-code'].provider, 'Moonshot AI');
+    assert.strictEqual(MODEL_PRICING['kimi-k2.7-code'].outputPerMillion, 4);
+  });
+
+  test('Claude Sonnet 4 is still listed as GA by GitHub', () => {
+    assert.strictEqual(MODEL_PRICING['claude-sonnet-4'].releaseStatus, 'GA');
+    assert.strictEqual(MODEL_PRICING['claude-sonnet-4'].retiredDate, undefined);
+  });
+
   test('marks retired models with status, date, and (where known) successor', () => {
     const retired: Record<string, string | undefined> = {
       'gpt-4.1': 'gpt-5.5',
       'gpt-5.2': 'gpt-5.5',
       'gpt-5.2-codex': 'gpt-5.3-codex',
       'grok-code-fast-1': 'gpt-5-mini',
-      'claude-sonnet-4': 'claude-sonnet-4.6',
+      'gemini-2.5-pro': 'gemini-3.1-pro',
+      'gemini-3-flash': 'gemini-3.5-flash',
       'goldeneye': undefined,
     };
     for (const [id, successor] of Object.entries(retired)) {

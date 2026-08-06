@@ -116,6 +116,9 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand('copilot-usage.dashboard', () =>
 			DashboardPanel.createOrShow(context.extensionUri),
 		),
+		vscode.commands.registerCommand('copilot-usage.exportExcelReport', () =>
+			DashboardPanel.exportReport(context.extensionUri),
+		),
 		vscode.commands.registerCommand('copilot-usage.refresh', () =>
 			refreshAllAndTrack(),
 		),

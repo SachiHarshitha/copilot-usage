@@ -5,6 +5,8 @@ import { findCurrentWorkspace, discoverWorkspaces, getWorkspaceStorageRoots } fr
 import { parseAllFiles, flattenEvents, computeKpis, computeModelStats, computeDailyStats, computeWorkspaceStats } from '../core/aggregator';
 import { loadCreditRates } from '../core/credits';
 import { computeRepoAttributionStats, discoverRepoDescriptors, RepoAttributionStats } from '../core/repoAttribution';
+import { DashboardSnapshot } from '../export/reportModel';
+import { runDashboardReportExport } from '../export/exportCommand';
 import { enableCostEstimator } from '../features/costEstimator/flags';
 import {
   didAffectCopilotDebugLogSetting,
@@ -114,9 +116,9 @@ export class WorkspacePanel {
     const rates = await loadCreditRates();
     const kpis = computeKpis(parsed, events, rates);
     const models = computeModelStats(events, rates);
-    const daily = computeDailyStats(events);
+    const daily = computeDailyStats(events, rates);
     const repos = await discoverRepoDescriptors([ws], folderPaths);
-    const repoStats = computeRepoAttributionStats(events, repos, { includeEmptyRepos: true });
+    const repoStats = computeRepoAttributionStats(events, repos, { includeEmptyRepos: true, rates });
 
     this.setHtml(getWorkspaceHtml(kpis, models, daily, ws.workspacePath, undefined, false, autoRefreshSeconds, monthsCovered(dateRange, events), showDebugLogBanner, repoStats));
   }
@@ -137,6 +139,9 @@ export class DashboardPanel {
   private readonly panel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
   private disposed = false;
+  /** The data currently rendered, kept so an export can never disagree with the screen. */
+  private snapshot?: DashboardSnapshot;
+  private dateRangeLabel = 'all';
 
   private constructor(panel: vscode.WebviewPanel, private extensionUri: vscode.Uri) {
     this.panel = panel;
@@ -146,6 +151,7 @@ export class DashboardPanel {
       async (msg) => {
         if (msg.command === 'refresh') { this.showLoading(); await this.loadData(); }
         if (msg.command === 'openWorkspace') { await WorkspacePanel.createOrShow(this.extensionUri); }
+        if (msg.command === 'exportReport') { await this.exportReport(); }
         if (msg.command === 'openCostEstimator' && enableCostEstimator) {
           await vscode.commands.executeCommand('copilot-usage.costEstimator');
         }
@@ -195,6 +201,20 @@ export class DashboardPanel {
     await DashboardPanel.currentPanel.loadData();
   }
 
+  /** Open (or reuse) the dashboard, then export what it is showing. */
+  public static async exportReport(extensionUri: vscode.Uri): Promise<void> {
+    await DashboardPanel.createOrShow(extensionUri);
+    await DashboardPanel.currentPanel?.exportReport();
+  }
+
+  private async exportReport(): Promise<void> {
+    if (!this.snapshot) {
+      await vscode.window.showInformationMessage('No Copilot usage data to export yet.');
+      return;
+    }
+    await runDashboardReportExport(this.extensionUri, this.snapshot, this.dateRangeLabel);
+  }
+
   private setHtml(html: string): void {
     if (!this.disposed) { this.panel.webview.html = html; }
   }
@@ -211,6 +231,7 @@ export class DashboardPanel {
 
     const workspaces = await discoverWorkspaces(DashboardPanel.storageRoots ?? getWorkspaceStorageRoots(vscode.env.appName));
     if (workspaces.length === 0) {
+      this.snapshot = undefined;
       this.setHtml(getDashboardHtml(undefined, undefined, undefined, undefined, 'No Copilot session data found.', autoRefreshSeconds, 0, showDebugLogBanner));
       return;
     }
@@ -221,11 +242,14 @@ export class DashboardPanel {
     const rates = await loadCreditRates();
     const kpis = computeKpis(parsed, events, rates);
     const models = computeModelStats(events, rates);
-    const daily = computeDailyStats(events);
+    const daily = computeDailyStats(events, rates);
 
     const wsStats = computeWorkspaceStats(parsed, events, rates);
     const repos = await discoverRepoDescriptors(workspaces);
-    const repoStats = computeRepoAttributionStats(events, repos);
+    const repoStats = computeRepoAttributionStats(events, repos, { rates });
+
+    this.dateRangeLabel = dateRange;
+    this.snapshot = { kpis, models, workspaces: wsStats, repos: repoStats, daily };
 
     this.setHtml(getDashboardHtml(kpis, models, daily, wsStats, undefined, autoRefreshSeconds, monthsCovered(dateRange, events), showDebugLogBanner, repoStats));
   }
@@ -350,6 +374,7 @@ ${commonStyles()}
     <button class="btn btn-star" onclick="starGitHub()" title="Star on GitHub">⭐</button>
     <button class="btn btn-secondary" onclick="openWorkspace()" title="Open Workspace View">📂</button>
     ${enableCostEstimator ? `<button class="btn btn-secondary" onclick="openCostEstimator()" title="Open Cost Estimator (Preview)">💵</button>` : ''}
+    <button class="btn btn-secondary" onclick="exportReport()" title="Download Excel Report" aria-label="Download Excel Report">${excelIcon()}</button>
     <button class="btn" onclick="refresh()" title="Refresh data">↻</button>
     <button class="btn btn-secondary" onclick="openSettings()" title="Settings">⚙</button>
   </div>
@@ -397,6 +422,7 @@ const vscode = acquireVsCodeApi();
 function refresh() { vscode.postMessage({ command: 'refresh' }); }
 function openWorkspace() { vscode.postMessage({ command: 'openWorkspace' }); }
 function openCostEstimator() { vscode.postMessage({ command: 'openCostEstimator' }); }
+function exportReport() { vscode.postMessage({ command: 'exportReport' }); }
 function starGitHub() { vscode.postMessage({ command: 'openGitHub' }); }
 function openSettings() { vscode.postMessage({ command: 'openSettings' }); }
 function openDebugLogSettings() { vscode.postMessage({ command: 'openDebugLogSettings' }); }
@@ -419,6 +445,7 @@ function commonStyles(): string {
   .header-actions { display: flex; gap: 8px; align-items: center; }
   .btn { background: var(--vscode-button-background, #2563eb); color: var(--vscode-button-foreground, #fff); border: none; padding: 0; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; font-size: 1.05em; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
   .btn:hover { opacity: 0.85; }
+  .btn svg { width: 16px; height: 16px; display: block; }
   .btn-secondary { background: var(--vscode-button-secondaryBackground, #334155); color: var(--vscode-button-secondaryForeground, #e2e8f0); }
   .btn-star { background: transparent; border: 1px solid #e3b341; color: #e3b341; }
   .btn-star:hover { background: rgba(227,179,65,0.15); opacity: 1; }
@@ -570,6 +597,14 @@ function shortPath(p: string): string {
 
 function headerIcon(): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="lens" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#58a6ff" stop-opacity="0.08"/><stop offset="100%" stop-color="#58a6ff" stop-opacity="0.02"/></linearGradient></defs><circle cx="224" cy="224" r="176" fill="url(#lens)" stroke="#58a6ff" stroke-width="16" stroke-linecap="round"/><line x1="347" y1="347" x2="492" y2="492" stroke="#58a6ff" stroke-width="28" stroke-linecap="round"/><ellipse cx="224" cy="200" rx="120" ry="100" fill="#e6edf3" opacity="0.92"/><rect x="104" y="200" width="240" height="60" rx="10" fill="#e6edf3" opacity="0.92"/><ellipse cx="224" cy="260" rx="120" ry="32" fill="#e6edf3" opacity="0.92"/><rect x="124" y="195" width="200" height="52" rx="20" fill="#0d1117" opacity="0.9"/><circle cx="179" cy="221" r="18" fill="#58a6ff"/><circle cx="269" cy="221" r="18" fill="#58a6ff"/></svg>`;
+}
+
+/** Spreadsheet mark for the report export button. */
+function excelIcon(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">`
+    + `<rect x="1" y="2" width="14" height="12" rx="2" fill="#1d6f42"/>`
+    + `<path d="M5 5.6 11 10.4M11 5.6 5 10.4" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" fill="none"/>`
+    + `</svg>`;
 }
 
 // ── Workspace HTML helper ───────────────────────────────────────────────

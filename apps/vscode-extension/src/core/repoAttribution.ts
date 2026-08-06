@@ -4,6 +4,7 @@ import { promisify } from 'util';
 import * as path from 'path';
 import { RequestEvent, WorkspaceInfo } from './types';
 import { getMultiplier } from './config';
+import { creditsForRequest, CreditRateMap } from './credits';
 
 const execFileAsync = promisify(execFile);
 const NESTED_REPO_SCAN_MAX_DEPTH = 3;
@@ -43,6 +44,7 @@ export interface RepoAttributionRow {
   promptTokens: number;
   outputTokens: number;
   premiumRequests: number;
+  credits: number;
   topModel: string;
 }
 
@@ -311,7 +313,7 @@ function resolveRepoWeights(event: RequestEvent, repos: RepoDescriptor[]): RepoW
 export function computeRepoAttributionStats(
   events: RequestEvent[],
   repos: RepoDescriptor[],
-  options?: { includeEmptyRepos?: boolean },
+  options?: { includeEmptyRepos?: boolean; rates?: CreditRateMap },
 ): RepoAttributionStats {
   const rowsById = new Map<string, RepoAttributionRow>();
   const reposById = new Map<string, RepoDescriptor>(repos.map(repo => [repo.id, repo]));
@@ -382,6 +384,7 @@ export function computeRepoAttributionStats(
       promptTokens: 0,
       outputTokens: 0,
       premiumRequests: 0,
+      credits: 0,
       topModel: '–',
     };
     rowsById.set(repo.id, next);
@@ -395,6 +398,7 @@ export function computeRepoAttributionStats(
     promptTokens: 0,
     outputTokens: 0,
     premiumRequests: 0,
+    credits: 0,
     topModel: '–',
   };
 
@@ -416,6 +420,7 @@ export function computeRepoAttributionStats(
     totalOutputTokens += event.outputTokens;
     const hasTokenUsage = event.promptTokens > 0 || event.outputTokens > 0;
     const premiumRequests = hasTokenUsage ? getMultiplier(event.modelId || '', event.timestampMs) : 0;
+    const credits = creditsForRequest(event.modelId, event.promptTokens, event.outputTokens, options?.rates);
 
     const weights = resolveRepoWeights(event, repos);
     if (weights.length === 0) {
@@ -423,6 +428,7 @@ export function computeRepoAttributionStats(
       unattributed.promptTokens += event.promptTokens;
       unattributed.outputTokens += event.outputTokens;
       unattributed.premiumRequests += premiumRequests;
+      unattributed.credits += credits;
       addModelAttribution(unattributed.id, event, 1);
       continue;
     }
@@ -438,6 +444,7 @@ export function computeRepoAttributionStats(
       row.promptTokens += event.promptTokens * weight.weight;
       row.outputTokens += event.outputTokens * weight.weight;
       row.premiumRequests += premiumRequests * weight.weight;
+      row.credits += credits * weight.weight;
       addModelAttribution(repo.id, event, weight.weight);
     }
   }

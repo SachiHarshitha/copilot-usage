@@ -78,10 +78,12 @@ export function computeModelStats(events: RequestEvent[], rates?: CreditRateMap)
     const modelId = e.modelId || 'unknown';
     let s = map.get(modelId);
     if (!s) {
-      s = { modelId, requests: 0, totalTokens: 0, premium: 0, credits: 0 };
+      s = { modelId, requests: 0, promptTokens: 0, outputTokens: 0, totalTokens: 0, premium: 0, credits: 0 };
       map.set(modelId, s);
     }
     s.requests++;
+    s.promptTokens += e.promptTokens;
+    s.outputTokens += e.outputTokens;
     s.totalTokens += e.promptTokens + e.outputTokens;
     if (e.promptTokens || e.outputTokens) {
       s.premium += getMultiplier(modelId, e.timestampMs);
@@ -153,20 +155,44 @@ export function computeWorkspaceStats(files: ParsedFile[], events: RequestEvent[
 }
 
 /** Compute daily aggregation. */
-export function computeDailyStats(events: RequestEvent[]): DailyStats[] {
+export function computeDailyStats(events: RequestEvent[], rates?: CreditRateMap): DailyStats[] {
   const map = new Map<string, DailyStats>();
+  const sessionsByDate = new Map<string, Set<string>>();
   for (const e of events) {
     if (!e.timestampMs) { continue; }
     const d = new Date(e.timestampMs);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     let s = map.get(key);
     if (!s) {
-      s = { date: key, promptTokens: 0, outputTokens: 0, requests: 0 };
+      s = {
+        date: key,
+        promptTokens: 0,
+        outputTokens: 0,
+        requests: 0,
+        toolCallRounds: 0,
+        premium: 0,
+        credits: 0,
+        sessions: 0,
+      };
       map.set(key, s);
+      sessionsByDate.set(key, new Set<string>());
     }
     s.promptTokens += e.promptTokens;
     s.outputTokens += e.outputTokens;
     s.requests++;
+    s.toolCallRounds += e.toolCallRounds;
+    if (e.promptTokens || e.outputTokens) {
+      s.premium += getMultiplier(e.modelId || '', e.timestampMs);
+    }
+    s.credits += creditsForRequest(e.modelId, e.promptTokens, e.outputTokens, rates);
+    if (e.chatSessionId) {
+      sessionsByDate.get(key)?.add(e.chatSessionId);
+    }
+  }
+  for (const [key, s] of map) {
+    s.premium = Math.round(s.premium * 100) / 100;
+    s.credits = Math.round(s.credits * 100) / 100;
+    s.sessions = sessionsByDate.get(key)?.size ?? 0;
   }
   return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
 }

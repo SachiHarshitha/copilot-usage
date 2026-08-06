@@ -53,6 +53,8 @@ export interface KpiTotals {
 export interface ModelStats {
   modelId: string;
   requests: number;
+  promptTokens: number;
+  outputTokens: number;
   totalTokens: number;
   premium: number;
   credits: number;
@@ -74,4 +76,8 @@ export interface DailyStats {
   promptTokens: number;
   outputTokens: number;
   requests: number;
+  toolCallRounds: number;
+  premium: number;
+  credits: number;
+  sessions: number;       // distinct chat sessions active on this date
 }

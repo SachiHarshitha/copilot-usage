@@ -1,6 +1,6 @@
 /** Types for the Cost Estimator feature. Pure data — no VS Code or DOM imports. */
 
-export type ModelProvider = 'OpenAI' | 'Anthropic' | 'Google' | 'xAI' | 'GitHub' | 'Microsoft';
+export type ModelProvider = 'OpenAI' | 'Anthropic' | 'Google' | 'xAI' | 'GitHub' | 'Microsoft' | 'Moonshot AI';
 
 export type ModelCategory = 'Lightweight' | 'Versatile' | 'Powerful' | 'Preview' | 'Unknown';
 

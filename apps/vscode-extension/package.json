@@ -15,7 +15,10 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": ["onStartupFinished", "onUri"],
+  "activationEvents": [
+    "onStartupFinished",
+    "onUri"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -28,6 +31,11 @@
         "command": "copilot-usage.dashboard",
         "title": "Copilot Usage: Global Dashboard",
         "icon": "$(dashboard)"
+      },
+      {
+        "command": "copilot-usage.exportExcelReport",
+        "title": "Copilot Usage: Export Excel Report",
+        "icon": "$(desktop-download)"
       },
       {
         "command": "copilot-usage.refresh",
@@ -55,7 +63,11 @@
       "properties": {
         "copilot-usage.statusBar.duration": {
           "type": "string",
-          "enum": ["daily", "monthly", "all-time"],
+          "enum": [
+            "daily",
+            "monthly",
+            "all-time"
+          ],
           "enumDescriptions": [
             "Today only — show token counts for the current day",
             "This month — show token counts for the current calendar month (resets on the 1st)",
@@ -66,7 +78,15 @@
         },
         "copilot-usage.workspaceAnalysis.dateRange": {
           "type": "string",
-          "enum": ["today", "7d", "30d", "3m", "mtd", "ytd", "all"],
+          "enum": [
+            "today",
+            "7d",
+            "30d",
+            "3m",
+            "mtd",
+            "ytd",
+            "all"
+          ],
           "enumDescriptions": [
             "Today",
             "Last 7 days",
@@ -81,7 +101,13 @@
         },
         "copilot-usage.workspaceAnalysis.autoRefreshSeconds": {
           "type": "number",
-          "enum": [0, 30, 60, 120, 300],
+          "enum": [
+            0,
+            30,
+            60,
+            120,
+            300
+          ],
           "enumDescriptions": [
             "Off",
             "Every 30 seconds",
@@ -94,7 +120,15 @@
         },
         "copilot-usage.dashboard.dateRange": {
           "type": "string",
-          "enum": ["today", "7d", "30d", "3m", "mtd", "ytd", "all"],
+          "enum": [
+            "today",
+            "7d",
+            "30d",
+            "3m",
+            "mtd",
+            "ytd",
+            "all"
+          ],
           "enumDescriptions": [
             "Today",
             "Last 7 days",
@@ -109,7 +143,13 @@
         },
         "copilot-usage.dashboard.autoRefreshSeconds": {
           "type": "number",
-          "enum": [0, 30, 60, 120, 300],
+          "enum": [
+            0,
+            30,
+            60,
+            120,
+            300
+          ],
           "enumDescriptions": [
             "Off",
             "Every 30 seconds",
@@ -119,6 +159,11 @@
           ],
           "default": 0,
           "description": "Auto-refresh interval for the Global Dashboard panel in seconds. Set to 0 to disable."
+        },
+        "copilot-usage.export.shortenWorkspacePaths": {
+          "type": "boolean",
+          "default": true,
+          "description": "Shorten workspace and repository paths in the exported Excel report to the last two folder segments."
         }
       }
     }
@@ -138,18 +183,19 @@
     "test": "vscode-test"
   },
   "dependencies": {
-    "@copilot-usage/shared-schema": "file:../../../promptstreak/packages/shared-schema"
+    "@copilot-usage/shared-schema": "file:../../../promptstreak/packages/shared-schema",
+    "fflate": "^0.8.3"
   },
   "devDependencies": {
-    "@types/vscode": "^1.100.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.56.1",
-    "eslint": "^9.39.3",
+    "@types/vscode": "^1.100.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.27.3",
+    "eslint": "^9.39.3",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "typescript-eslint": "^8.56.1"
   }
 }
